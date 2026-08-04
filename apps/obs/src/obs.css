@@ -1,0 +1,43 @@
+/*
+ * OBS-specific chrome.
+ *
+ * The overlay body stays transparent so the browser source composites over
+ * gameplay with no letterbox. Do not add a background colour here — set one
+ * with a Color Correction filter in OBS if you want a backing plate.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body.overlay {
+  background: transparent;
+  padding: 8px;
+  /* `?scale=` on the browser source URL sizes the whole overlay at once. */
+  transform: scale(var(--overlay-scale, 1));
+  transform-origin: top left;
+}
+
+body.dock {
+  background: #101218;
+  color: #e8e8ef;
+  padding: 8px;
+}
+
+body.dock #controls {
+  margin-block-end: 8px;
+}
+
+/* OBS docks are narrow; let the overworld grid shrink rather than clip. */
+body.dock .z1r-map {
+  gap: 1px;
+}
+
+body.dock .z1r-item-grid {
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+}

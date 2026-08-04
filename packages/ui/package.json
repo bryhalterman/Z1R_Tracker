@@ -1,0 +1,16 @@
+{
+  "name": "@z1r/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Framework-free rendering layer shared by the web, desktop and OBS builds.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "@z1r/core": "0.1.0"
+  }
+}

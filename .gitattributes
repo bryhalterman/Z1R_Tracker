@@ -1,0 +1,17 @@
+# Normalise to LF in the repository; check out with native endings on Windows.
+* text=auto
+
+# Shell scripts must keep LF even on a Windows checkout — a CRLF shebang makes
+# the file unrunnable on macOS and Linux ("bad interpreter: /usr/bin/env sh^M").
+*.sh text eol=lf
+
+# Batch files are the mirror image: cmd.exe wants CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Never mangle binaries, in case sprite art is ever vendored locally.
+*.png binary
+*.gif binary
+*.jpg binary
+*.webp binary
+*.ico binary

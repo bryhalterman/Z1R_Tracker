@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and publish
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build downloadable targets
+        run: |
+          npm run build:desktop
+          npm run build:obs
+
+      - name: Package
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          mkdir -p release
+          # LICENSE travels with the zips — they're distributed on their own.
+          cp LICENSE apps/desktop/dist/
+          cp LICENSE apps/obs/dist/
+          cp docs/OBS.md apps/obs/dist/README.md
+          (cd apps/desktop/dist && zip -r "../../../release/Z1R_Tracker-desktop-$TAG.zip" .)
+          (cd apps/obs/dist && zip -r "../../../release/Z1R_Tracker-obs-$TAG.zip" .)
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: release/*.zip
+          generate_release_notes: true
+          body: |
+            ### Downloads
+
+            - **`Z1R_Tracker-desktop-*.zip`** — unzip and open `index.html`. Run `start.cmd`
+              (Windows) or `start.sh` (macOS/Linux) instead to get offline sprite caching.
+            - **`Z1R_Tracker-obs-*.zip`** — add `index.html` as a Browser Source and `dock.html`
+              as a Custom Browser Dock. See the included `README.md`.
+
+            The web version runs at https://bryhalterman.github.io/Z1R_Tracker/ with nothing to install.

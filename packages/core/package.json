@@ -1,0 +1,13 @@
+{
+  "name": "@z1r/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Game model, tracker state, logic rules and sprite resolution shared by every Z1R_Tracker build target.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sprites/manifest.json": "./src/sprites/manifest.json"
+  }
+}

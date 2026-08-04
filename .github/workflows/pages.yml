@@ -1,0 +1,61 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Read-only source access; the deploy uses the Pages OIDC token instead of a PAT.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let an in-flight deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build web
+        run: npm run build:web
+
+      # The OBS pages ship alongside so a streamer can point OBS at a URL
+      # instead of a local checkout. Their base is relative, so a subpath works.
+      - name: Build OBS
+        run: npm run build:obs
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r apps/web/dist/. _site/
+          mkdir -p _site/obs
+          cp -r apps/obs/dist/. _site/obs/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

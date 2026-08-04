@@ -1,0 +1,17 @@
+{
+  "name": "@z1r/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Static GitHub Pages build of Z1R_Tracker.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@z1r/core": "0.1.0",
+    "@z1r/ui": "0.1.0"
+  }
+}

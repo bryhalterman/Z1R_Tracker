@@ -1,0 +1,12 @@
+{
+  "name": "Z1R Tracker",
+  "short_name": "Z1R",
+  "description": "Item, dungeon and overworld tracker for The Legend of Zelda and Zelda 1 Randomizer.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101218",
+  "theme_color": "#101218",
+  "orientation": "any",
+  "icons": []
+}

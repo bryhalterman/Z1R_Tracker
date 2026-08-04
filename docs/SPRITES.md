@@ -1,0 +1,114 @@
+# Sprites
+
+## Why there's no art in this repo
+
+Two reasons, one practical and one legal.
+
+Practical: three build targets need the same art, and a streamer will want to swap art packs without
+rebuilding anything. Indirection through a manifest gives both for free.
+
+Legal: the sprites are Nintendo's. Redistributing them in a public MIT-licensed repo would be
+relicensing work that isn't ours to relicense. Pointing at a URL doesn't.
+
+## How resolution works
+
+`packages/core/src/sprites/manifest.json` maps a **logical key** to an entry:
+
+```json
+"item.sword.wood": { "url": "https://example.com/sword.png", "name": "Wooden Sword", "glyph": "SW" }
+```
+
+Renderers never see a URL. They call `resolver.resolve('item.sword.wood')` and get one of three
+things back:
+
+| Result | When | Rendered as |
+| --- | --- | --- |
+| `image` | `url` is set | `background-image`, pixelated |
+| `sheet` | `sheet` + `rect` are set | the sheet, offset to the region |
+| `glyph` | neither is set | the `glyph` letters in a dashed box |
+
+An image that fails to load — dead host, hotlink blocking, offline — **downgrades to its glyph** at
+runtime rather than leaving an empty cell. That is the single most important property of this layer:
+a tracker that quietly loses half its icons mid-run is worse than one showing letters.
+
+## Filling in the manifest
+
+### From a CSV
+
+```bash
+npm run sprites:import -- sprites.csv
+```
+
+Header row required. Recognised columns, case-insensitive:
+
+| Column | Aliases | Required | Notes |
+| --- | --- | --- | --- |
+| `url` | `link`, `src`, `href` | yes | Absolute, or relative to `baseUrl` |
+| `key` | `id`, `sprite` | one of | The manifest key — unambiguous, prefer this |
+| `name` | `label` | one of | Matched against existing entry names, case-insensitive |
+| `glyph` | `fallback` | no | 1–3 character fallback |
+
+Rows are **merged**, not replaced. Importing a partial sheet leaves everything else alone, so you
+can fill the manifest in over several passes. A key the manifest doesn't know yet is added rather
+than dropped.
+
+See [`sprites.example.csv`](sprites.example.csv) for the shape.
+
+### By hand
+
+Edit `manifest.json` directly. Set `baseUrl` if all your art lives under one host and you'd rather
+store short paths:
+
+```json
+{ "baseUrl": "https://cdn.example.com/z1r", "sprites": { "item.bow": { "url": "bow.png" } } }
+```
+
+Absolute URLs and `data:` URIs ignore `baseUrl`.
+
+### From a sprite sheet
+
+One remote file, many keys:
+
+```json
+"item.bow": { "name": "Bow", "sheet": "https://example.com/items.png", "rect": [16, 0, 16, 16] }
+```
+
+`rect` is `[x, y, width, height]` in sheet pixels.
+
+## Checking coverage
+
+```bash
+npm run sprites:check
+```
+
+Lists every key still falling back to a glyph. Add `-- --fetch` to HEAD each URL and flag dead
+links; that form exits non-zero on a dead link, so it's safe to wire into CI. Unfilled keys never
+fail the check — a glyph is a valid state, not a build error.
+
+## Overriding at runtime
+
+Each build fetches `sprites.json` from beside its own `index.html` before falling back to the
+bundled manifest. Dropping a `sprites.json` into `apps/web/dist` (or onto the Pages branch) re-skins
+the tracker with no rebuild.
+
+## Choosing a host
+
+Whatever you point at needs to allow hotlinking and send permissive CORS headers — the loader
+requests images with `crossOrigin="anonymous"` so a hostile host can't be handed credentials. Hosts
+that block hotlinking will silently serve a placeholder or 403, and the tracker will show glyphs.
+
+If you control the art, a GitHub Pages branch or any static CDN is the least fragile option.
+
+## Key naming
+
+Dot-separated, most general first:
+
+```
+item.<item>[.<tier>]     item.sword.magical, item.bow
+dungeon.<level>          dungeon.1 … dungeon.9
+mark.<kind>              mark.shop, mark.bombable
+ui.<element>             ui.triforce, ui.compass
+```
+
+Keys are referenced from `items.ts`, `dungeons.ts` and `overworld.ts`. Renaming one means updating
+both the manifest and the definition that points at it.

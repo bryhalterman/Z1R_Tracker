@@ -1,0 +1,9 @@
+key,name,url,glyph
+item.sword.wood,Wooden Sword,https://example.com/z1/sword-wood.png,SW
+item.sword.white,White Sword,https://example.com/z1/sword-white.png,SW
+item.sword.magical,Magical Sword,https://example.com/z1/sword-magical.png,SW
+item.bow,Bow,https://example.com/z1/bow.png,BW
+item.arrow.silver,Silver Arrow,https://example.com/z1/arrow-silver.png,AR
+dungeon.1,Level 1 - Eagle,https://example.com/z1/level-1.png,1
+mark.shop,Shop,https://example.com/z1/shop.png,$
+ui.triforce,Triforce Piece,https://example.com/z1/triforce.png,

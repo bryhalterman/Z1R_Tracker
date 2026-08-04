@@ -1,0 +1,412 @@
+/*
+ * Shared tracker styling.
+ *
+ * Two rendering contexts share this file: a normal page, and an OBS browser
+ * source composited over gameplay. The overlay variant must have a fully
+ * transparent backdrop and heavy text outlines, because it will sit on top of
+ * bright NES colours that no flat background can be tuned against.
+ */
+
+.z1r-tracker {
+  --z1r-bg: #14161c;
+  --z1r-panel: #1c1f28;
+  --z1r-border: #2c3140;
+  --z1r-text: #e8e8ef;
+  --z1r-muted: #8b90a0;
+  --z1r-accent: #d9a441;
+  --z1r-good: #58b368;
+  --z1r-bad: #c34a4a;
+  --z1r-radius: 6px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--z1r-text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ------------------------------------------------------------------ sprites */
+
+.z1r-sprite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--sprite-size, 32px);
+  block-size: var(--sprite-size, 32px);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  /* NES art is tiny; never let the browser smooth it. */
+  image-rendering: pixelated;
+  user-select: none;
+}
+
+.z1r-sprite[data-sprite-mode="glyph"] {
+  font-family: "Consolas", "SF Mono", ui-monospace, monospace;
+  font-size: calc(var(--sprite-size, 32px) * 0.42);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--z1r-muted);
+  background: #23273300;
+  border: 1px dashed var(--z1r-border);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+/* ------------------------------------------------------------------- panels */
+
+.z1r-panel {
+  background: var(--z1r-panel);
+  border: 1px solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  padding: 10px 12px;
+}
+
+.z1r-panel-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--z1r-muted);
+}
+
+/* ------------------------------------------------------------------ summary */
+
+.z1r-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.z1r-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.z1r-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-accent);
+}
+
+.z1r-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--z1r-muted);
+}
+
+.z1r-status {
+  margin-inline-start: auto;
+  font-size: 12px;
+  color: var(--z1r-muted);
+}
+
+.z1r-status[data-ready="true"] {
+  color: var(--z1r-good);
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------------- items */
+
+.z1r-item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 6px;
+}
+
+.z1r-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: #00000033;
+  border: 1px solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+  /* Unobtained items read as silhouettes, the convention every tracker uses. */
+  filter: grayscale(1) brightness(0.45);
+  opacity: 0.6;
+  transition: filter 90ms linear, opacity 90ms linear, border-color 90ms linear;
+}
+
+.z1r-item[data-owned="true"] {
+  filter: none;
+  opacity: 1;
+  border-color: var(--z1r-accent);
+}
+
+.z1r-item:disabled {
+  cursor: default;
+}
+
+.z1r-item:not(:disabled):hover {
+  border-color: var(--z1r-accent);
+}
+
+.z1r-item-badge {
+  position: absolute;
+  inset-block-end: 1px;
+  inset-inline-end: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-text);
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------- dungeons */
+
+.z1r-dungeon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.z1r-dungeon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #00000026;
+}
+
+.z1r-dungeon[data-cleared="true"] {
+  background: #58b3681f;
+}
+
+.z1r-dungeon-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-inline-size: 52px;
+}
+
+.z1r-dungeon-name {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.z1r-dungeon-flags {
+  display: flex;
+  gap: 4px;
+}
+
+.z1r-flag {
+  display: flex;
+  padding: 2px;
+  background: transparent;
+  border: 1px solid var(--z1r-border);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.z1r-flag[data-on="true"] {
+  opacity: 1;
+  filter: none;
+  border-color: var(--z1r-accent);
+}
+
+.z1r-flag:disabled {
+  cursor: default;
+}
+
+.z1r-dungeon-location {
+  inline-size: 52px;
+  margin-inline-start: auto;
+  padding: 2px 5px;
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--z1r-text);
+  background: #00000044;
+  border: 1px solid var(--z1r-border);
+  border-radius: 4px;
+}
+
+.z1r-dungeon-location:focus {
+  outline: 1px solid var(--z1r-accent);
+}
+
+/* ---------------------------------------------------------------- overworld */
+
+.z1r-map {
+  display: grid;
+  grid-template-columns: repeat(var(--map-columns, 16), 1fr);
+  gap: 2px;
+}
+
+.z1r-screen {
+  aspect-ratio: 16 / 11;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: #0000004d;
+  border: 1px solid var(--z1r-border);
+  border-radius: 2px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 0 var(--mark-color, transparent);
+  transition: box-shadow 90ms linear;
+}
+
+.z1r-screen:not([data-mark="none"]) {
+  box-shadow: inset 0 0 0 2px var(--mark-color, transparent);
+  background: color-mix(in srgb, var(--mark-color, transparent) 22%, #0000004d);
+}
+
+.z1r-screen[data-mark="empty"] {
+  opacity: 0.4;
+}
+
+.z1r-screen:not(:disabled):hover {
+  border-color: var(--z1r-accent);
+}
+
+/* -------------------------------------------------------------------- hints */
+
+.z1r-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.z1r-hint {
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--z1r-border);
+  color: var(--z1r-muted);
+}
+
+.z1r-hint[data-met="true"] {
+  color: var(--z1r-good);
+  border-color: color-mix(in srgb, var(--z1r-good) 55%, transparent);
+  background: color-mix(in srgb, var(--z1r-good) 12%, transparent);
+}
+
+/* ----------------------------------------------------------------- controls */
+
+.z1r-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: #e8e8ef;
+}
+
+.z1r-segmented {
+  display: inline-flex;
+  border: 1px solid #2c3140;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.z1r-segmented button {
+  padding: 5px 12px;
+  font: inherit;
+  color: #8b90a0;
+  background: #1c1f28;
+  border: 0;
+  cursor: pointer;
+}
+
+.z1r-segmented button[data-active="true"] {
+  color: #14161c;
+  background: #d9a441;
+  font-weight: 600;
+}
+
+.z1r-action {
+  padding: 5px 12px;
+  font: inherit;
+  color: #e8e8ef;
+  background: #1c1f28;
+  border: 1px solid #2c3140;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.z1r-action:hover {
+  border-color: #d9a441;
+}
+
+.z1r-action-danger:hover {
+  border-color: #c34a4a;
+  color: #c34a4a;
+}
+
+.z1r-controls-status {
+  font-size: 12px;
+  color: #d9a441;
+}
+
+.z1r-controls-note {
+  margin-inline-start: auto;
+  font-size: 12px;
+  color: #8b90a0;
+}
+
+/* --------------------------------------------------------- overlay variant */
+
+.z1r-tracker[data-mode="overlay"] {
+  gap: 6px;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-panel {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-panel-title {
+  display: none;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-item {
+  background: transparent;
+  border-color: transparent;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-item[data-owned="true"] {
+  border-color: transparent;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-dungeon {
+  background: transparent;
+}
+
+/* Outlines, not a backdrop — the overlay sits on unpredictable colours. */
+.z1r-tracker[data-mode="overlay"] .z1r-stat-value,
+.z1r-tracker[data-mode="overlay"] .z1r-stat-label,
+.z1r-tracker[data-mode="overlay"] .z1r-dungeon-name,
+.z1r-tracker[data-mode="overlay"] .z1r-item-badge,
+.z1r-tracker[data-mode="overlay"] .z1r-status {
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 4px #000;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-sprite[data-sprite-mode="image"],
+.z1r-tracker[data-mode="overlay"] .z1r-sprite[data-sprite-mode="sheet"] {
+  filter: drop-shadow(0 0 2px #000);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .z1r-item,
+  .z1r-screen {
+    transition: none;
+  }
+}
