@@ -87,9 +87,16 @@ fail the check — a glyph is a valid state, not a build error.
 
 ## Overriding at runtime
 
-Each build fetches `sprites.json` from beside its own `index.html` before falling back to the
-bundled manifest. Dropping a `sprites.json` into `apps/web/dist` (or onto the Pages branch) re-skins
-the tracker with no rebuild.
+Every build ships a copy of the manifest as `sprites.json` beside its own `index.html`, and fetches
+that at startup before falling back to the copy compiled into the bundle. Editing the deployed
+`sprites.json` re-skins the tracker with no rebuild — useful for trying an art pack on a live
+overlay mid-stream.
+
+The file is emitted at build time from `packages/core/src/sprites/manifest.json`, so there is still
+only one copy in the repository. Don't commit per-app copies; they'd drift.
+
+The `file://` desktop build skips the fetch, since local pages can't read sibling files, and uses
+its bundled copy.
 
 ## Choosing a host
 
