@@ -1179,3 +1179,66 @@
 .z1r-tracker[data-mode="overlay"] .z1r-locations-compact-panel {
   padding: 0;
 }
+
+/*
+ * Overlay chrome removal, continued.
+ *
+ * The B-slot box and the Triforce panel carry borders that make sense on a page
+ * and read as stray rectangles over a game capture.
+ */
+.z1r-tracker[data-mode="overlay"] .z1r-item-group[data-group="bslot"] .z1r-item-grid {
+  padding: 0;
+  border-color: transparent;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-item-group-label,
+.z1r-tracker[data-mode="overlay"] .z1r-locations-summary {
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-compact-slot {
+  background: transparent;
+}
+
+/* Fixed composition width: never let a panel push past it. */
+.z1r-tracker[data-mode="overlay"] .z1r-pair > .z1r-items-panel,
+.z1r-tracker[data-mode="overlay"] .z1r-pair > .z1r-triforce-panel {
+  min-inline-size: 0;
+  max-inline-size: none;
+}
+
+/* Overlay composition: one left edge for everything. */
+.z1r-tracker[data-mode="overlay"] .z1r-triforce {
+  /* Centred inside its panel on a page, which reads as misaligned when the
+     panel chrome is gone and only the shapes remain. */
+  margin-inline: 0;
+  max-inline-size: 190px;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-triforce-status {
+  text-align: start;
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+}
+
+/*
+ * Numerals sit directly on gameplay, so they carry their own outline — but the
+ * width is in viewBox units against a 9-unit font, so 2.5 swallowed the glyph
+ * entirely. Roughly a tenth of the font size is enough to separate it.
+ */
+.z1r-tracker[data-mode="overlay"] .z1r-tri-piece text {
+  paint-order: stroke fill;
+  stroke: #000;
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+
+/* Unheld wedges are near-invisible against dark gameplay without this. */
+.z1r-tracker[data-mode="overlay"] .z1r-tri-piece polygon {
+  stroke: #000;
+  stroke-width: 1.5;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-tri-piece[data-on="true"] polygon {
+  stroke: #000;
+  stroke-width: 1.5;
+}

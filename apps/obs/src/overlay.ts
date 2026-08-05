@@ -31,28 +31,74 @@ async function main(): Promise<void> {
     (params.get('sections') ?? OVERLAY_DEFAULT_SECTIONS).split(',').map((value) => value.trim()),
   );
 
-  const scale = Number(params.get('scale') ?? '1');
   const itemSize = Number(params.get('size') ?? '40');
-  if (Number.isFinite(scale) && scale > 0) {
-    document.body.style.setProperty('--overlay-scale', String(scale));
-  }
 
-  const store = createStore(load() ?? createInitialState());
-  // `write: false` — the overlay must never be the source of truth. If the
-  // dock and overlay both wrote, a stale overlay could clobber a live edit.
-  attachPersistence(store, { write: false });
+  /*
+   * Lay out at a fixed width, then scale to fit the source.
+   *
+   * A browser source's viewport is whatever you drag the source to, so letting
+   * the tracker reflow means resizing rearranges it — columns reflow, panels
+   * jump between one row and two, and nothing keeps its proportions. A stream
+   * graphic should behave like a graphic: fixed composition, scaled to fit.
+   *
+   * `?width=` sets the composition width; `?scale=` pins the factor manually
+   * and turns auto-fit off.
+   */
+  const baseWidth = Math.max(200, Number(params.get('width') ?? '420') || 420);
+  const fixedScale = Number(params.get('scale') ?? '');
+  root.style.inlineSize = `${baseWidth}px`;
 
-  const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
+  /*
+   * Measured from `offsetHeight`, which is layout height and therefore
+   * unaffected by the transform we are about to set. The earlier version reset
+   * the scale to 1 to take a measurement, which inside a ResizeObserver either
+   * loops or reads a stale value — and the content ended up overflowing the
+   * source instead of fitting it.
+   */
+  const applyFit = () => {
+    if (Number.isFinite(fixedScale) && fixedScale > 0) {
+      document.body.style.setProperty('--overlay-scale', String(fixedScale));
+      return;
+    }
+    const height = root.offsetHeight || 1;
+    const padding = 16; // body padding, both axes
+    const factor = Math.min(
+      (window.innerWidth - padding) / baseWidth,
+      (window.innerHeight - padding) / height,
+    );
+    const next = String(Math.max(factor, 0.1));
+    // Compare before writing: a ResizeObserver that always writes re-triggers
+    // itself, and Chromium drops the surplus notifications with a console error.
+    if (document.body.style.getPropertyValue('--overlay-scale') !== next) {
+      document.body.style.setProperty('--overlay-scale', next);
+    }
+  };
+
+  /*
+   * Coalesced for repeated events, but never for the first fit.
+   *
+   * requestAnimationFrame does not run in a hidden tab, and an OBS source that
+   * is not currently being rendered counts as hidden — so deferring the initial
+   * fit left the overlay unscaled until something happened to wake it.
+   */
+  let queued = false;
+  const fit = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      applyFit();
+    });
+  };
 
   /*
    * Say so when someone clicks.
    *
-   * This page is read-only on purpose, and it is served at `/` — so pointing a
-   * Custom Browser Dock at the root URL instead of dock.html yields a tracker
-   * where every control is disabled and dimmed, with nothing on screen to
-   * explain why. A real browser source never receives clicks (OBS discards them
-   * unless you enable Interact), so a click here almost certainly means the
-   * page is being used as a dock by mistake.
+   * This page is read-only on purpose. A real browser source never receives
+   * clicks — OBS discards them unless Interact is enabled — so a click here
+   * almost certainly means it has been added as a Custom Browser Dock by
+   * mistake, which otherwise presents as a tracker where nothing responds and
+   * nothing explains why.
    */
   document.addEventListener('click', () => {
     if (document.querySelector('.z1r-readonly-note')) return;
@@ -64,6 +110,19 @@ async function main(): Promise<void> {
     window.setTimeout(() => note.remove(), 8000);
   });
 
+  const store = createStore(load() ?? createInitialState());
+  // `write: false` — the overlay must never be the source of truth. If the
+  // dock and overlay both wrote, a stale overlay could clobber a live edit.
+  attachPersistence(store, { write: false });
+
+  const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
+
+  // Resize is applied directly: it is infrequent, and routing it through
+  // requestAnimationFrame means it never lands while the source is hidden.
+  window.addEventListener('resize', applyFit);
+  // The observer can fire in bursts as sprites load, so that one is coalesced.
+  new ResizeObserver(fit).observe(root);
+
   mountTracker(root, {
     store,
     resolver,
@@ -73,6 +132,12 @@ async function main(): Promise<void> {
     compact: true,
     itemSize: Number.isFinite(itemSize) ? itemSize : 40,
   });
+
+  // Synchronous, so the overlay is correct on its very first paint.
+  applyFit();
+  // Fonts and remote sprites can change the height after first layout.
+  document.fonts?.ready.then(applyFit).catch(() => {});
+  document.addEventListener('visibilitychange', applyFit);
 }
 
 void main();
