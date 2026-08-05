@@ -563,42 +563,6 @@
   border-radius: var(--z1r-radius);
 }
 
-/* -------------------------------------------------------------------- hints */
-
-.z1r-hints {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.z1r-hint {
-  padding: 2px 8px;
-  font-size: var(--z1r-text-md);
-  border-radius: 999px;
-  /* Dashed = not yet available. Never rely on the colour alone. */
-  border: var(--z1r-border-width) dashed var(--z1r-border);
-  color: var(--z1r-muted);
-}
-
-/* The mark, not the colour, is the primary signal. */
-.z1r-hint::before {
-  content: "✕ ";
-  font-weight: 700;
-  opacity: 0.8;
-}
-
-.z1r-hint[data-met="true"] {
-  color: var(--z1r-good);
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--z1r-good) 55%, transparent);
-  background: color-mix(in srgb, var(--z1r-good) 12%, transparent);
-}
-
-.z1r-hint[data-met="true"]::before {
-  content: "✓ ";
-  opacity: 1;
-}
-
 /* --------------------------------------------------------------- seed form */
 
 .z1r-seed-body {

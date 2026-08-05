@@ -40,10 +40,6 @@ the same for the other two targets.
 - Progress saves in the browser automatically. **Export** writes a JSON file; **Import** reads one
   back.
 
-The **Can I…** row is a live capability readout — it answers "do I hold what this obstacle needs?"
-It deliberately does not claim a location is in logic, because the randomizer shuffles item
-placement and dungeon entrances and any such claim would be wrong under some settings.
-
 ## Seeds, settings and item locations
 
 The **Seed** panel takes the seed number, the full flag string, and the handful of settings that
@@ -76,8 +72,9 @@ from — is in [`docs/SEEDS.md`](docs/SEEDS.md).
 ## Accessibility
 
 No state in this tracker is signalled by colour alone. Held items have a solid border and unheld
-ones a dashed border; capability chips carry a `✓` or `✕`; slot kinds are spelled out as `FLOOR` /
-`STAIR`; overworld marks are distinct drawn shapes, not coloured squares. The rule and the full
+ones a dashed border; Triforce pieces are hatched when unheld and solid when held; slot kinds are
+spelled out as `FLOOR` / `STAIR`; overworld marks are distinct drawn shapes listed by name in the
+map's palette. The rule and the full
 table of second channels are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#accessibility) — keep
 to it when adding panels.
 

@@ -84,7 +84,6 @@ Every stateful element carries a second, non-colour channel:
 
 | Element | Colour | Also |
 | --- | --- | --- |
-| Capability hint | green when met | `✓` / `✕` prefix, solid vs dashed border |
 | Item cell | accent border when held | dashed border + desaturated + dimmed when not |
 | Dungeon flag | accent border when on | dashed border + desaturated when off |
 | Location slot kind | per-kind tint | the words `FLOOR` / `STAIR` / `HEART` / `OW` |
@@ -180,7 +179,11 @@ more.
 
 It deliberately is **not** a reachability solver. The randomizer shuffles item placement, dungeon
 entrances and more depending on settings, so any claim of the form "location X is in logic" would be
-wrong under some seed. Capability checks stay true under every shuffle.
+wrong under some seed.
+
+It used to hold a capability table behind a "Can I…" panel. That panel was removed at the
+maintainer's request, and the table went with it — a model of every obstacle that nothing renders is
+just weight. All that survives is the Level 9 gate, which the Triforce panel reads.
 
 `dungeons.ts` used to carry `vanilla*` fields (screen, item, boss). They were never rendered by any
 build and never read as logic, so they've been removed rather than left as furniture.

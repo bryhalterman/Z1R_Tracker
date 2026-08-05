@@ -32,7 +32,6 @@ export const OBS_SECTIONS: readonly TrackerSection[] = [
   'dungeons',
   'locations',
   'hintlog',
-  'hints',
 ];
 
 /**

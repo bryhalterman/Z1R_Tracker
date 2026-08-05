@@ -9,14 +9,12 @@
 
 import {
   DUNGEONS,
-  ITEMS_BY_ID,
   MARKS,
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
   REGIONS_BY_ID,
   regionForScreen,
-  evaluateAll,
   ITEMS,
   labelFor,
   maxValue,
@@ -39,8 +37,7 @@ export type TrackerSection =
   | 'dungeons'
   | 'locations'
   | 'hintlog'
-  | 'map'
-  | 'hints';
+  | 'map';
 
 export interface MountOptions {
   readonly store: Store;
@@ -61,7 +58,6 @@ const DEFAULT_SECTIONS: readonly TrackerSection[] = [
   'locations',
   'hintlog',
   'map',
-  'hints',
 ];
 
 type Patch = (state: TrackerState) => void;
@@ -111,7 +107,6 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     locations: () => buildLocations(store, resolver, patches, interactive),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),
-    hints: () => buildHints(patches),
   };
 
   // Items and the Triforce share a row when both are shown — the triangle is
@@ -476,26 +471,3 @@ function buildMap(
   return root;
 }
 
-/* -------------------------------------------------------------------- hints */
-
-function buildHints(patches: Patch[]): HTMLElement {
-  const { root, body } = section('Can I…', 'z1r-hints');
-  const chips = new Map<string, HTMLElement>();
-
-  patches.push((state) => {
-    for (const result of evaluateAll(state)) {
-      let chip = chips.get(result.id);
-      if (!chip) {
-        chip = el('span', 'z1r-hint', result.label);
-        chips.set(result.id, chip);
-        body.append(chip);
-      }
-      chip.dataset.met = String(result.met);
-      chip.title = result.met
-        ? result.label
-        : `Needs: ${result.missing.map((id) => ITEMS_BY_ID.get(id)?.name ?? id).join(', ')}`;
-    }
-  });
-
-  return root;
-}
