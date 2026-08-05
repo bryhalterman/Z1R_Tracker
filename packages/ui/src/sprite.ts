@@ -47,6 +47,7 @@ function paint(element: HTMLElement, resolved: ResolvedSprite, size: number): vo
       element.dataset.spriteMode = 'image';
       element.style.backgroundImage = `url("${resolved.url}")`;
       return;
+    
 
     case 'sheet': {
       const [x, y, width, height] = resolved.rect;
@@ -59,6 +60,32 @@ function paint(element: HTMLElement, resolved: ResolvedSprite, size: number): vo
       return;
     }
   }
+}
+
+/**
+ * Sizes the art to a whole-number multiple of its source resolution.
+ *
+ * `background-size: contain` fits the box exactly, which for a 14x32 sprite in
+ * a 40px box means 1.25x — nearest-neighbour then duplicates every fourth
+ * column, and which columns get duplicated depends on the rasterisation origin.
+ * A repaint anywhere in the panel reshuffles it, so sprites appear to distort
+ * when an unrelated neighbour changes. An integer factor is stable and crisp.
+ */
+function snapToWholePixels(
+  element: HTMLElement,
+  natural: { width: number; height: number } | null,
+  size: number,
+): void {
+  if (!natural || !natural.width || !natural.height) return;
+  const fit = Math.min(size / natural.width, size / natural.height);
+  // Never below 1x: shrinking pixel art by a whole factor would drop rows
+  // entirely. Art larger than the cell is left to `contain` and smoothed.
+  if (fit < 1) {
+    element.style.imageRendering = 'auto';
+    return;
+  }
+  const scale = Math.floor(fit);
+  element.style.backgroundSize = `${natural.width * scale}px ${natural.height * scale}px`;
 }
 
 export function createSprite(
@@ -84,7 +111,11 @@ export function createSprite(
     // A dead host, a blocked hotlink, or being offline all land here. Degrade
     // to the drawn vector when the key has one, and only then to letters.
     void resolver.preload(key).then((ok) => {
-      if (!ok) paint(element, resolver.fallback(key), size);
+      if (!ok) {
+        paint(element, resolver.fallback(key), size);
+        return;
+      }
+      snapToWholePixels(element, resolver.naturalSize(key), size);
     });
   }
 

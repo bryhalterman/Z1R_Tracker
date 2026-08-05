@@ -47,6 +47,8 @@ function join(baseUrl: string | undefined, url: string): string {
 export class SpriteResolver {
   readonly #manifest: SpriteManifest;
   readonly #preloads = new Map<string, Promise<boolean>>();
+  /** Natural pixel size per URL, learned during preload. */
+  readonly #dimensions = new Map<string, { width: number; height: number }>();
   /** Keys asked for that the manifest doesn't define — surfaced by `missing()`. */
   readonly #unknown = new Set<string>();
 
@@ -122,7 +124,13 @@ export class SpriteResolver {
       // and costs real hosts: spriters-resource.com serves sprite sheets with
       // no Access-Control-Allow-Origin, so an anonymous request fails and the
       // sprite falls back to a glyph even though CSS renders it fine.
-      image.onload = () => resolve(true);
+      image.onload = () => {
+        this.#dimensions.set(resolved.url, {
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+        });
+        resolve(true);
+      };
       image.onerror = () => resolve(false);
       image.src = resolved.url;
     });
@@ -133,6 +141,20 @@ export class SpriteResolver {
 
   preloadAll(keys: Iterable<string>): Promise<boolean[]> {
     return Promise.all([...keys].map((key) => this.preload(key)));
+  }
+
+  /**
+   * Natural size of a key's art once loaded, or null.
+   *
+   * Renderers need this to scale pixel art by a whole number. Fractional
+   * scaling with `image-rendering: pixelated` duplicates source pixels
+   * unevenly, and the pattern shifts on repaint — which reads as neighbouring
+   * sprites distorting whenever anything nearby changes.
+   */
+  naturalSize(key: string): { width: number; height: number } | null {
+    const resolved = this.resolve(key);
+    if (resolved.kind !== 'image' && resolved.kind !== 'sheet') return null;
+    return this.#dimensions.get(resolved.url) ?? null;
   }
 
   /** Keys requested during this session that the manifest does not define. */
