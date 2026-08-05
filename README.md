@@ -130,9 +130,15 @@ npm run sprites:check -- --fetch
 
 ## OBS
 
-Add `apps/obs/dist/overlay.html` as a **Browser Source** for the on-stream overlay, and
-`dock.html` as a **Custom Browser Dock** for the half you click. Both must load from the same
-origin so they can sync. Full walkthrough in [`docs/OBS.md`](docs/OBS.md).
+```bash
+npm run start:obs
+```
+
+Builds and serves both pages on <http://127.0.0.1:4178>. Add `/overlay.html` as a **Browser
+Source** for the on-stream half and `/dock.html` as a **Custom Browser Dock** for the half you
+click. Serve them rather than loading `file://` paths — they sync through `localStorage` and a
+`BroadcastChannel`, and both are scoped per origin. Full walkthrough in
+[`docs/OBS.md`](docs/OBS.md).
 
 The overlay accepts query parameters:
 
@@ -140,7 +146,8 @@ The overlay accepts query parameters:
 | --- | --- | --- |
 | `sections` | `items,dungeons` | Any of `seed`, `items`, `dungeons`, `locations`, `hintlog`, `hints` |
 | `size` | `40` | Item cell size in pixels |
-| `scale` | `1` | Scales the whole overlay |
+| `width` | `420` | Composition width — laid out at this width, then scaled to fit the source |
+| `scale` | auto | Pins the scale factor and turns auto-fit off |
 
 Names outside that list are dropped rather than rendered, so a typo can't put an empty panel on
 stream. The overworld grid isn't offered at all in the OBS build — 128 cells with a region code on

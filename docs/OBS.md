@@ -27,11 +27,15 @@ when clicked.
 ## 1. Get a build
 
 ```bash
-npm run build:obs
+npm run start:obs
 ```
 
-The result is in `apps/obs/dist`. You can also point OBS at the hosted Pages build — see
-*Same-origin* below for the one rule that matters.
+That builds `apps/obs/dist` and serves it on <http://127.0.0.1:4178>. Leave it running while you
+stream. `npm run build:obs` and `npm run serve:obs` are the two halves if you want them separately.
+
+Serve it rather than ticking **Local file**: the two pages only sync when they share an origin, and
+`file://` pages don't (see *Same-origin*). The server also sends `no-store`, so a rebuild shows up
+on a plain refresh instead of needing **Refresh cache of current page**.
 
 ## 2. Add the overlay
 
@@ -39,8 +43,8 @@ The result is in `apps/obs/dist`. You can also point OBS at the hosted Pages bui
 
 | Field | Value |
 | --- | --- |
-| Local file | ✔ checked |
-| Local file path | `apps/obs/dist/overlay.html` |
+| Local file | ✖ unchecked |
+| URL | `http://127.0.0.1:4178/overlay.html?width=420` |
 | Width / Height | `420` × `700` to start |
 | Shutdown source when not visible | ✖ unchecked |
 | Refresh browser when scene becomes active | ✖ unchecked |
@@ -52,17 +56,24 @@ re-reads state from storage — briefly flashing an empty tracker on stream.
 
 ### Tuning it
 
-Append query parameters to the local file path:
+Append query parameters to the URL:
 
 ```
-apps/obs/dist/overlay.html?sections=items,hintlog&size=32&scale=1.25
+http://127.0.0.1:4178/overlay.html?sections=items,hintlog&size=32&width=500
 ```
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `sections` | `items,dungeons` | Any of `seed`, `items`, `dungeons`, `locations`, `hintlog`, `hints` |
 | `size` | `40` | Item cell size in pixels |
-| `scale` | `1` | Scales the whole overlay |
+| `width` | `420` | Composition width — the layout is built at this width, then scaled to fit the source |
+| `scale` | auto | Pins the scale factor and turns auto-fit off |
+
+`width` is the one to reach for. The overlay lays out at a fixed width and scales that whole
+composition to fit the source, the way a stream graphic should behave — so dragging the source
+resizes the tracker instead of reflowing it. A **narrower** `width` means fewer items per row and a
+taller, chunkier overlay; a **wider** one means long rows and finer detail. Set it to the shape you
+want, then drag the source to whatever size suits the scene.
 
 A vertical item strip beside a 4:3 game capture is usually `?sections=items&size=36`. Add
 `dungeons` if you're tracking a full randomizer seed.
@@ -82,6 +93,34 @@ room for it. If you want it during a run, keep one of those open on a second mon
 The overlay has no background by design. If you want a backing plate, add a Color Source behind it
 in OBS rather than styling one in — that way it stays independent of the tracker's own layout.
 
+### Custom CSS
+
+OBS pre-fills the source's **Custom CSS** box with this:
+
+```css
+body { background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; }
+```
+
+**Leave it.** It is a no-op here — the overlay already sets all three to the same values, and
+`body.overlay` outranks a bare `body` selector — but it is also exactly right, so there is nothing
+to gain by clearing it.
+
+Two overrides are supported if you want them:
+
+```css
+/* Remove the 8px inset so the tracker fills the source edge to edge. */
+body { --overlay-pad: 0px; }
+
+/* Backing plate, if a Color Source is more trouble than it's worth. */
+.z1r-tracker { background: rgba(0, 0, 0, .55); border-radius: 6px; }
+```
+
+Use `--overlay-pad`, not `padding`. The auto-fit reads that variable when it measures, so the scale
+stays correct; setting `padding` directly both loses on specificity and desynchronises the fit.
+
+Don't set `zoom` or `transform` on the body. The overlay already transforms itself to fit, and a
+second one compounds rather than replaces it. Change `?width=` instead.
+
 ## 3. Add the dock
 
 **Docks → Custom Browser Docks…**
@@ -89,7 +128,7 @@ in OBS rather than styling one in — that way it stays independent of the track
 | Field | Value |
 | --- | --- |
 | Dock Name | `Z1R Tracker` |
-| URL | `file:///C:/path/to/apps/obs/dist/dock.html` |
+| URL | `http://127.0.0.1:4178/dock.html` |
 
 Apply, then drag the dock wherever you like. Click in it and the overlay updates immediately.
 
@@ -100,11 +139,18 @@ The two pages sync through `localStorage` and a `BroadcastChannel`, both of whic
 
 That means:
 
-- Both from the same local folder → same origin. ✔
+- Both from the same HTTP address → same origin. ✔
 - Both from the same hosted URL → same origin. ✔
 - Dock from a hosted URL, overlay from a local file → **different origins**. ✘
+- Both from the same local folder over `file://` → **don't rely on it.** ✘
 
-Pick one and use it for both.
+That last one is the trap, because it looks like it should work. A `file://` page has an opaque
+origin in the browser OBS embeds, so `BroadcastChannel` — the half that makes an edit in the dock
+show up on stream immediately — has nothing to deliver to. You can end up with edits that appear
+only after a reload, or not at all. Serve the folder over HTTP (`npm run serve:obs`) and the
+problem doesn't arise.
+
+Pick one address and use it for both.
 
 ## Troubleshooting
 
@@ -123,6 +169,15 @@ expected: they have no art and don't need any. See [SPRITES.md](SPRITES.md).
 The source was added as a Window Capture or a Media Source rather than a Browser Source, or a
 custom CSS block in the source's properties set a background. The default custom CSS OBS pre-fills
 (`background-color: rgba(0,0,0,0);`) is correct — leave it.
+
+**The overlay shrinks as I resize the source.**
+Fixed — rebuild and refresh. The fit measured the visual viewport rather than the layout one and
+nothing clipped the overrun, so a scrollbar appeared, which narrowed the viewport, which shrank the
+next fit. If you still see it, check you haven't added `zoom` or `transform` in Custom CSS.
+
+**I rebuilt and the source still shows the old version.**
+Only happens if you're loading from `file://` or through some other server. `npm run serve:obs`
+sends `no-store`. Otherwise: right-click the source → **Refresh cache of current page**.
 
 **I want the overlay clickable instead of the dock.**
 Enable *Interact* on the browser source and load `dock.html` in it. It works, but every click lands
