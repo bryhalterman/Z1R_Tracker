@@ -12,7 +12,10 @@ import { DUNGEONS } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
 import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
+
+/** Upper bound on manual extra floor slots. Shared with `migrate` on purpose. */
+export const MAX_EXTRA_FLOOR_SLOTS = 8;
 
 export interface LocationState {
   /** Pool entry id known to be here. Empty until identified. */
@@ -39,9 +42,11 @@ export interface HintEntry {
   note: string;
 }
 
+/**
+ * Where a dungeon was found is recorded on the overworld map with its Dungeon
+ * mark, so all that is left per level is whether its Triforce piece is in hand.
+ */
 export interface DungeonState {
-  /** Free-text screen reference for where the entrance was found, e.g. "H7". */
-  location: string;
   triforce: boolean;
 }
 
@@ -110,7 +115,6 @@ export type Action =
 
 function emptyDungeon(): DungeonState {
   return {
-    location: '',
     triforce: false,
   };
 }
@@ -245,7 +249,10 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
 
     case 'addFloorSlot': {
       const key = String(action.level);
-      const next = Math.min(Math.max((state.extraFloorSlots[key] ?? 0) + action.delta, 0), 8);
+      const next = Math.min(
+        Math.max((state.extraFloorSlots[key] ?? 0) + action.delta, 0),
+        MAX_EXTRA_FLOOR_SLOTS,
+      );
       if (next === (state.extraFloorSlots[key] ?? 0)) return state;
       return bump({ extraFloorSlots: { ...state.extraFloorSlots, [key]: next } });
     }
@@ -314,7 +321,15 @@ export function createStore(initial: TrackerState = createInitialState()): Store
       const next = reduce(state, action);
       if (next === state) return;
       state = next;
-      for (const listener of listeners) listener(state, action);
+      for (const listener of listeners) {
+        // Same reasoning as the render patch loop: one bad subscriber must not
+        // stop persistence or the cross-window broadcast from running.
+        try {
+          listener(state, action);
+        } catch (error) {
+          console.error('Store listener failed', error);
+        }
+      }
     },
     subscribe(listener) {
       listeners.add(listener);

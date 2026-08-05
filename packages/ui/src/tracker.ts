@@ -113,14 +113,39 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     hints: () => buildHints(patches),
   };
 
+  // Items and the Triforce share a row when both are shown — the triangle is
+  // narrow and was leaving most of its own panel empty.
+  const built = new Map<TrackerSection, HTMLElement>();
   for (const name of sections) {
     // An unknown `?sections=` value must not take the whole overlay down.
     const build = builders[name];
-    if (build) root.append(build());
+    if (build) built.set(name, build());
+  }
+  const items = built.get('items');
+  const triforce = built.get('dungeons');
+  if (items && triforce) items.classList.add('z1r-items-panel');
+  for (const [name, node] of built) {
+    if (name === 'dungeons' && items && triforce) continue;
+    if (name === 'items' && items && triforce) {
+      const pair = el('div', 'z1r-pair');
+      pair.append(items, triforce);
+      root.append(pair);
+      continue;
+    }
+    root.append(node);
   }
 
   const apply = (state: TrackerState) => {
-    for (const patch of patches) patch(state);
+    for (const patch of patches) {
+      // Isolated per panel: the store has already committed this state, so a
+      // throw here would otherwise leave every later panel showing the previous
+      // one — silently, and on stream.
+      try {
+        patch(state);
+      } catch (error) {
+        console.error('Tracker panel failed to update', error);
+      }
+    }
   };
 
   apply(store.getState());
@@ -141,10 +166,24 @@ function buildItems(
   patches: Patch[],
   opts: { interactive: boolean; itemSize: number },
 ): HTMLElement {
-  const { root, body } = section('Items', 'z1r-item-grid');
+  const { root, body } = section('Items', 'z1r-item-groups');
   const cellPatches: Patch[] = [];
-  for (const def of ITEMS) {
-    body.append(buildItemCell(store, resolver, def, cellPatches, opts));
+
+  // Two groups, in the game's own order: always-active items on top, then the
+  // boxed B-slot items, mirroring the inventory screen.
+  for (const [group, caption] of [
+    ['passive', 'Always active'],
+    ['bslot', 'B slot'],
+  ] as const) {
+    const wrap = el('div', 'z1r-item-group');
+    wrap.dataset.group = group;
+    wrap.append(el('span', 'z1r-item-group-label', caption));
+    const grid = el('div', 'z1r-item-grid');
+    for (const def of ITEMS.filter((item) => item.group === group)) {
+      grid.append(buildItemCell(store, resolver, def, cellPatches, opts));
+    }
+    wrap.append(grid);
+    body.append(wrap);
   }
 
   patches.push((state) => {

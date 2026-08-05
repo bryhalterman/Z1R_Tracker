@@ -10,11 +10,15 @@
 
 import {
   createInitialState,
+  MAX_EXTRA_FLOOR_SLOTS,
   STATE_VERSION,
   type DungeonState,
+  type HintEntry,
   type Store,
   type TrackerState,
 } from './state.js';
+
+import type { SeedSettings } from './seed.js';
 
 export const STORAGE_KEY = 'z1r-tracker:state';
 export const CHANNEL_NAME = 'z1r-tracker';
@@ -51,17 +55,65 @@ function pruneDungeons(
   return result;
 }
 
-/** Accepts anything shaped like a tracker state; repairs older versions. */
+const QUESTS = new Set([
+  '1st', '2nd', 'mixed', 'shapes', 'mixed-shapes', 'random-no-shapes', 'random',
+]);
+const SHUFFLES = new Set([
+  'none', 'dungeon', 'anywhere-hearts-in-dungeons', 'items-hearts', 'random',
+]);
+
+/** Drops anything that isn't a well-formed hint object. */
+function conformHints(saved: unknown): HintEntry[] {
+  if (!Array.isArray(saved)) return [];
+  const blank: HintEntry = { id: '', subject: '', region: '', screen: '', note: '' };
+  return saved
+    .filter((h): h is object => !!h && typeof h === 'object')
+    .map((h) => conform(blank, h))
+    .filter((h) => typeof h.id === 'string' && h.id !== '');
+}
+
+/** Enum-valued settings have to be checked, not merged — see `questForLevel`. */
+function conformSeed(base: SeedSettings, saved: unknown): SeedSettings {
+  const seed = conform(base, saved);
+  if (!QUESTS.has(seed.dungeonQuest)) seed.dungeonQuest = base.dungeonQuest;
+  if (!SHUFFLES.has(seed.itemShuffle)) seed.itemShuffle = base.itemShuffle;
+  if (seed.questLow !== '1st' && seed.questLow !== '2nd') seed.questLow = base.questLow;
+  if (seed.questHigh !== '1st' && seed.questHigh !== '2nd') seed.questHigh = base.questHigh;
+  return seed;
+}
+
+/** Clamped to the same bound the reducer enforces, so the two can't drift. */
+function conformExtraSlots(saved: unknown): Record<string, number> {
+  if (!saved || typeof saved !== 'object') return {};
+  const out: Record<string, number> = {};
+  for (const [level, value] of Object.entries(saved as Record<string, unknown>)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    out[level] = Math.min(Math.max(Math.trunc(value), 0), MAX_EXTRA_FLOOR_SLOTS);
+  }
+  return out;
+}
+
+/**
+ * Accepts anything shaped like a tracker state; repairs older versions.
+ *
+ * Validation is structural, not just a version check. `{"version":1}` used to
+ * be accepted as a save — so importing any JSON file with a numeric `version`
+ * silently wiped the run and reported "Save loaded." Everything below is
+ * conformed to the current model rather than spread in, which also stops
+ * unknown top-level keys living forever in exports and broadcasts.
+ */
 export function migrate(raw: unknown): TrackerState | null {
   if (!raw || typeof raw !== 'object') return null;
   const candidate = raw as Partial<TrackerState>;
   if (typeof candidate.version !== 'number') return null;
   if (candidate.version > STATE_VERSION) return null;
+  // Require evidence this is actually a tracker save, not merely versioned JSON.
+  if (!candidate.items || typeof candidate.items !== 'object') return null;
+  if (!candidate.dungeons || typeof candidate.dungeons !== 'object') return null;
 
   const base = createInitialState();
   return {
     ...base,
-    ...candidate,
     version: STATE_VERSION,
     // Saves written before `rev` existed have none; start them at 0.
     rev: typeof candidate.rev === 'number' ? candidate.rev : 0,
@@ -73,10 +125,11 @@ export function migrate(raw: unknown): TrackerState | null {
     marks: { ...(candidate.marks ?? {}) },
     // v1 saves predate seed tracking; merging over the defaults fills in any
     // setting added since without discarding what the save does carry.
-    seed: { ...base.seed, ...(candidate.seed ?? {}) },
+    seed: conformSeed(base.seed, candidate.seed),
     locations: { ...(candidate.locations ?? {}) },
-    extraFloorSlots: { ...(candidate.extraFloorSlots ?? {}) },
-    hints: Array.isArray(candidate.hints) ? candidate.hints : [],
+    extraFloorSlots: conformExtraSlots(candidate.extraFloorSlots),
+    // A null in this array threw on every render; the panel indexes into it.
+    hints: conformHints(candidate.hints),
     // Restart ids above anything the save already used, or a new hint would
     // collide with an existing one and edits would hit the wrong row.
     hintSeq: Math.max(
@@ -89,7 +142,22 @@ export function migrate(raw: unknown): TrackerState | null {
   };
 }
 
-export function load(storage: Storage = localStorage): TrackerState | null {
+/**
+ * `localStorage` throws on *access* when site data is blocked or the document
+ * is a sandboxed iframe. Reading it in a default parameter put that throw
+ * outside every try/catch below, so a blocked-cookies browser crashed in the
+ * first statement of each app's `main()`.
+ */
+export function safeStorage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function load(storage: Storage | null = safeStorage()): TrackerState | null {
+  if (!storage) return null;
   try {
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -99,7 +167,8 @@ export function load(storage: Storage = localStorage): TrackerState | null {
   }
 }
 
-export function save(state: TrackerState, storage: Storage = localStorage): void {
+export function save(state: TrackerState, storage: Storage | null = safeStorage()): void {
+  if (!storage) return;
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
@@ -110,7 +179,7 @@ export function save(state: TrackerState, storage: Storage = localStorage): void
 export interface SyncOptions {
   /** Set false in a read-only display (browser source) to never write back. */
   readonly write?: boolean;
-  readonly storage?: Storage;
+  readonly storage?: Storage | null;
 }
 
 /**
@@ -118,7 +187,7 @@ export interface SyncOptions {
  * function. Safe to call in any browser context; no-ops outside one.
  */
 export function attachPersistence(store: Store, options: SyncOptions = {}): () => void {
-  const { write = true, storage = globalThis.localStorage } = options;
+  const { write = true, storage = safeStorage() } = options;
   if (!storage) return () => {};
 
   // A remote update must not be re-broadcast, or two windows ping-pong forever.

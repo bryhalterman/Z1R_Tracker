@@ -57,7 +57,14 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
     const file = filePicker.files?.[0];
     if (!file) return;
     try {
-      store.dispatch({ type: 'import', state: importState(await file.text()) });
+      const loaded = importState(await file.text());
+      // Import discards the current run exactly as Reset does, so it asks the
+      // same question once there is something to lose.
+      if (store.getState().rev > 0 && !window.confirm('Load this save? The current run is replaced.')) {
+        filePicker.value = '';
+        return;
+      }
+      store.dispatch({ type: 'import', state: loaded });
       say('Save loaded.');
     } catch (error) {
       say(error instanceof Error ? error.message : 'Could not read that file.');

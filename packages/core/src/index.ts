@@ -27,7 +27,14 @@ export function createDefaultResolver(): SpriteResolver {
  */
 export async function loadResolver(url = 'sprites.json'): Promise<SpriteResolver> {
   try {
-    return await SpriteResolver.fromUrl(url, { cache: 'no-cache' });
+    const resolver = await SpriteResolver.fromUrl(url, { cache: 'no-cache' });
+    // Shape, not just parseability. A hand-edited override missing the
+    // `sprites` key used to reach `entry()` and throw on the first lookup —
+    // blanking the tracker in the very "re-skin a live overlay" workflow the
+    // docs recommend. A bad override should fall back like a 404 does.
+    const sprites = resolver.manifest?.sprites;
+    if (!sprites || typeof sprites !== 'object') return createDefaultResolver();
+    return resolver;
   } catch {
     return createDefaultResolver();
   }

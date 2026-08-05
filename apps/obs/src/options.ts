@@ -35,9 +35,16 @@ export const OBS_SECTIONS: readonly TrackerSection[] = [
   'hints',
 ];
 
-/** Keeps `?sections=` honest — an unknown or excluded name is dropped. */
-export function allowedSections(requested: readonly string[]): TrackerSection[] {
-  return requested.filter((name): name is TrackerSection =>
+/**
+ * Keeps `?sections=` honest — an unknown or excluded name is dropped.
+ *
+ * Falls back to the full set rather than returning empty: a typo, an empty
+ * value, or asking only for the excluded map would otherwise render a blank
+ * browser source, which looks identical to the tracker being broken.
+ */
+export function allowedSections(requested: readonly string[]): readonly TrackerSection[] {
+  const allowed = requested.filter((name): name is TrackerSection =>
     OBS_SECTIONS.includes(name as TrackerSection),
   );
+  return allowed.length ? allowed : OBS_SECTIONS;
 }

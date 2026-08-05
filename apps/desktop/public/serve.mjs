@@ -36,9 +36,16 @@ const TYPES = new Map(
   }),
 );
 
-/** Resolves a URL path inside ROOT, or null if it tries to escape. */
+/** Resolves a URL path inside ROOT, or null if it is malformed or escapes. */
 function safePath(urlPath) {
-  const decoded = decodeURIComponent(urlPath.split('?')[0] ?? '/');
+  let decoded;
+  try {
+    // A stray percent — /%ZZ — makes this throw URIError. It used to do so
+    // outside the request handler's try, taking the whole server down.
+    decoded = decodeURIComponent(urlPath.split('?')[0] ?? '/');
+  } catch {
+    return null;
+  }
   const candidate = resolve(join(ROOT, normalize(decoded)));
   if (candidate !== ROOT && !candidate.startsWith(ROOT + sep)) return null;
   return candidate;
@@ -79,6 +86,12 @@ server.listen(PORT, '127.0.0.1', () => {
         ? ['open', [url]]
         : ['xdg-open', [url]];
   spawn(opener[0], opener[1], { stdio: 'ignore', detached: true }).unref();
+});
+
+// A launcher that dies on one bad request is worse than one that logs and
+// carries on; nothing here is worth taking the process down for.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection (continuing):', reason);
 });
 
 server.on('error', (error) => {

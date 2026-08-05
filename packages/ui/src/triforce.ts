@@ -167,48 +167,6 @@ export function buildTriforce(store: Store, patches: Patch[], interactive: boole
     });
   }
 
-  // Where each entrance was found. Nine narrow cells rather than nine full
-  // rows: the same information in roughly 50px instead of 318px. The overworld
-  // map could carry this spatially, but the OBS dock has no map, so it would
-  // become untrackable there.
-  const found = document.createElement('div');
-  found.className = 'z1r-dungeon-where';
-  const foundLabel = document.createElement('span');
-  foundLabel.className = 'z1r-field-label';
-  foundLabel.textContent = 'Found at';
-  found.append(foundLabel);
-
-  for (const level of [...LEVELS, 9]) {
-    const cell = document.createElement('label');
-    cell.className = 'z1r-where-cell';
-    const caption = document.createElement('span');
-    caption.textContent = String(level);
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'z1r-input z1r-where-input';
-    input.maxLength = 3;
-    input.spellcheck = false;
-    input.readOnly = !interactive;
-    input.setAttribute('aria-label', `Screen where Level ${level} was found`);
-    input.addEventListener('change', () =>
-      store.dispatch({
-        type: 'setDungeon',
-        level,
-        patch: { location: input.value.trim().toUpperCase() },
-      }),
-    );
-    cell.append(caption, input);
-    found.append(cell);
-
-    patches.push((state) => {
-      // Never stomp what is being typed.
-      if (document.activeElement !== input) {
-        input.value = state.dungeons[String(level)]?.location ?? '';
-      }
-    });
-  }
-  root.append(found);
-
   // Levels 1-8 hold the pieces; Level 9 holds Ganon. Its state is a sentence
   // rather than a ninth wedge, which would break the tiling.
   const status = document.createElement('p');

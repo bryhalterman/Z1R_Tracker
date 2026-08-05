@@ -54,6 +54,35 @@ await build({
   logLevel: 'warning',
 });
 
-const outFiles = (await readdir(OUT)).filter((f) => f.endsWith('.js')).map((f) => join(OUT, f));
+/** Bundled output, recursively — esbuild nests once entry points span directories. */
+async function findBundles(dir) {
+  const found = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...(await findBundles(full)));
+    else if (entry.name.endsWith('.js')) found.push(full);
+  }
+  return found;
+}
+
+const outFiles = await findBundles(OUT);
+
+/*
+ * Refuse to run rather than run the wrong thing.
+ *
+ * `node --test` with no paths discovers from the working directory — which
+ * here means the raw `.ts` sources and this script itself. A non-recursive
+ * readdir used to produce an empty list the moment a test file lived outside
+ * packages/core/src, so the suite would silently stop testing the bundles and
+ * start re-entering itself. Spawning with no paths must be unreachable.
+ */
+if (outFiles.length !== tests.length) {
+  console.error(
+    `Bundled ${outFiles.length} file(s) from ${tests.length} test file(s) — refusing to run.\n` +
+      'The bundle step did not produce one output per input; fix that before trusting a green suite.',
+  );
+  process.exit(1);
+}
+
 const child = spawn(process.execPath, ['--test', ...outFiles], { stdio: 'inherit' });
 child.on('exit', (code) => process.exit(code ?? 1));
