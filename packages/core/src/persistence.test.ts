@@ -51,7 +51,9 @@ test('migrate drops dungeon fields the model no longer defines', () => {
   assert.ok(state);
   const dungeon = state.dungeons['1'];
   assert.ok(dungeon);
-  assert.deepEqual(Object.keys(dungeon).sort(), ['found', 'item', 'location', 'notes', 'triforce']);
+  // The legacy save carries found/cleared/map/compass/item/notes. Only the two
+  // fields the model still defines may survive.
+  assert.deepEqual(Object.keys(dungeon).sort(), ['location', 'triforce']);
 });
 
 test('migrate keeps everything still in the model', () => {

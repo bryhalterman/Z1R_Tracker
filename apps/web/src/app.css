@@ -1,6 +1,5 @@
 :root {
   color-scheme: dark;
-  --page-bg: #101218;
 }
 
 * {
@@ -11,9 +10,9 @@ body {
   margin: 0;
   padding: 16px;
   min-block-size: 100vh;
-  background: var(--page-bg);
-  color: #e8e8ef;
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--z1r-bg);
+  color: var(--z1r-text);
+  font-family: var(--z1r-font);
 }
 
 .page-header {
@@ -36,11 +35,11 @@ body {
   flex-wrap: wrap;
   margin-block-start: 16px;
   font-size: 12px;
-  color: #8b90a0;
+  color: var(--z1r-muted);
 }
 
 .page-footer a {
-  color: #d9a441;
+  color: var(--z1r-accent);
 }
 
 main {

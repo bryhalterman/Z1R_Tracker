@@ -24,14 +24,15 @@ export interface CapabilityResult extends Capability {
   readonly missing: readonly string[];
 }
 
+/**
+ * Only conjunctions earn a chip.
+ *
+ * "Burn bushes needs the candle" is a restatement of one cell in the item grid
+ * two panels up — the same redundancy the summary bar was removed for. What
+ * the grid can't show is a requirement spanning several items, so those are
+ * what's left.
+ */
 export const CAPABILITIES: readonly Capability[] = [
-  { id: 'burn', label: 'Burn bushes', requires: [['candle', 1]] },
-  { id: 'blast', label: 'Blast walls', requires: [['bomb', 1]] },
-  { id: 'push', label: 'Push rocks', requires: [['bracelet', 1]] },
-  { id: 'water', label: 'Cross water', requires: [['raft', 1]] },
-  { id: 'river', label: 'Cross rivers', requires: [['ladder', 1]] },
-  { id: 'read', label: 'Read tablets', requires: [['book', 1]] },
-  { id: 'digdogger', label: 'Split Digdogger', requires: [['recorder', 1]] },
   { id: 'gohma', label: 'Damage Gohma', requires: [['bow', 1], ['arrow', 1]] },
   { id: 'ganon', label: 'Finish Ganon', requires: [['sword', 1], ['bow', 1], ['arrow', 2]] },
 ];
@@ -52,8 +53,3 @@ export function canEnterLevel9(state: TrackerState): boolean {
   return triforceCount(state) >= TRIFORCE_REQUIRED_FOR_L9;
 }
 
-/** Everything needed to actually end the run, entrance included. */
-export function canFinishRun(state: TrackerState): boolean {
-  const ganon = CAPABILITIES.find((c) => c.id === 'ganon');
-  return canEnterLevel9(state) && !!ganon && evaluate(state, ganon).met;
-}

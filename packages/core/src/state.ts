@@ -12,7 +12,7 @@ import { DUNGEONS } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
 import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
-export const STATE_VERSION = 3;
+export const STATE_VERSION = 4;
 
 export interface LocationState {
   /** Pool entry id known to be here. Empty until identified. */
@@ -40,14 +40,9 @@ export interface HintEntry {
 }
 
 export interface DungeonState {
-  /** Entrance located on the overworld. */
-  found: boolean;
-  /** Free-text screen reference, e.g. "H7". */
+  /** Free-text screen reference for where the entrance was found, e.g. "H7". */
   location: string;
   triforce: boolean;
-  /** Item id recovered here — randomizer bookkeeping. */
-  item: string;
-  notes: string;
 }
 
 export interface TrackerState {
@@ -115,11 +110,8 @@ export type Action =
 
 function emptyDungeon(): DungeonState {
   return {
-    found: false,
     location: '',
     triforce: false,
-    item: '',
-    notes: '',
   };
 }
 

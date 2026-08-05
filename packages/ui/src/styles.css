@@ -322,7 +322,7 @@
   inset-block-start: 1px;
   inset-inline-start: 2px;
   font-family: var(--z1r-font-mono);
-  font-size: var(--z1r-text-xs);
+  font-size: var(--z1r-text-2xs);
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -362,7 +362,7 @@
 
 .z1r-map-focus {
   margin-inline-start: 10px;
-  font-size: var(--z1r-text-2xs);
+  font-size: var(--z1r-text-xs);
   letter-spacing: 0.04em;
   color: var(--z1r-accent);
 }
@@ -467,7 +467,7 @@
   min-block-size: var(--spectrum-component-height-75);
   padding: 1px 8px;
   font: inherit;
-  font-size: var(--z1r-text-2xs);
+  font-size: var(--z1r-text-xs);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--z1r-muted);
@@ -702,7 +702,7 @@
   flex: none;
   inline-size: 38px;
   padding: 1px 0;
-  font-size: var(--z1r-text-2xs);
+  font-size: var(--z1r-text-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-align: center;

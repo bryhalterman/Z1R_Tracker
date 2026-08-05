@@ -12,7 +12,7 @@
 
 body {
   margin: 0;
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--z1r-font);
 }
 
 body.overlay {
@@ -24,8 +24,8 @@ body.overlay {
 }
 
 body.dock {
-  background: #101218;
-  color: #e8e8ef;
+  background: var(--z1r-bg);
+  color: var(--z1r-text);
   padding: 8px;
 }
 

@@ -23,13 +23,15 @@
 @import '@spectrum-css/tokens/dist/css/dark-vars.css';
 
 /*
- * Spectrum scopes its tokens to `.spectrum`, `.spectrum--dark` and
- * `.spectrum--medium`, so the mount roots carry all three (see `mountTracker`
- * and `mountControls`). Binding the aliases on the same selector keeps this
- * file self-contained — no app HTML has to opt in.
+ * Bound to `.spectrum` itself rather than to the tracker's own roots, so the
+ * page shell gets the palette too. Each app's `<body>` carries the Spectrum
+ * classes; the mount roots add them as well, which is harmless when nested.
+ *
+ * The shells previously hand-picked #101218 / #e8e8ef / #8b90a0 / #d9a441 —
+ * the last being the very hex this migration replaced. `theme:check` was
+ * measuring text against a page background that was never rendered.
  */
-.z1r-tracker,
-.z1r-controls {
+.spectrum {
   /* Surfaces. */
   --z1r-bg: var(--spectrum-gray-50);
   --z1r-panel: var(--spectrum-gray-100);
@@ -73,13 +75,16 @@
   --z1r-space-lg: var(--spectrum-spacing-200); /* 12px */
 
   /* Type. */
-  --z1r-font: var(--spectrum-sans-font-family-stack);
+  /* Not Spectrum's stack: it leads with Adobe Clean, a licensed font this repo
+     has no @font-face for, so it silently fell through to different typefaces
+     in different parts of the same window. */
+  --z1r-font: system-ui, "Segoe UI", Roboto, -apple-system, sans-serif;
   --z1r-font-mono: var(--spectrum-code-font-family-stack);
   /* Spectrum's type scale stops at 11px. The overworld region codes and the
      slot chips have to fit inside a ~60x40px grid cell, so they step below it
      — derived from the token rather than hard-coded, so they track the scale. */
-  --z1r-text-xs: calc(var(--spectrum-font-size-50) - 2px); /* 9px */
-  --z1r-text-2xs: calc(var(--spectrum-font-size-50) - 1px); /* 10px */
+  --z1r-text-2xs: calc(var(--spectrum-font-size-50) - 2px); /* 9px, smallest */
+  --z1r-text-xs: calc(var(--spectrum-font-size-50) - 1px); /* 10px */
   --z1r-text-sm: var(--spectrum-font-size-50); /* 11px */
   --z1r-text-md: var(--spectrum-font-size-75); /* 12px */
   --z1r-text-lg: var(--spectrum-font-size-100); /* 14px */

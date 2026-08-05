@@ -83,8 +83,5 @@ export const DUNGEONS_BY_LEVEL: ReadonlyMap<number, DungeonDef> = new Map(
   DUNGEONS.map((d) => [d.level, d]),
 );
 
-/** Levels that award a Triforce piece. Level 9 holds Ganon, not a piece. */
-export const TRIFORCE_LEVELS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
-
 /** Triforce pieces needed before Level 9's entrance opens. */
 export const TRIFORCE_REQUIRED_FOR_L9 = 8;

@@ -10,9 +10,9 @@ body {
   margin: 0;
   padding: 14px;
   min-block-size: 100vh;
-  background: #101218;
-  color: #e8e8ef;
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--z1r-bg);
+  color: var(--z1r-text);
+  font-family: var(--z1r-font);
 }
 
 .page-header {
@@ -31,5 +31,5 @@ body {
 .page-footer {
   margin-block-start: 14px;
   font-size: 12px;
-  color: #8b90a0;
+  color: var(--z1r-muted);
 }
