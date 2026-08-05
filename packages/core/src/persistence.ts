@@ -62,6 +62,13 @@ const SHUFFLES = new Set([
   'none', 'dungeon', 'anywhere-hearts-in-dungeons', 'items-hearts', 'random',
 ]);
 
+/** Highest id in use, so a new hint can never reuse one. */
+function hintSeqFrom(saved: unknown, hints: HintEntry[]): number {
+  const base = Number.isFinite(saved) ? Math.max(Math.trunc(saved as number), 0) : 0;
+  const used = hints.map((h) => Number(String(h.id).replace(/^h/, '')) || 0);
+  return Math.max(base, ...used, 0);
+}
+
 /** Drops anything that isn't a well-formed hint object. */
 function conformHints(saved: unknown): HintEntry[] {
   if (!Array.isArray(saved)) return [];
@@ -116,7 +123,12 @@ export function migrate(raw: unknown): TrackerState | null {
     ...base,
     version: STATE_VERSION,
     // Saves written before `rev` existed have none; start them at 0.
-    rev: typeof candidate.rev === 'number' ? candidate.rev : 0,
+    //
+    // Finite and integral, not merely "a number". JSON has no Infinity literal
+    // but 1e400 overflows to one, and applyRemote gates on `rev <= current` —
+    // so once both windows reach Infinity every later edit is silently dropped
+    // by the OBS browser source, with no visible cause.
+    rev: Number.isFinite(candidate.rev) ? Math.max(Math.trunc(candidate.rev as number), 0) : 0,
     // Prune, don't just merge. A plain spread would carry keys for items and
     // dungeon flags that have since been removed from the model — they'd
     // survive every future load and get written back into exported saves.
@@ -132,12 +144,12 @@ export function migrate(raw: unknown): TrackerState | null {
     hints: conformHints(candidate.hints),
     // Restart ids above anything the save already used, or a new hint would
     // collide with an existing one and edits would hit the wrong row.
-    hintSeq: Math.max(
-      candidate.hintSeq ?? 0,
-      ...(Array.isArray(candidate.hints)
-        ? candidate.hints.map((h) => Number(String(h?.id ?? '').replace(/^h/, '')) || 0)
-        : [0]),
-    ),
+    //
+    // Derived from the *conformed* hints and a coerced counter. A string
+    // hintSeq used to make this NaN, giving every new hint the id "hNaN" —
+    // after which editing one note edited all of them and removing one row
+    // removed the lot.
+    hintSeq: hintSeqFrom(candidate.hintSeq, conformHints(candidate.hints)),
     focusRegion: typeof candidate.focusRegion === 'string' ? candidate.focusRegion : '',
   };
 }

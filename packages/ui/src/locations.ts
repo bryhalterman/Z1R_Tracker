@@ -17,8 +17,7 @@ import {
   type TrackerState,
 } from '@z1r/core';
 import { createSprite } from './sprite.js';
-
-type Patch = (state: TrackerState) => void;
+import { memoise, runPatches, type Patch } from './patch.js';
 
 /** Slot kind is the thing the owner most wants at a glance, so it gets a chip. */
 const KIND_LABEL: Record<string, string> = {
@@ -120,11 +119,8 @@ export function buildLocations(
   patches.push((state) => {
     const locations = deriveLocations(state.seed, state.extraFloorSlots);
     const signature = `${locations.map((l) => l.id).join('|')}::${state.seed.shuffleMinorDrops}`;
-    if (signature !== renderedSignature) {
-      renderedSignature = signature;
-      rebuild(state);
-    }
-    for (const patch of rowPatches) patch(state);
+    renderedSignature = memoise(renderedSignature, signature, () => rebuild(state)) ?? '';
+    runPatches(rowPatches, state);
 
     const collected = locations.filter((l) => state.locations[l.id]?.collected).length;
     summary.textContent = `${collected}/${locations.length}`;
@@ -194,11 +190,10 @@ function buildRow(
     row.dataset.known = String(!!current.item);
 
     const sprite = current.item ? (POOL_BY_ID.get(current.item)?.sprite ?? '') : '';
-    if (sprite !== renderedSprite) {
-      renderedSprite = sprite;
+    renderedSprite = memoise(renderedSprite, sprite, () => {
       if (sprite) slot.replaceChildren(createSprite(resolver, sprite, { size: 22 }));
       else slot.replaceChildren();
-    }
+    });
   });
 
   return row;

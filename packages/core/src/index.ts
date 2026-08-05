@@ -33,7 +33,17 @@ export async function loadResolver(url = 'sprites.json'): Promise<SpriteResolver
     // blanking the tracker in the very "re-skin a live overlay" workflow the
     // docs recommend. A bad override should fall back like a 404 does.
     const sprites = resolver.manifest?.sprites;
-    if (!sprites || typeof sprites !== 'object') return createDefaultResolver();
+    if (!sprites || typeof sprites !== 'object' || Array.isArray(sprites)) {
+      return createDefaultResolver();
+    }
+    // Entries too, not just the container. A hand-edited override missing a
+    // `name` reached `entry.name.slice(0, 2)` in the resolver and threw out of
+    // `mountTracker` — a blank page, in the exact workflow this guard exists
+    // for. Omitting `name` is the likeliest slip when editing by hand.
+    const wellFormed = Object.values(sprites).every(
+      (entry) => !!entry && typeof entry === 'object' && typeof entry.name === 'string',
+    );
+    if (!wellFormed) return createDefaultResolver();
     return resolver;
   } catch {
     return createDefaultResolver();

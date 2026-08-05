@@ -189,3 +189,48 @@ test('migrate drops unknown top-level keys instead of persisting them forever', 
   assert.equal('somethingElse' in state, false);
   assert.equal('anotherThing' in state, false);
 });
+
+/*
+ * Regressions from review loop 2. Every one of these was reproduced against the
+ * real bundle before being fixed, and none was caught by the tests above —
+ * which only ever fed `migrate` well-typed numbers.
+ */
+
+test('migrate rejects a non-finite rev, which would deadlock cross-window sync', () => {
+  // JSON has no Infinity literal, but 1e400 overflows to one. applyRemote gates
+  // on `incoming.rev <= current.rev`, so once both windows reach Infinity every
+  // later edit is dropped silently by the OBS browser source.
+  const state = migrate(JSON.parse('{"version":5,"items":{},"dungeons":{},"rev":1e400}'));
+  assert.ok(state);
+  assert.equal(Number.isFinite(state.rev), true);
+  assert.equal(state.rev, 0);
+
+  const fractional = migrate({ ...legacySave(), rev: 1.5 });
+  assert.ok(fractional);
+  assert.equal(Number.isInteger(fractional.rev), true);
+});
+
+test('migrate coerces hintSeq so new hints cannot collide', () => {
+  // A string hintSeq made Math.max return NaN, so every added hint got the id
+  // "hNaN" — editing one note edited all of them, and removing one row removed
+  // the entire log.
+  for (const bad of ['abc', null, undefined, {}]) {
+    let state = migrate({ ...legacySave(), hintSeq: bad });
+    assert.ok(state);
+    assert.equal(Number.isFinite(state.hintSeq), true);
+
+    state = reduce(state, { type: 'addHint' });
+    state = reduce(state, { type: 'addHint' });
+    const ids = state.hints.map((h) => h.id);
+    assert.equal(new Set(ids).size, ids.length, `ids must stay unique for hintSeq=${String(bad)}`);
+    assert.equal(ids.some((id) => id.includes('NaN')), false);
+  }
+});
+
+test('migrate keeps hintSeq above ids already present in the save', () => {
+  const state = migrate({ ...legacySave(), hintSeq: 0, hints: [{ id: 'h42' }] });
+  assert.ok(state);
+  const next = reduce(state, { type: 'addHint' });
+  assert.equal(next.hints.some((h) => h.id === 'h42'), true);
+  assert.equal(next.hints.filter((h) => h.id === 'h42').length, 1);
+});

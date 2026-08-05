@@ -26,6 +26,7 @@ import {
   type TrackerState,
 } from '@z1r/core';
 import { createSprite } from './sprite.js';
+import { memoise, runPatches, type Patch } from './patch.js';
 import { buildSeedPanel } from './seed-panel.js';
 import { buildLocations } from './locations.js';
 import { buildHintTracker } from './hints.js';
@@ -59,8 +60,6 @@ const DEFAULT_SECTIONS: readonly TrackerSection[] = [
   'hintlog',
   'map',
 ];
-
-type Patch = (state: TrackerState) => void;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -131,18 +130,9 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     root.append(node);
   }
 
-  const apply = (state: TrackerState) => {
-    for (const patch of patches) {
-      // Isolated per panel: the store has already committed this state, so a
-      // throw here would otherwise leave every later panel showing the previous
-      // one — silently, and on stream.
-      try {
-        patch(state);
-      } catch (error) {
-        console.error('Tracker panel failed to update', error);
-      }
-    }
-  };
+  // Isolated per panel: the store has already committed this state, so a throw
+  // here would otherwise leave every later panel showing the previous one.
+  const apply = (state: TrackerState) => runPatches(patches, state);
 
   apply(store.getState());
   const unsubscribe = store.subscribe(apply);
@@ -182,9 +172,9 @@ function buildItems(
     body.append(wrap);
   }
 
-  patches.push((state) => {
-    for (const patch of cellPatches) patch(state);
-  });
+  // Per cell, not per panel: these eighteen shared one registered patch, so a
+  // throw in one dropped every cell after it.
+  patches.push((state) => runPatches(cellPatches, state));
 
   return root;
 }
@@ -228,10 +218,9 @@ function buildItemCell(
   patches.push((state) => {
     const value = state.items[def.id] ?? 0;
     const key = spriteFor(def, value);
-    if (key !== renderedSprite) {
-      renderedSprite = key;
+    renderedSprite = memoise(renderedSprite, key, () => {
       slot.replaceChildren(createSprite(resolver, key, { size: opts.itemSize }));
-    }
+    });
     cell.dataset.owned = String(value > 0);
     cell.title = def.note ? `${labelFor(def, value)} — ${def.note}` : labelFor(def, value);
     cell.setAttribute('aria-pressed', String(value > 0));
@@ -426,12 +415,12 @@ function buildMap(
       let renderedMap: string | null = null;
       patches.push(() => {
         const key = mapKey();
-        if (key === renderedMap) return;
-        renderedMap = key;
-        const resolved = resolver.resolve(key);
-        // A missing or unreachable map just leaves the cell blank; the codes
-        // and marks carry the tracker's own information regardless.
-        terrainImage.src = resolved.kind === 'image' ? resolved.url : '';
+        renderedMap = memoise(renderedMap, key, () => {
+          const resolved = resolver.resolve(key);
+          // A missing or unreachable map just leaves the cell blank; the codes
+          // and marks carry the tracker's own information regardless.
+          terrainImage.src = resolved.kind === 'image' ? resolved.url : '';
+        });
       });
 
       let renderedMark: string | null = null;
@@ -440,23 +429,21 @@ function buildMap(
       patches.push((state) => {
         const mark = state.marks[id] ?? 'none';
         const def = MARKS_BY_KIND.get(mark);
-        if (mark !== renderedMark) {
-          renderedMark = mark;
+        renderedMark = memoise(renderedMark, mark, () => {
           cell.dataset.mark = mark;
           cell.style.setProperty('--mark-color', def?.color ?? 'transparent');
           if (!def?.sprite) slot.replaceChildren();
           else slot.replaceChildren(createSprite(resolver, def.sprite, { size: 18, label: def.name }));
-        }
+        });
 
         const region = regionForScreen(id, state.seed.mirroredOverworld);
         const regionKey = `${region?.id ?? ''}:${state.focusRegion}`;
-        if (regionKey !== renderedRegion) {
-          renderedRegion = regionKey;
+        renderedRegion = memoise(renderedRegion, regionKey, () => {
           code.textContent = region?.code ?? '';
           cell.dataset.region = region?.id ?? '';
           cell.style.setProperty('--region-color', region?.color ?? 'transparent');
           cell.dataset.focused = String(!!region && region.id === state.focusRegion);
-        }
+        });
 
         const parts = [id];
         if (region) parts.push(region.name);

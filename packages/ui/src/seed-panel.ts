@@ -16,8 +16,7 @@ import {
   type Store,
   type TrackerState,
 } from '@z1r/core';
-
-type Patch = (state: TrackerState) => void;
+import { memoise, runPatches, type Patch } from './patch.js';
 
 function field(label: string, control: HTMLElement, hint?: string): HTMLElement {
   const wrap = document.createElement('label');

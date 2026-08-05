@@ -29,8 +29,7 @@ import {
   type Store,
   type TrackerState,
 } from '@z1r/core';
-
-type Patch = (state: TrackerState) => void;
+import { memoise, runPatches, type Patch } from './patch.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -148,14 +147,13 @@ export function buildTriforce(store: Store, patches: Patch[], interactive: boole
 
     patches.push((state) => {
       const quest = questForLevel(state.seed, level);
-      const position = POSITIONS[quest][level] ?? 'UL';
-      if (position !== renderedPosition) {
-        renderedPosition = position;
+      const position = POSITIONS[quest]?.[level] ?? 'UL';
+      renderedPosition = memoise(renderedPosition, position, () => {
         const shape = SHAPES[position];
         polygon.setAttribute('points', shape.points);
         numeral.setAttribute('x', String(shape.label[0]));
         numeral.setAttribute('y', String(shape.label[1]));
-      }
+      });
 
       const held = state.dungeons[String(level)]?.triforce ?? false;
       group.dataset.on = String(held);

@@ -16,8 +16,7 @@ import {
   type Store,
   type TrackerState,
 } from '@z1r/core';
-
-type Patch = (state: TrackerState) => void;
+import { memoise, runPatches, type Patch } from './patch.js';
 
 export function buildHintTracker(
   store: Store,
@@ -63,15 +62,14 @@ export function buildHintTracker(
 
   patches.push((state) => {
     const ids = state.hints.map((hint) => hint.id).join('|');
-    if (ids !== renderedIds) {
-      renderedIds = ids;
+    renderedIds = memoise(renderedIds, ids, () => {
       rowPatches.length = 0;
       body.replaceChildren();
       for (const hint of state.hints) {
         body.append(buildHintRow(store, hint.id, rowPatches, interactive));
       }
-    }
-    for (const patch of rowPatches) patch(state);
+    }) ?? '';
+    runPatches(rowPatches, state);
     empty.hidden = state.hints.length > 0;
     count.textContent = state.hints.length ? String(state.hints.length) : '';
   });

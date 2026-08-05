@@ -96,7 +96,7 @@ export class SpriteResolver {
     }
     const vector = VECTORS[key];
     if (vector) return { kind: 'svg', vector, name: entry.name };
-    return { kind: 'glyph', text: entry.glyph ?? entry.name.slice(0, 2), name: entry.name };
+    return { kind: 'glyph', text: entry.glyph ?? String(entry.name ?? key).slice(0, 2), name: entry.name ?? key };
   }
 
   /**
@@ -149,7 +149,7 @@ export class SpriteResolver {
    */
   fallback(key: string): ResolvedSprite {
     const entry = this.entry(key);
-    const name = entry?.name ?? key;
+    const name = String(entry?.name ?? key);
     const vector = VECTORS[key];
     if (vector) return { kind: 'svg', vector, name };
     return { kind: 'glyph', text: entry?.glyph ?? name.slice(0, 2), name };
