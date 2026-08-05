@@ -107,7 +107,10 @@
 
 .z1r-item-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  /* Replaced at runtime with a balanced column count — see `balanceItemGrids`.
+     This is the fallback for the first paint and for a zero-width measure. */
+  --z1r-item-min: 44px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--z1r-item-min), 1fr));
   gap: 4px;
 }
 
@@ -1213,6 +1216,21 @@
   text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
 }
 
+/*
+ * One vertical axis for the whole overlay.
+ *
+ * Balanced columns are sized in px rather than fractions, so a group with
+ * fewer columns than fit would hug the start edge, and a start-aligned caption
+ * above a centred grid reads as a misalignment rather than a heading.
+ */
+.z1r-tracker[data-mode="overlay"] .z1r-item-grid {
+  justify-content: center;
+}
+
+.z1r-tracker[data-mode="overlay"] .z1r-item-group-label {
+  text-align: center;
+}
+
 .z1r-tracker[data-mode="overlay"] .z1r-compact-slot {
   background: transparent;
 }
@@ -1224,16 +1242,24 @@
   max-inline-size: none;
 }
 
-/* Overlay composition: one left edge for everything. */
+/*
+ * Overlay composition: centred on a shared axis.
+ *
+ * The 190px cap and the flush-left margin were written for the old side-by-side
+ * pair, where the Triforce had a ~190px column of its own. Stacked, they left
+ * the triangle in the corner of a 420px panel with a third of the width dead
+ * beside it. The item rows centre, so this centres too.
+ */
 .z1r-tracker[data-mode="overlay"] .z1r-triforce {
-  /* Centred inside its panel on a page, which reads as misaligned when the
-     panel chrome is gone and only the shapes remain. */
-  margin-inline: 0;
-  max-inline-size: 190px;
+  margin-inline: auto;
+  /* Not the full width: the triangle is close to 2:1, so letting it span the
+     composition doubles the overlay's height for no extra legibility, and
+     vertical space is what a stream layout is actually short of. */
+  max-inline-size: 260px;
 }
 
 .z1r-tracker[data-mode="overlay"] .z1r-triforce-status {
-  text-align: start;
+  text-align: center;
   text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
 }
 

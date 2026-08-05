@@ -152,8 +152,65 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     const width = root.offsetWidth;
     root.dataset.width = width < 640 ? 'xs' : width < 720 ? 'sm' : 'md';
   };
-  applyWidthBand();
-  const widthObserver = new ResizeObserver(applyWidthBand);
+
+  /*
+   * Balance each item grid so the last row is never a stray remainder.
+   *
+   * `repeat(auto-fill, ...)` packs as many columns as fit and lets the
+   * remainder fall where it may — ten B-slot items in eight columns render as
+   * eight and then a lonely two. Choosing the column count from the row count
+   * instead gives five and five, which is also how the game's own inventory
+   * reads: one row of always-active items, then the equipable ones below.
+   *
+   * The cell size stays keyed to the *maximum* columns that fit, not the
+   * balanced count, so every group draws at one size. Sprites snap to integer
+   * scale factors, so a group with wider cells would land on a different
+   * multiple and visibly disagree with its neighbour.
+   */
+  const balanceItemGrids = () => {
+    for (const grid of root.querySelectorAll<HTMLElement>('.z1r-item-grid')) {
+      /*
+       * Overlay only. The web and desktop panels have room to let cells stretch
+       * to fill, which is what `auto-fill` with a `1fr` track already does well;
+       * balancing there would shrink every cell to its minimum and centre the
+       * block, which is a change to those apps that nobody asked for.
+       */
+      if (mode !== 'overlay') {
+        if (grid.style.gridTemplateColumns) grid.style.removeProperty('grid-template-columns');
+        continue;
+      }
+
+      const count = grid.childElementCount;
+      if (count === 0) continue;
+
+      const styles = getComputedStyle(grid);
+      const gap = Number.parseFloat(styles.columnGap) || 0;
+      const inner =
+        grid.clientWidth -
+        (Number.parseFloat(styles.paddingLeft) || 0) -
+        (Number.parseFloat(styles.paddingRight) || 0);
+      // Mid-teardown, or display:none — leave the stylesheet's rule in place
+      // rather than committing a column count derived from a zero width.
+      if (inner <= 0) continue;
+
+      const minCell = Number.parseFloat(styles.getPropertyValue('--z1r-item-min')) || 44;
+      const maxColumns = Math.max(1, Math.floor((inner + gap) / (minCell + gap)));
+      const rows = Math.ceil(count / maxColumns);
+      const columns = Math.ceil(count / rows);
+      const cell = Math.max(minCell, Math.floor((inner + gap) / maxColumns - gap));
+
+      const next = `repeat(${columns}, ${cell}px)`;
+      // Writing unconditionally would re-enter this observer on every pass.
+      if (grid.style.gridTemplateColumns !== next) grid.style.gridTemplateColumns = next;
+    }
+  };
+
+  const applyLayout = () => {
+    applyWidthBand();
+    balanceItemGrids();
+  };
+  applyLayout();
+  const widthObserver = new ResizeObserver(applyLayout);
   widthObserver.observe(root);
 
   apply(store.getState());
