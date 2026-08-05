@@ -64,6 +64,8 @@ export interface SeedSettings {
   shuffleMinorDrops: boolean;
   /** Ladder, raft, bracelet, recorder, bow (and wand when swordless) may be in L9. */
   importantItemsIn9: boolean;
+  /** Mirrored Overworld flips the map left-to-right — and the hint regions with it. */
+  mirroredOverworld: boolean;
   /**
    * Which quest levels 1-6 turned out to be, and 7-9 respectively. Fixed
    * quests derive these; Mixed and the Random options can't be known until
@@ -83,6 +85,7 @@ export function createSeedSettings(): SeedSettings {
     shuffleDungeonDrops: true,
     shuffleMinorDrops: false,
     importantItemsIn9: false,
+    mirroredOverworld: false,
     questLow: '1st',
     questHigh: '1st',
     notes: '',

@@ -57,8 +57,19 @@ still has somewhere to live.
 Turning on **Shuffle minor drops** grows a `+ floor` button per level, since that flag lets a
 dungeon hold more floor items than the base tables list.
 
-Full detail, including the per-quest slot tables and how the Mixed Quest split works, is in
-[`docs/SEEDS.md`](docs/SEEDS.md).
+## Hints
+
+A Z1R hint pairs a subject with an overworld region — "Digdogger gazes… By a Lake" — so the
+**Hints** panel is a row per hint: the dungeon (listed by the phrase you actually hear) or item, and
+the region. Hit **show** and those screens light up on the overworld grid.
+
+The regions are built into the tiled map rather than left in a reference image: every screen carries
+its two-letter region code (`DM`, `LK`, `DE`…), so a hint turns 128 screens into the handful worth
+walking to. The **Regions** toggle hides the codes; **Hint map** still opens the original wiki
+image. **Mirrored overworld** flips the map and the regions with it.
+
+Full detail — per-quest slot tables, the Mixed Quest split, the region table and where it came
+from — is in [`docs/SEEDS.md`](docs/SEEDS.md).
 
 ## Accessibility
 
@@ -103,7 +114,7 @@ The overlay accepts query parameters:
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `sections` | `summary,items,dungeons` | Any of `summary`, `seed`, `items`, `dungeons`, `locations`, `map`, `hints` |
+| `sections` | `summary,items,dungeons` | Any of `summary`, `seed`, `items`, `dungeons`, `locations`, `hintlog`, `map`, `hints` |
 | `size` | `40` | Item cell size in pixels |
 | `scale` | `1` | Scales the whole overlay |
 
@@ -136,8 +147,12 @@ the only dev dependencies.
 
 ## Status
 
-Early. The tracker is functional end to end; the sprite manifest is still unfilled, so everything
-renders as glyphs until art URLs are supplied.
+Functional end to end: items, dungeons, seed settings, derived item locations, the hint log and the
+region-labelled overworld all work and persist.
+
+The sprite manifest holds no remote art yet. The Triforce, hearts, rupees, bombs, keys and overworld
+marks are drawn as vectors; detailed item sprites (swords, bow, recorder, and friends) still render
+as lettered glyphs until URLs are supplied. `npm run sprites:check` lists what's outstanding.
 
 ## License
 

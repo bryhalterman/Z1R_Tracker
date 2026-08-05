@@ -13,7 +13,9 @@ import {
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
+  REGIONS_BY_ID,
   TRIFORCE_REQUIRED_FOR_L9,
+  regionForScreen,
   canEnterLevel9,
   clearedCount,
   evaluateAll,
@@ -31,6 +33,7 @@ import {
 import { createSprite } from './sprite.js';
 import { buildSeedPanel } from './seed-panel.js';
 import { buildLocations } from './locations.js';
+import { buildHintTracker } from './hints.js';
 
 export type TrackerSection =
   | 'summary'
@@ -38,6 +41,7 @@ export type TrackerSection =
   | 'items'
   | 'dungeons'
   | 'locations'
+  | 'hintlog'
   | 'map'
   | 'hints';
 
@@ -59,6 +63,7 @@ const DEFAULT_SECTIONS: readonly TrackerSection[] = [
   'items',
   'dungeons',
   'locations',
+  'hintlog',
   'map',
   'hints',
 ];
@@ -106,6 +111,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     items: () => buildItems(store, resolver, patches, { interactive, itemSize }),
     dungeons: () => buildDungeons(store, resolver, patches, interactive),
     locations: () => buildLocations(store, resolver, patches, interactive),
+    hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),
     hints: () => buildHints(patches),
   };
@@ -282,7 +288,10 @@ function buildDungeons(
     row.dataset.level = String(def.level);
 
     const head = el('div', 'z1r-dungeon-head');
-    head.append(createSprite(resolver, def.sprite, { size: 28, label: `Level ${def.level}` }));
+    // The hint phrase is how the game refers to this level, so surface it where
+    // you'd look when an old man has just said it.
+    head.title = `Level ${def.level} — “${def.hint}”`;
+    head.append(createSprite(resolver, def.sprite, { size: 24, label: `Level ${def.level}` }));
     head.append(el('span', 'z1r-dungeon-name', `${def.level}`));
     row.append(head);
 
@@ -356,15 +365,29 @@ function buildMap(
 ): HTMLElement {
   const { root, body } = section('Overworld', 'z1r-map');
   body.style.setProperty('--map-columns', String(OVERWORLD_COLUMNS));
+  const heading = root.querySelector('.z1r-panel-title');
 
-  // The community hint-location map is the thing you actually reach for when
-  // an old man gives you a hint, so it lives one click away rather than in a
-  // browser tab behind OBS.
+  // Hint regions are baked into the grid rather than left in a reference
+  // image: a hint names a region, so the map should be able to answer "which
+  // screens is that?" directly.
+  const regionToggle = el('button', 'z1r-map-ref-toggle', 'Regions');
+  regionToggle.type = 'button';
+  regionToggle.dataset.open = 'true';
+  regionToggle.title = 'Show the hint region code on each screen';
+  regionToggle.addEventListener('click', () => {
+    const on = regionToggle.dataset.open !== 'true';
+    regionToggle.dataset.open = String(on);
+    body.dataset.regions = String(on);
+  });
+  body.dataset.regions = 'true';
+  heading?.append(regionToggle);
+
+  // Kept alongside as the source of truth people already know.
   const reference = resolver.resolve('ref.owHints');
   if (reference.kind === 'image') {
-    const toggle = el('button', 'z1r-map-ref-toggle', 'Hint locations');
+    const toggle = el('button', 'z1r-map-ref-toggle', 'Hint map');
     toggle.type = 'button';
-    toggle.title = 'Show the overworld hint-location reference map';
+    toggle.title = 'Show the original overworld hint-region reference map';
 
     const figure = el('figure', 'z1r-map-ref');
     figure.hidden = true;
@@ -380,9 +403,17 @@ function buildMap(
       if (!figure.hidden && !image.src) image.src = reference.url;
     });
 
-    root.querySelector('.z1r-panel-title')?.append(toggle);
+    heading?.append(toggle);
     root.append(figure);
   }
+
+  const focusNote = el('span', 'z1r-map-focus');
+  heading?.append(focusNote);
+  patches.push((state) => {
+    const def = state.focusRegion ? REGIONS_BY_ID.get(state.focusRegion) : undefined;
+    focusNote.textContent = def ? `showing ${def.code} · ${def.name}` : '';
+    focusNote.hidden = !def;
+  });
 
   for (let row = 1; row <= OVERWORLD_ROWS; row++) {
     for (let col = 1; col <= OVERWORLD_COLUMNS; col++) {
@@ -402,17 +433,40 @@ function buildMap(
         });
       }
 
+      // The region code is the non-colour channel: two letters, always legible,
+      // where a tint alone would be unreadable to a colour-blind viewer.
+      const code = el('span', 'z1r-screen-region');
+      const slot = el('span', 'z1r-screen-mark');
+      cell.append(code, slot);
+
       let renderedMark: string | null = null;
+      let renderedRegion: string | null = null;
+
       patches.push((state) => {
         const mark = state.marks[id] ?? 'none';
-        if (mark === renderedMark) return;
-        renderedMark = mark;
         const def = MARKS_BY_KIND.get(mark);
-        cell.dataset.mark = mark;
-        cell.style.setProperty('--mark-color', def?.color ?? 'transparent');
-        cell.title = def && mark !== 'none' ? `${id} — ${def.name}` : id;
-        if (!def?.sprite) cell.replaceChildren();
-        else cell.replaceChildren(createSprite(resolver, def.sprite, { size: 20, label: def.name }));
+        if (mark !== renderedMark) {
+          renderedMark = mark;
+          cell.dataset.mark = mark;
+          cell.style.setProperty('--mark-color', def?.color ?? 'transparent');
+          if (!def?.sprite) slot.replaceChildren();
+          else slot.replaceChildren(createSprite(resolver, def.sprite, { size: 18, label: def.name }));
+        }
+
+        const region = regionForScreen(id, state.seed.mirroredOverworld);
+        const regionKey = `${region?.id ?? ''}:${state.focusRegion}`;
+        if (regionKey !== renderedRegion) {
+          renderedRegion = regionKey;
+          code.textContent = region?.code ?? '';
+          cell.dataset.region = region?.id ?? '';
+          cell.style.setProperty('--region-color', region?.color ?? 'transparent');
+          cell.dataset.focused = String(!!region && region.id === state.focusRegion);
+        }
+
+        const parts = [id];
+        if (region) parts.push(region.name);
+        if (def && mark !== 'none') parts.push(def.name);
+        cell.title = parts.join(' — ');
       });
 
       body.append(cell);

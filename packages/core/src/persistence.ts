@@ -35,6 +35,16 @@ export function migrate(raw: unknown): TrackerState | null {
     seed: { ...base.seed, ...(candidate.seed ?? {}) },
     locations: { ...(candidate.locations ?? {}) },
     extraFloorSlots: { ...(candidate.extraFloorSlots ?? {}) },
+    hints: Array.isArray(candidate.hints) ? candidate.hints : [],
+    // Restart ids above anything the save already used, or a new hint would
+    // collide with an existing one and edits would hit the wrong row.
+    hintSeq: Math.max(
+      candidate.hintSeq ?? 0,
+      ...(Array.isArray(candidate.hints)
+        ? candidate.hints.map((h) => Number(String(h?.id ?? '').replace(/^h/, '')) || 0)
+        : [0]),
+    ),
+    focusRegion: typeof candidate.focusRegion === 'string' ? candidate.focusRegion : '',
   };
 }
 

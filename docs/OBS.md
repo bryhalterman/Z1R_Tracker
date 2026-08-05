@@ -46,7 +46,7 @@ apps/obs/dist/index.html?sections=summary,items&size=32&scale=1.25
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `sections` | `summary,items,dungeons` | Any of `summary`, `seed`, `items`, `dungeons`, `locations`, `map`, `hints` |
+| `sections` | `summary,items,dungeons` | Any of `summary`, `seed`, `items`, `dungeons`, `locations`, `hintlog`, `map`, `hints` |
 | `size` | `40` | Item cell size in pixels |
 | `scale` | `1` | Scales the whole overlay |
 

@@ -79,6 +79,8 @@ Every stateful element carries a second, non-colour channel:
 | Dungeon row | green tint when cleared | `✓` at the end of the row |
 | Location slot kind | per-kind tint | the words `FLOOR` / `STAIR` / `HEART` / `OW` |
 | Overworld mark | per-mark tint | a distinct drawn shape per mark |
+| Overworld region | faint region tint | a two-letter code (`DM`, `LK`, …) on every screen |
+| Focused hint region | raised tint | 2px solid ring, brightened code, `◉ on map` on the button |
 | Location collected | dimmed row | the checkbox itself |
 | Level 9 status | green when open | the sentence changes |
 

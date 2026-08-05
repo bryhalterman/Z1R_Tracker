@@ -20,7 +20,7 @@
 
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   color: var(--z1r-text);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14px;
@@ -69,11 +69,15 @@
   background: var(--z1r-panel);
   border: 1px solid var(--z1r-border);
   border-radius: var(--z1r-radius);
-  padding: 10px 12px;
+  padding: 7px 9px;
 }
 
 .z1r-panel-title {
-  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0 0 5px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -86,7 +90,7 @@
 .z1r-summary {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
@@ -125,8 +129,8 @@
 
 .z1r-item-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 4px;
 }
 
 .z1r-item {
@@ -179,14 +183,14 @@
 .z1r-dungeon-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .z1r-dungeon {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 3px 6px;
+  gap: 7px;
+  padding: 1px 5px;
   border-radius: 4px;
   background: #00000026;
 }
@@ -213,8 +217,9 @@
 .z1r-dungeon-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-inline-size: 52px;
+  gap: 5px;
+  min-inline-size: 44px;
+  cursor: help;
 }
 
 .z1r-dungeon-name {
@@ -276,17 +281,20 @@
 }
 
 .z1r-screen {
+  position: relative;
   aspect-ratio: 16 / 11;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: #0000004d;
+  /* Region tint is deliberately faint — the two-letter code carries the
+     meaning, the tint only groups neighbours at a glance. */
+  background: color-mix(in srgb, var(--region-color, transparent) 14%, #0000004d);
   border: 1px solid var(--z1r-border);
   border-radius: 2px;
   cursor: pointer;
   box-shadow: inset 0 0 0 0 var(--mark-color, transparent);
-  transition: box-shadow 90ms linear;
+  transition: box-shadow 90ms linear, background-color 90ms linear;
 }
 
 .z1r-screen:not([data-mark="none"]) {
@@ -300,6 +308,152 @@
 
 .z1r-screen:not(:disabled):hover {
   border-color: var(--z1r-accent);
+}
+
+.z1r-screen-region {
+  position: absolute;
+  inset-block-start: 1px;
+  inset-inline-start: 2px;
+  font-family: "Consolas", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--z1r-muted);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.z1r-map[data-regions="false"] .z1r-screen-region {
+  display: none;
+}
+
+.z1r-map[data-regions="false"] .z1r-screen {
+  background: #0000004d;
+}
+
+.z1r-screen-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* A focused region is called out by a solid ring, a brightened code and a
+   raised tint — three channels, none of which is colour on its own. */
+.z1r-screen[data-focused="true"] {
+  border-color: var(--z1r-accent);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--region-color, transparent) 34%, #0000004d);
+}
+
+.z1r-screen[data-focused="true"] .z1r-screen-region {
+  color: var(--z1r-text);
+  opacity: 1;
+  text-shadow: 0 0 3px #000;
+}
+
+.z1r-map-focus {
+  margin-inline-start: 10px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--z1r-accent);
+}
+
+/* ------------------------------------------------------------- hint tracker */
+
+.z1r-hint-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.z1r-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #00000026;
+}
+
+.z1r-hint-row[data-focused="true"] {
+  border-color: var(--z1r-accent);
+  background: #d9a4411f;
+}
+
+.z1r-hint-row .z1r-hint-subject {
+  flex: 2 1 190px;
+  min-inline-size: 0;
+  font-size: 12px;
+}
+
+.z1r-hint-row .z1r-hint-region {
+  flex: 1 1 130px;
+  min-inline-size: 0;
+  font-size: 12px;
+}
+
+.z1r-hint-row .z1r-hint-screen {
+  flex: none;
+  inline-size: 62px;
+  font-size: 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.z1r-hint-row .z1r-hint-note {
+  flex: 2 1 120px;
+  min-inline-size: 0;
+  font-size: 12px;
+}
+
+.z1r-hint-show {
+  flex: none;
+  padding: 2px 7px;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--z1r-muted);
+  background: transparent;
+  border: 1px dashed var(--z1r-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.z1r-hint-row[data-focused="true"] .z1r-hint-show {
+  color: var(--z1r-accent);
+  border-style: solid;
+  border-color: var(--z1r-accent);
+}
+
+.z1r-hint-show:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.z1r-hint-remove {
+  flex: none;
+  inline-size: 20px;
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--z1r-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.z1r-hint-remove:hover {
+  color: var(--z1r-bad);
+}
+
+.z1r-hint-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--z1r-muted);
 }
 
 .z1r-map-ref-toggle {
@@ -374,8 +528,8 @@
 
 .z1r-seed-body {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 8px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 5px 12px;
   align-items: end;
 }
 
@@ -462,15 +616,15 @@
 
 .z1r-location-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 6px;
 }
 
 .z1r-location-group {
   background: #00000026;
   border: 1px solid var(--z1r-border);
   border-radius: 4px;
-  padding: 5px 6px;
+  padding: 4px 5px;
 }
 
 .z1r-location-group-head {
@@ -503,8 +657,8 @@
 .z1r-location {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 0;
+  gap: 4px;
+  padding: 1px 0;
 }
 
 .z1r-location[data-collected="true"] {
@@ -547,8 +701,8 @@
 
 .z1r-location-label {
   flex: none;
-  inline-size: 62px;
-  font-size: 12px;
+  inline-size: 56px;
+  font-size: 11px;
   color: var(--z1r-muted);
 }
 

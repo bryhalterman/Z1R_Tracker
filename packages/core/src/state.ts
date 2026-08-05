@@ -21,6 +21,24 @@ export interface LocationState {
   collected: boolean;
 }
 
+/**
+ * One hint heard in game.
+ *
+ * A Z1R hint pairs a subject with an overworld region — "Digdogger gazes… By a
+ * Lake". Both halves are optional here because you often note one before the
+ * other, and a half-recorded hint still narrows the map.
+ */
+export interface HintEntry {
+  readonly id: string;
+  /** `d1`-`d9` for a level, or a shuffle-pool entry id for an item hint. */
+  subject: string;
+  /** Region id from `regions.ts`. */
+  region: string;
+  /** Screen where the hint was given, if worth remembering. */
+  screen: string;
+  note: string;
+}
+
 export interface DungeonState {
   /** Entrance located on the overworld. */
   found: boolean;
@@ -66,6 +84,12 @@ export interface TrackerState {
   locations: Record<string, LocationState>;
   /** Level -> extra floor slots added under Shuffle Minor Dungeon Drops. */
   extraFloorSlots: Record<string, number>;
+  /** Hints heard, in the order they were recorded. */
+  hints: HintEntry[];
+  /** Monotonic source of hint ids — the reducer must stay deterministic. */
+  hintSeq: number;
+  /** Region highlighted on the overworld grid, or '' for none. */
+  focusRegion: string;
   startedAt: number;
   /** Wall clock, for display only. Never compare two of these to order edits. */
   updatedAt: number;
@@ -84,6 +108,11 @@ export type Action =
   /** Mark a location picked up. Collecting also grants the item; unchecking never revokes it. */
   | { type: 'collectLocation'; id: string; collected: boolean }
   | { type: 'addFloorSlot'; level: number; delta: 1 | -1 }
+  | { type: 'addHint' }
+  | { type: 'updateHint'; id: string; patch: Partial<Omit<HintEntry, 'id'>> }
+  | { type: 'removeHint'; id: string }
+  /** Toggling the same region off is how you clear the map highlight. */
+  | { type: 'focusRegion'; region: string }
   /** An update received from another window. Adopts the sender's `rev` verbatim. */
   | { type: 'replace'; state: TrackerState }
   /** A save file loaded by the user here. Outranks whatever peers currently hold. */
@@ -122,6 +151,9 @@ export function createInitialState(game: Game = 'z1r', now = Date.now()): Tracke
     seed: createSeedSettings(),
     locations: {},
     extraFloorSlots: {},
+    hints: [],
+    hintSeq: 0,
+    focusRegion: '',
     startedAt: now,
     updatedAt: now,
   };
@@ -250,6 +282,33 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       const next = Math.min(Math.max((state.extraFloorSlots[key] ?? 0) + action.delta, 0), 8);
       if (next === (state.extraFloorSlots[key] ?? 0)) return state;
       return bump({ extraFloorSlots: { ...state.extraFloorSlots, [key]: next } });
+    }
+
+    case 'addHint': {
+      const seq = state.hintSeq + 1;
+      const hint: HintEntry = { id: `h${seq}`, subject: '', region: '', screen: '', note: '' };
+      return bump({ hints: [...state.hints, hint], hintSeq: seq });
+    }
+
+    case 'updateHint': {
+      const hints = state.hints.map((hint) =>
+        hint.id === action.id ? { ...hint, ...action.patch } : hint,
+      );
+      return bump({ hints });
+    }
+
+    case 'removeHint': {
+      const hints = state.hints.filter((hint) => hint.id !== action.id);
+      if (hints.length === state.hints.length) return state;
+      // Don't leave the map highlighting a region no hint mentions any more.
+      const stillReferenced = hints.some((hint) => hint.region === state.focusRegion);
+      return bump({ hints, focusRegion: stillReferenced ? state.focusRegion : '' });
+    }
+
+    case 'focusRegion': {
+      const next = state.focusRegion === action.region ? '' : action.region;
+      if (next === state.focusRegion) return state;
+      return bump({ focusRegion: next });
     }
 
     case 'replace':

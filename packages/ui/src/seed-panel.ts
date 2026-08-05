@@ -85,7 +85,7 @@ export function buildSeedPanel(store: Store, patches: Patch[], interactive: bool
   };
 
   const check = (
-    key: 'shuffleDungeonDrops' | 'shuffleMinorDrops' | 'importantItemsIn9',
+    key: 'shuffleDungeonDrops' | 'shuffleMinorDrops' | 'importantItemsIn9' | 'mirroredOverworld',
     label: string,
     hint: string,
   ) => {
@@ -169,6 +169,11 @@ export function buildSeedPanel(store: Store, patches: Patch[], interactive: bool
       'importantItemsIn9',
       'Important items in 9',
       'Ladder, raft, bracelet, recorder and bow may appear in Level 9.',
+    ),
+    check(
+      'mirroredOverworld',
+      'Mirrored overworld',
+      'Flips the map left to right — the hint regions on the grid flip with it.',
     ),
   );
   body.append(checks);

@@ -95,8 +95,48 @@ Three overworld spots are shuffled independently of dungeons and get their own r
 - **Armos** — the item under an Armos statue.
 - **Coast** — the ladder-only spot on the coast.
 
-## Hint locations
+## Hints
 
-The Overworld panel has a **Hint locations** toggle that pulls in the community hint-location map,
-so it's one click away instead of in a browser tab behind OBS. The image is fetched only on first
-reveal.
+A Z1R hint pairs a **subject** with an **overworld region** — "Digdogger gazes… By a Lake". The
+tracker models exactly that.
+
+### Regions on the map
+
+The overworld grid labels every screen with its hint region:
+
+| Code | Region | Code | Region |
+| --- | --- | --- | --- |
+| `DM` | Death Mountain | `LK` | By a Lake |
+| `GR` | At the Grave | `CO` | The Coast |
+| `DW` | The Dead Woods | `FO` | The Forest |
+| `RV` | The River | `LH` | The Lost Hills |
+| `CS` | Close to Start | `DE` | The Desert |
+
+The **Regions** toggle in the Overworld panel turns the codes off if you want a plain grid; **Hint
+map** still opens the original wiki reference image.
+
+The region table was extracted from that map by matching each screen against the map's flat fill
+colours — every screen resolved at ≥92% agreement, so this isn't eyeballed.
+
+### The hint log
+
+Each row in the **Hints** panel is one hint:
+
+1. **Subject** — a dungeon, listed by the phrase you actually hear (`Digdogger gazes… (L5)`), or an
+   item from the shuffle pool.
+2. **Region** — one of the ten above.
+3. **Show** — lights that region's screens up on the grid. The button reads `○ show` or `◉ on map`,
+   so its state is legible without colour.
+4. **Heard at** and **note** — optional bookkeeping.
+
+Both halves are optional. You often note the subject before the region, or vice versa, and a
+half-recorded hint still narrows the map.
+
+Picking a region focuses it immediately, since that's almost always what you wanted next. Clicking
+`◉ on map` again clears the highlight.
+
+## Mirrored overworld
+
+The **Mirrored overworld** checkbox flips the map left to right — `A1` becomes `A16`. The hint
+regions flip with it, which is why the wiki has no separate mirrored hint map: the same table
+reflects. Turn it on and the grid's region codes reverse to match what you're actually looking at.
