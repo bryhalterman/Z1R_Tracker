@@ -50,6 +50,11 @@ export interface MountOptions {
   readonly sections?: readonly TrackerSection[];
   /** Item cell edge length in CSS pixels. */
   readonly itemSize?: number;
+  /**
+   * Dense layout for narrow contexts — the OBS dock and overlay. Panels that
+   * have a compact form use it; the rest are unaffected.
+   */
+  readonly compact?: boolean;
 }
 
 const DEFAULT_SECTIONS: readonly TrackerSection[] = [
@@ -88,6 +93,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     interactive = true,
     sections = DEFAULT_SECTIONS,
     itemSize = 40,
+    compact = false,
   } = options;
 
   // Spectrum scopes its tokens to these classes, so the mount root carries them
@@ -95,6 +101,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   // scale; `large` is for touch and would inflate every control.
   root.classList.add('z1r-tracker', 'spectrum', 'spectrum--dark', 'spectrum--medium');
   root.dataset.mode = mode;
+  root.dataset.compact = String(compact);
   root.dataset.interactive = String(interactive);
   root.replaceChildren();
 
@@ -103,7 +110,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     seed: () => buildSeedPanel(store, patches, interactive),
     items: () => buildItems(store, resolver, patches, { interactive, itemSize }),
     dungeons: () => buildTriforce(store, patches, interactive),
-    locations: () => buildLocations(store, resolver, patches, interactive),
+    locations: () => buildLocations(store, resolver, patches, interactive, compact),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),
   };

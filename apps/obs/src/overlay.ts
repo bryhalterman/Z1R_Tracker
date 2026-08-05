@@ -7,6 +7,7 @@
  */
 
 import {
+  OVERLAY_DEFAULT_SECTIONS,
   allowedSections,
   attachPersistence,
   createInitialState,
@@ -27,7 +28,7 @@ async function main(): Promise<void> {
   // Filtered rather than trusted: the overworld grid isn't offered in the OBS
   // build at all, and a typo shouldn't put an empty panel on stream.
   const sections = allowedSections(
-    (params.get('sections') ?? 'items,dungeons').split(',').map((value) => value.trim()),
+    (params.get('sections') ?? OVERLAY_DEFAULT_SECTIONS).split(',').map((value) => value.trim()),
   );
 
   const scale = Number(params.get('scale') ?? '1');
@@ -49,6 +50,7 @@ async function main(): Promise<void> {
     mode: 'overlay',
     interactive: false,
     sections,
+    compact: true,
     itemSize: Number.isFinite(itemSize) ? itemSize : 40,
   });
 }

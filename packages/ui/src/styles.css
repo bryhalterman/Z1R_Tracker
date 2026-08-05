@@ -1058,3 +1058,124 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ------------------------------------------------- compact locations (OBS) */
+
+/*
+ * Built for a stream, where the game capture is the premium space. One line per
+ * level, each slot an 18px chip: roughly a sixth of the area the full layout
+ * needs. Both facts still read — the sprite says what is there, and a solid
+ * versus dashed border says whether it has been collected.
+ */
+.z1r-locations-compact-panel {
+  position: relative;
+}
+
+.z1r-locations-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.z1r-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.z1r-compact-level {
+  inline-size: 20px;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-muted);
+}
+
+.z1r-compact-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 20px;
+  block-size: 20px;
+  padding: 0;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  color: var(--z1r-muted);
+  background: var(--z1r-inset);
+  border: var(--z1r-border-width) dashed var(--z1r-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.z1r-compact-slot[data-known="true"] {
+  color: var(--z1r-text);
+}
+
+/* Collected: solid border and full strength. Unknown or uncollected stays
+   dashed and dimmed, so the state never rests on colour. */
+.z1r-compact-slot[data-collected="true"] {
+  border-style: solid;
+  border-color: var(--z1r-accent);
+}
+
+.z1r-compact-slot[data-collected="false"] {
+  opacity: 0.7;
+}
+
+.z1r-compact-slot:disabled {
+  cursor: default;
+}
+
+.z1r-compact-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.z1r-slot-picker {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  inline-size: max-content;
+  max-block-size: 260px;
+  overflow-y: auto;
+  padding: var(--z1r-space-sm);
+  background: var(--z1r-panel);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  box-shadow: 0 6px 18px #000a;
+}
+
+.z1r-slot-picker[hidden] {
+  display: none;
+}
+
+.z1r-slot-option {
+  display: flex;
+  align-items: center;
+  gap: var(--z1r-space-sm);
+  min-block-size: var(--spectrum-component-height-75);
+  padding: 1px var(--z1r-space-sm);
+  font: inherit;
+  font-size: var(--z1r-text-md);
+  text-align: start;
+  white-space: nowrap;
+  color: var(--z1r-text);
+  background: transparent;
+  border: var(--z1r-border-width) solid transparent;
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+}
+
+.z1r-slot-option:hover {
+  background: var(--z1r-inset);
+  border-color: var(--z1r-accent);
+}
+
+/* The overlay is read-only and sits over gameplay: no panel chrome at all. */
+.z1r-tracker[data-mode="overlay"] .z1r-locations-compact-panel {
+  padding: 0;
+}

@@ -7,7 +7,7 @@
  */
 
 import {
-  OBS_SECTIONS,
+  DOCK_SECTIONS,
   attachPersistence,
   createInitialState,
   createStore,
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
 
   mountControls(controls, { store, footnote: 'Browser source: index.html' });
-  mountTracker(root, { store, resolver, itemSize: 34, sections: OBS_SECTIONS });
+  mountTracker(root, { store, resolver, itemSize: 34, sections: DOCK_SECTIONS, compact: true });
 }
 
 void main();
