@@ -29,8 +29,17 @@ import {
   type TrackerState,
 } from '@z1r/core';
 import { createSprite } from './sprite.js';
+import { buildSeedPanel } from './seed-panel.js';
+import { buildLocations } from './locations.js';
 
-export type TrackerSection = 'summary' | 'items' | 'dungeons' | 'map' | 'hints';
+export type TrackerSection =
+  | 'summary'
+  | 'seed'
+  | 'items'
+  | 'dungeons'
+  | 'locations'
+  | 'map'
+  | 'hints';
 
 export interface MountOptions {
   readonly store: Store;
@@ -46,8 +55,10 @@ export interface MountOptions {
 
 const DEFAULT_SECTIONS: readonly TrackerSection[] = [
   'summary',
+  'seed',
   'items',
   'dungeons',
+  'locations',
   'map',
   'hints',
 ];
@@ -91,14 +102,18 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   const patches: Patch[] = [];
   const builders: Record<TrackerSection, () => HTMLElement> = {
     summary: () => buildSummary(patches),
+    seed: () => buildSeedPanel(store, patches, interactive),
     items: () => buildItems(store, resolver, patches, { interactive, itemSize }),
     dungeons: () => buildDungeons(store, resolver, patches, interactive),
+    locations: () => buildLocations(store, resolver, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),
     hints: () => buildHints(patches),
   };
 
   for (const name of sections) {
-    root.append(builders[name]());
+    // An unknown `?sections=` value must not take the whole overlay down.
+    const build = builders[name];
+    if (build) root.append(build());
   }
 
   const apply = (state: TrackerState) => {
@@ -341,6 +356,33 @@ function buildMap(
 ): HTMLElement {
   const { root, body } = section('Overworld', 'z1r-map');
   body.style.setProperty('--map-columns', String(OVERWORLD_COLUMNS));
+
+  // The community hint-location map is the thing you actually reach for when
+  // an old man gives you a hint, so it lives one click away rather than in a
+  // browser tab behind OBS.
+  const reference = resolver.resolve('ref.owHints');
+  if (reference.kind === 'image') {
+    const toggle = el('button', 'z1r-map-ref-toggle', 'Hint locations');
+    toggle.type = 'button';
+    toggle.title = 'Show the overworld hint-location reference map';
+
+    const figure = el('figure', 'z1r-map-ref');
+    figure.hidden = true;
+    const image = el('img');
+    image.alt = reference.name;
+    image.loading = 'lazy';
+    figure.append(image);
+
+    toggle.addEventListener('click', () => {
+      figure.hidden = !figure.hidden;
+      toggle.dataset.open = String(!figure.hidden);
+      // Fetch only on first reveal — it's a 135 kB third-party image.
+      if (!figure.hidden && !image.src) image.src = reference.url;
+    });
+
+    root.querySelector('.z1r-panel-title')?.append(toggle);
+    root.append(figure);
+  }
 
   for (let row = 1; row <= OVERWORLD_ROWS; row++) {
     for (let col = 1; col <= OVERWORLD_COLUMNS; col++) {

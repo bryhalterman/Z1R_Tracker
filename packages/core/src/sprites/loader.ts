@@ -23,6 +23,8 @@ export interface SpriteEntry {
   readonly rect?: readonly [number, number, number, number];
 }
 
+import { VECTORS, type VectorSprite } from './vectors.js';
+
 export interface SpriteManifest {
   readonly version: number;
   readonly baseUrl?: string;
@@ -33,6 +35,7 @@ export interface SpriteManifest {
 export type ResolvedSprite =
   | { kind: 'image'; url: string; name: string }
   | { kind: 'sheet'; url: string; rect: readonly [number, number, number, number]; name: string }
+  | { kind: 'svg'; vector: VectorSprite; name: string }
   | { kind: 'glyph'; text: string; name: string };
 
 function join(baseUrl: string | undefined, url: string): string {
@@ -65,9 +68,18 @@ export class SpriteResolver {
     return this.#manifest.sprites[key];
   }
 
+  /**
+   * Resolution order: supplied art first, then a drawn vector, then letters.
+   * Putting `url`/`sheet` ahead of the vector is what lets a CSV of real NES
+   * art override the built-ins without editing code.
+   */
   resolve(key: string): ResolvedSprite {
     const entry = this.entry(key);
     if (!entry) {
+      // An unknown key can still have a drawn vector — `slot.floor` and
+      // friends are rendered without needing a manifest row.
+      const vector = VECTORS[key];
+      if (vector) return { kind: 'svg', vector, name: key };
       this.#unknown.add(key);
       return { kind: 'glyph', text: '?', name: key };
     }
@@ -82,6 +94,8 @@ export class SpriteResolver {
     if (entry.url) {
       return { kind: 'image', url: join(this.#manifest.baseUrl, entry.url), name: entry.name };
     }
+    const vector = VECTORS[key];
+    if (vector) return { kind: 'svg', vector, name: entry.name };
     return { kind: 'glyph', text: entry.glyph ?? entry.name.slice(0, 2), name: entry.name };
   }
 
@@ -91,7 +105,7 @@ export class SpriteResolver {
    */
   preload(key: string): Promise<boolean> {
     const resolved = this.resolve(key);
-    if (resolved.kind === 'glyph') return Promise.resolve(true);
+    if (resolved.kind === 'glyph' || resolved.kind === 'svg') return Promise.resolve(true);
 
     const cached = this.#preloads.get(resolved.url);
     if (cached) return cached;
@@ -103,8 +117,11 @@ export class SpriteResolver {
       }
       const image = new Image();
       image.decoding = 'async';
-      // Remote art is third-party; never let it carry credentials.
-      image.crossOrigin = 'anonymous';
+      // Deliberately NOT crossOrigin='anonymous'. This probe only asks "does
+      // this URL load?" — nothing here reads pixels, so CORS buys no safety
+      // and costs real hosts: spriters-resource.com serves sprite sheets with
+      // no Access-Control-Allow-Origin, so an anonymous request fails and the
+      // sprite falls back to a glyph even though CSS renders it fine.
       image.onload = () => resolve(true);
       image.onerror = () => resolve(false);
       image.src = resolved.url;
@@ -123,10 +140,13 @@ export class SpriteResolver {
     return [...this.#unknown].sort();
   }
 
-  /** Manifest keys with no art wired up yet. Used by `npm run sprites:check`. */
+  /**
+   * Manifest keys with neither remote art nor a drawn vector — the ones that
+   * still render as letters. Used by `npm run sprites:check`.
+   */
   unfilled(): string[] {
     return Object.entries(this.#manifest.sprites)
-      .filter(([, entry]) => !entry.url && !entry.sheet)
+      .filter(([key, entry]) => !entry.url && !entry.sheet && !VECTORS[key])
       .map(([key]) => key)
       .sort();
   }

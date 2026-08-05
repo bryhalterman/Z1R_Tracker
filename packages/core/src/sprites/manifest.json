@@ -51,6 +51,12 @@
     "ui.triforce": { "url": "", "name": "Triforce Piece", "glyph": "▲" },
     "ui.map": { "url": "", "name": "Map", "glyph": "M" },
     "ui.compass": { "url": "", "name": "Compass", "glyph": "C" },
-    "ui.ganon": { "url": "", "name": "Ganon", "glyph": "G" }
+    "ui.ganon": { "url": "", "name": "Ganon", "glyph": "G" },
+    "ui.triforce.full": { "url": "", "name": "Triforce", "glyph": "▲" },
+    "ref.owHints": {
+      "url": "https://static.wikia.nocookie.net/z1r/images/1/1b/OW_Hint_Locations.png/revision/latest/scale-to-width-down/1000",
+      "name": "Overworld Hint Locations",
+      "glyph": "?"
+    }
   }
 }

@@ -3,10 +3,12 @@
 export * from './items.js';
 export * from './dungeons.js';
 export * from './overworld.js';
+export * from './seed.js';
 export * from './state.js';
 export * from './logic.js';
 export * from './persistence.js';
 export * from './sprites/loader.js';
+export * from './sprites/vectors.js';
 
 import manifest from './sprites/manifest.json';
 import { SpriteResolver, type SpriteManifest } from './sprites/loader.js';

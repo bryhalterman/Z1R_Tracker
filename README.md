@@ -42,14 +42,41 @@ The **Can I…** row is a live capability readout — it answers "do I hold what
 It deliberately does not claim a location is in logic, because the randomizer shuffles item
 placement and dungeon entrances and any such claim would be wrong under some settings.
 
+## Seeds, settings and item locations
+
+The **Seed** panel takes the seed number, the full flag string, and the handful of settings that
+actually change the tracker's shape. The important one is **Dungeon Quest**: it determines how many
+item slots each level has and whether they're **floor** items (lying in a room) or **stair** items
+(behind a staircase, in an item basement). Change it and the location list re-shapes to match.
+
+The **Item locations** panel is a slot per findable item — every dungeon floor/stair slot, every
+Heart Container, plus the three shuffled overworld spots (White Sword Cave, Armos, Coast). Each row
+records *what's there* and *whether you've taken it*, separately, so a hint you can't act on yet
+still has somewhere to live.
+
+Turning on **Shuffle minor drops** grows a `+ floor` button per level, since that flag lets a
+dungeon hold more floor items than the base tables list.
+
+Full detail, including the per-quest slot tables and how the Mixed Quest split works, is in
+[`docs/SEEDS.md`](docs/SEEDS.md).
+
+## Accessibility
+
+No state in this tracker is signalled by colour alone. Held items have a solid border and unheld
+ones a dashed border; capability chips carry a `✓` or `✕`; slot kinds are spelled out as `FLOOR` /
+`STAIR`; overworld marks are distinct drawn shapes, not coloured squares. The rule and the full
+table of second channels are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#accessibility) — keep
+to it when adding panels.
+
 ## Sprites
 
 **No sprite art is stored in this repo.** `packages/core/src/sprites/manifest.json` maps a stable
 logical key (`item.sword.wood`) to a remote URL, and every renderer asks the resolver instead of
 hard-coding a path.
 
-Keys with no URL render as a lettered glyph, so the tracker is fully usable before any art exists —
-which is exactly the state it ships in.
+Sprites simple enough to draw — the Triforce, hearts, rupees, bombs, keys, and every overworld mark
+— are **inline SVG** in `sprites/vectors.ts`, so they need no host, work offline, and look right out
+of the box. Anything left over renders as a lettered glyph. Supplying a URL overrides either.
 
 To wire up real art, put a CSV next to the repo and run:
 
@@ -76,7 +103,7 @@ The overlay accepts query parameters:
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `sections` | `summary,items,dungeons` | Which panels to show, comma separated |
+| `sections` | `summary,items,dungeons` | Any of `summary`, `seed`, `items`, `dungeons`, `locations`, `map`, `hints` |
 | `size` | `40` | Item cell size in pixels |
 | `scale` | `1` | Scales the whole overlay |
 
@@ -95,7 +122,7 @@ offline sprite caching via a service worker.
 ## Layout
 
 ```
-packages/core    game data, tracker state, logic hints, sprite resolution
+packages/core    game data, seed settings, tracker state, logic hints, sprites
 packages/ui      framework-free rendering shared by all three targets
 apps/web         GitHub Pages build
 apps/desktop     downloadable offline build

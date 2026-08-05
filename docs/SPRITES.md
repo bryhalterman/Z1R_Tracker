@@ -18,14 +18,31 @@ relicensing work that isn't ours to relicense. Pointing at a URL doesn't.
 "item.sword.wood": { "url": "https://example.com/sword.png", "name": "Wooden Sword", "glyph": "SW" }
 ```
 
-Renderers never see a URL. They call `resolver.resolve('item.sword.wood')` and get one of three
-things back:
+Renderers never see a URL. They call `resolver.resolve('item.sword.wood')` and get one of four
+things back, in this precedence order:
 
 | Result | When | Rendered as |
 | --- | --- | --- |
-| `image` | `url` is set | `background-image`, pixelated |
 | `sheet` | `sheet` + `rect` are set | the sheet, offset to the region |
-| `glyph` | neither is set | the `glyph` letters in a dashed box |
+| `image` | `url` is set | `background-image`, pixelated |
+| `svg` | the key has a built-in vector | inline SVG drawn from `vectors.ts` |
+| `glyph` | none of the above | the `glyph` letters in a dashed box |
+
+Supplied art deliberately outranks the built-in vectors, so dropping in a CSV of real NES sprites
+overrides them without touching code.
+
+### The vector tier
+
+Some sprites are simple enough to draw: a Triforce piece is three triangles, a rupee is a hexagon,
+an overworld shop is a hut. Those live in `packages/core/src/sprites/vectors.ts` as inline SVG.
+
+It costs a few hundred bytes each and buys a lot — no third-party host to go down, no CORS or
+hotlink question, works offline, no attribution burden, and the tracker looks finished the moment
+you clone it. Items with real detail (swords, the bow, the recorder) stay as glyphs, because a
+hand-drawn approximation of a recognisable sprite looks worse than honest letters.
+
+Overworld marks are drawn as **distinct silhouettes**, not coloured squares. That is deliberate —
+see the accessibility rule in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 An image that fails to load — dead host, hotlink blocking, offline — **downgrades to its glyph** at
 runtime rather than leaving an empty cell. That is the single most important property of this layer:

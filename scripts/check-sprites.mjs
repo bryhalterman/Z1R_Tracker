@@ -15,17 +15,42 @@ import { fileURLToPath } from 'node:url';
 const MANIFEST_PATH = fileURLToPath(
   new URL('../packages/core/src/sprites/manifest.json', import.meta.url),
 );
+const VECTORS_PATH = fileURLToPath(
+  new URL('../packages/core/src/sprites/vectors.ts', import.meta.url),
+);
+
+/**
+ * Which keys have a drawn vector.
+ *
+ * Read by pattern rather than by importing, because this is a plain .mjs
+ * script and `vectors.ts` would need a compile step. The shape it depends on
+ * is one `'key': V(` entry per line in the VECTORS table.
+ */
+async function vectorKeys() {
+  try {
+    const source = await readFile(VECTORS_PATH, 'utf8');
+    return new Set([...source.matchAll(/^\s*'([\w.]+)':\s*V\(/gm)].map((m) => m[1]));
+  } catch {
+    return new Set();
+  }
+}
 
 const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
 const entries = Object.entries(manifest.sprites);
+const vectors = await vectorKeys();
 
-const unfilled = entries.filter(([, entry]) => !entry.url && !entry.sheet).map(([key]) => key);
-const filled = entries.filter(([, entry]) => entry.url || entry.sheet);
+const hasArt = ([key, entry]) => Boolean(entry.url || entry.sheet || vectors.has(key));
+const unfilled = entries.filter((e) => !hasArt(e)).map(([key]) => key);
+const filled = entries.filter(hasArt);
+const drawn = entries.filter(([key, entry]) => !entry.url && !entry.sheet && vectors.has(key));
 
-console.log(`${filled.length}/${entries.length} sprites have art.`);
+console.log(
+  `${filled.length}/${entries.length} sprites render as art ` +
+    `(${filled.length - drawn.length} from URLs, ${drawn.length} drawn as vectors).`,
+);
 
 if (unfilled.length) {
-  console.log(`\nStill using glyph fallbacks (${unfilled.length}):`);
+  console.log(`\nStill using letter fallbacks (${unfilled.length}):`);
   for (const key of unfilled) console.log(`  ${key}`);
 }
 

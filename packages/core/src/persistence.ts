@@ -30,6 +30,11 @@ export function migrate(raw: unknown): TrackerState | null {
     items: { ...base.items, ...(candidate.items ?? {}) },
     dungeons: { ...base.dungeons, ...(candidate.dungeons ?? {}) },
     marks: { ...(candidate.marks ?? {}) },
+    // v1 saves predate seed tracking; merging over the defaults fills in any
+    // setting added since without discarding what the save does carry.
+    seed: { ...base.seed, ...(candidate.seed ?? {}) },
+    locations: { ...(candidate.locations ?? {}) },
+    extraFloorSlots: { ...(candidate.extraFloorSlots ?? {}) },
   };
 }
 

@@ -64,6 +64,44 @@ every click is exactly the kind of thing that shows up as a dropped frame on str
 The items panel is the one exception — it rebuilds wholesale, but only when the *game* changes,
 since vanilla and randomizer show different item sets.
 
+## Accessibility
+
+**No state may be signalled by colour alone.** The maintainer is colour blind, and a tracker whose
+"do I have this" cue is a green-vs-grey tint is unusable to a chunk of its audience besides.
+
+Every stateful element carries a second, non-colour channel:
+
+| Element | Colour | Also |
+| --- | --- | --- |
+| Capability hint | green when met | `✓` / `✕` prefix, solid vs dashed border |
+| Item cell | accent border when held | dashed border + desaturated + dimmed when not |
+| Dungeon flag | accent border when on | dashed border + desaturated when off |
+| Dungeon row | green tint when cleared | `✓` at the end of the row |
+| Location slot kind | per-kind tint | the words `FLOOR` / `STAIR` / `HEART` / `OW` |
+| Overworld mark | per-mark tint | a distinct drawn shape per mark |
+| Location collected | dimmed row | the checkbox itself |
+| Level 9 status | green when open | the sentence changes |
+
+When adding a panel, pick the second channel first — shape, text, a mark, or a border style — and
+treat colour as reinforcement. The mark-shape requirement is also why `mark.*` sprites are drawn as
+distinct silhouettes rather than as coloured squares.
+
+## Seeds and derived locations
+
+`seed.ts` holds the randomizer settings; `deriveLocations(settings, extraFloorSlots)` turns them
+into the list of findable slots. The list is **derived on every render, never stored**.
+
+That's the important call. Storing the slot list would mean reconciling it whenever a setting
+changed — a migration problem for something that is a pure function of two inputs. Deriving it means
+switching Dungeon Quest simply produces a different list. State keys off the slot **id**, so
+switching to 2nd Quest and back leaves everything already recorded intact rather than orphaned.
+
+The locations panel rebuilds only when the derived list's *shape* changes (it compares a signature
+of the ids), and otherwise patches rows in place, same as everything else.
+
+Only settings that change that structure get typed fields. The rest of Z1R's flags round-trip
+through a free-text box — see [SEEDS.md](SEEDS.md) for where that line falls and why.
+
 ## Logic
 
 `packages/core/src/logic.ts` answers "do I currently hold what this obstacle needs?" and nothing

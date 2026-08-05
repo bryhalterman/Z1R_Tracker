@@ -43,6 +43,14 @@
   user-select: none;
 }
 
+.z1r-sprite[data-sprite-mode="svg"] > svg {
+  inline-size: 100%;
+  block-size: 100%;
+  display: block;
+  /* Vectors are drawn on a 16x16 grid; keep edges crisp at small sizes. */
+  shape-rendering: geometricPrecision;
+}
+
 .z1r-sprite[data-sprite-mode="glyph"] {
   font-family: "Consolas", "SF Mono", ui-monospace, monospace;
   font-size: calc(var(--sprite-size, 32px) * 0.42);
@@ -128,7 +136,9 @@
   justify-content: center;
   padding: 4px;
   background: #00000033;
-  border: 1px solid var(--z1r-border);
+  /* Dashed border + heavy desaturation both say "not obtained", so the state
+     survives without colour vision. */
+  border: 1px dashed var(--z1r-border);
   border-radius: var(--z1r-radius);
   cursor: pointer;
   /* Unobtained items read as silhouettes, the convention every tracker uses. */
@@ -140,6 +150,7 @@
 .z1r-item[data-owned="true"] {
   filter: none;
   opacity: 1;
+  border-style: solid;
   border-color: var(--z1r-accent);
 }
 
@@ -184,6 +195,21 @@
   background: #58b3681f;
 }
 
+/* Cleared is also marked structurally, for readers who can't use the tint. */
+.z1r-dungeon::after {
+  content: "";
+  flex: none;
+  inline-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--z1r-good);
+}
+
+.z1r-dungeon[data-cleared="true"]::after {
+  content: "✓";
+}
+
 .z1r-dungeon-head {
   display: flex;
   align-items: center;
@@ -205,7 +231,7 @@
   display: flex;
   padding: 2px;
   background: transparent;
-  border: 1px solid var(--z1r-border);
+  border: 1px dashed var(--z1r-border);
   border-radius: 4px;
   cursor: pointer;
   opacity: 0.35;
@@ -215,6 +241,7 @@
 .z1r-flag[data-on="true"] {
   opacity: 1;
   filter: none;
+  border-style: solid;
   border-color: var(--z1r-accent);
 }
 
@@ -275,6 +302,38 @@
   border-color: var(--z1r-accent);
 }
 
+.z1r-map-ref-toggle {
+  margin-inline-start: 10px;
+  padding: 1px 8px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--z1r-muted);
+  background: transparent;
+  border: 1px solid var(--z1r-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.z1r-map-ref-toggle:hover,
+.z1r-map-ref-toggle[data-open="true"] {
+  color: var(--z1r-accent);
+  border-color: var(--z1r-accent);
+}
+
+.z1r-map-ref {
+  margin: 10px 0 0;
+}
+
+.z1r-map-ref img {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  border: 1px solid var(--z1r-border);
+  border-radius: 4px;
+}
+
 /* -------------------------------------------------------------------- hints */
 
 .z1r-hints {
@@ -287,14 +346,232 @@
   padding: 2px 8px;
   font-size: 12px;
   border-radius: 999px;
-  border: 1px solid var(--z1r-border);
+  /* Dashed = not yet available. Never rely on the colour alone. */
+  border: 1px dashed var(--z1r-border);
   color: var(--z1r-muted);
+}
+
+/* The mark, not the colour, is the primary signal. */
+.z1r-hint::before {
+  content: "✕ ";
+  font-weight: 700;
+  opacity: 0.8;
 }
 
 .z1r-hint[data-met="true"] {
   color: var(--z1r-good);
+  border-style: solid;
   border-color: color-mix(in srgb, var(--z1r-good) 55%, transparent);
   background: color-mix(in srgb, var(--z1r-good) 12%, transparent);
+}
+
+.z1r-hint[data-met="true"]::before {
+  content: "✓ ";
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------- seed form */
+
+.z1r-seed-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px 14px;
+  align-items: end;
+}
+
+.z1r-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-inline-size: 0;
+}
+
+.z1r-field-label,
+.z1r-split-caption {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--z1r-muted);
+}
+
+.z1r-field-hint {
+  font-size: 11px;
+  color: var(--z1r-muted);
+  opacity: 0.75;
+}
+
+.z1r-input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--z1r-text);
+  background: #00000055;
+  border: 1px solid var(--z1r-border);
+  border-radius: 4px;
+}
+
+.z1r-input:focus {
+  outline: 1px solid var(--z1r-accent);
+}
+
+.z1r-quest-split {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.z1r-quest-split[hidden] {
+  display: none;
+}
+
+.z1r-split-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.z1r-segmented-sm button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.z1r-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.z1r-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--z1r-text);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------- locations */
+
+.z1r-locations-summary {
+  margin-inline-start: 8px;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-accent);
+}
+
+.z1r-location-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 8px;
+}
+
+.z1r-location-group {
+  background: #00000026;
+  border: 1px solid var(--z1r-border);
+  border-radius: 4px;
+  padding: 5px 6px;
+}
+
+.z1r-location-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-block-end: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--z1r-muted);
+}
+
+.z1r-slot-add {
+  margin-inline-start: auto;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--z1r-muted);
+  background: transparent;
+  border: 1px solid var(--z1r-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.z1r-slot-add:hover {
+  color: var(--z1r-accent);
+  border-color: var(--z1r-accent);
+}
+
+.z1r-location {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+.z1r-location[data-collected="true"] {
+  opacity: 0.55;
+}
+
+.z1r-location-kind {
+  flex: none;
+  inline-size: 38px;
+  padding: 1px 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  border-radius: 3px;
+  cursor: help;
+}
+
+/* Floor vs stair is the distinction worth reading at a glance. */
+.z1r-location[data-kind="floor"] .z1r-location-kind {
+  color: #7ec4a8;
+  background: #7ec4a826;
+}
+
+.z1r-location[data-kind="stair"] .z1r-location-kind {
+  color: #c9a2e0;
+  background: #c9a2e026;
+}
+
+.z1r-location[data-kind="heart"] .z1r-location-kind {
+  color: #e05c7a;
+  background: #e05c7a26;
+}
+
+.z1r-location[data-kind="overworld"] .z1r-location-kind {
+  color: #d9a441;
+  background: #d9a44126;
+}
+
+.z1r-location-label {
+  flex: none;
+  inline-size: 62px;
+  font-size: 12px;
+  color: var(--z1r-muted);
+}
+
+.z1r-location-sprite {
+  flex: none;
+  inline-size: 22px;
+  block-size: 22px;
+}
+
+.z1r-location-picker {
+  flex: 1;
+  min-inline-size: 0;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.z1r-location[data-known="false"] .z1r-location-picker {
+  color: var(--z1r-muted);
+}
+
+.z1r-location-check {
+  flex: none;
+  cursor: pointer;
 }
 
 /* ----------------------------------------------------------------- controls */

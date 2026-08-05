@@ -43,6 +43,20 @@ export function createSprite(
       drawGlyph(resolved.text);
       break;
 
+    case 'svg': {
+      element.dataset.spriteMode = 'svg';
+      // Built from a trusted in-repo table, never from manifest or user input,
+      // so the markup is safe to inject. Keep it that way.
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', resolved.vector.viewBox);
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.innerHTML = resolved.vector.markup;
+      element.replaceChildren(svg);
+      break;
+    }
+
     case 'image':
       element.dataset.spriteMode = 'image';
       element.style.backgroundImage = `url("${resolved.url}")`;

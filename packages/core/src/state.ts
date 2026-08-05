@@ -10,8 +10,16 @@
 import { ITEMS_BY_ID, itemsForGame, maxValue, type Game } from './items.js';
 import { DUNGEONS } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
+import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
+
+export interface LocationState {
+  /** Pool entry id known to be here. Empty until identified. */
+  item: string;
+  /** Whether it's actually been picked up, as opposed to merely known. */
+  collected: boolean;
+}
 
 export interface DungeonState {
   /** Entrance located on the overworld. */
@@ -46,6 +54,18 @@ export interface TrackerState {
   dungeons: Record<string, DungeonState>;
   /** overworld screen id -> mark. */
   marks: Record<string, MarkKind>;
+  /** Seed number, flag string, and the settings that reshape the tracker. */
+  seed: SeedSettings;
+  /**
+   * Location id -> what's there. Sparse: absent means untouched.
+   *
+   * Keyed by id rather than by position so changing the Dungeon Quest reshapes
+   * the location list without discarding what was already recorded — switch
+   * back and the entries are still there.
+   */
+  locations: Record<string, LocationState>;
+  /** Level -> extra floor slots added under Shuffle Minor Dungeon Drops. */
+  extraFloorSlots: Record<string, number>;
   startedAt: number;
   /** Wall clock, for display only. Never compare two of these to order edits. */
   updatedAt: number;
@@ -58,6 +78,12 @@ export type Action =
   | { type: 'setDungeon'; level: number; patch: Partial<DungeonState> }
   | { type: 'cycleMark'; screen: string; direction: 1 | -1 }
   | { type: 'setMark'; screen: string; mark: MarkKind }
+  | { type: 'setSeed'; patch: Partial<SeedSettings> }
+  /** Record which pool entry sits at a location. Does not touch inventory. */
+  | { type: 'setLocation'; id: string; item: string }
+  /** Mark a location picked up. Collecting also grants the item; unchecking never revokes it. */
+  | { type: 'collectLocation'; id: string; collected: boolean }
+  | { type: 'addFloorSlot'; level: number; delta: 1 | -1 }
   /** An update received from another window. Adopts the sender's `rev` verbatim. */
   | { type: 'replace'; state: TrackerState }
   /** A save file loaded by the user here. Outranks whatever peers currently hold. */
@@ -93,6 +119,9 @@ export function createInitialState(game: Game = 'z1r', now = Date.now()): Tracke
     items,
     dungeons,
     marks: {},
+    seed: createSeedSettings(),
+    locations: {},
+    extraFloorSlots: {},
     startedAt: now,
     updatedAt: now,
   };
@@ -167,6 +196,60 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       if (action.mark === 'none') delete marks[action.screen];
       else marks[action.screen] = action.mark;
       return bump({ marks });
+    }
+
+    case 'setSeed': {
+      const seed = { ...state.seed, ...action.patch };
+      // Mixed Quest guarantees 1-6 and 7-9 come from different quests, so
+      // setting one half implies the other rather than allowing an impossible
+      // "both 1st Quest" that would show the wrong item slots.
+      if (questsMustDiffer(seed.dungeonQuest)) {
+        if (action.patch.questLow && !action.patch.questHigh) {
+          seed.questHigh = seed.questLow === '1st' ? '2nd' : '1st';
+        } else if (action.patch.questHigh && !action.patch.questLow) {
+          seed.questLow = seed.questHigh === '1st' ? '2nd' : '1st';
+        } else if (seed.questLow === seed.questHigh) {
+          seed.questHigh = seed.questLow === '1st' ? '2nd' : '1st';
+        }
+      }
+      return bump({ seed });
+    }
+
+    case 'setLocation': {
+      const current = state.locations[action.id] ?? { item: '', collected: false };
+      if (current.item === action.item) return state;
+      return bump({
+        locations: { ...state.locations, [action.id]: { ...current, item: action.item } },
+      });
+    }
+
+    case 'collectLocation': {
+      const current = state.locations[action.id] ?? { item: '', collected: false };
+      const locations = {
+        ...state.locations,
+        [action.id]: { ...current, collected: action.collected },
+      };
+
+      const entry = POOL_BY_ID.get(current.item);
+      if (!action.collected || !entry) return bump({ locations });
+
+      const def = ITEMS_BY_ID.get(entry.itemId);
+      if (!def) return bump({ locations });
+
+      // Counters are left alone: two locations can both hold a Heart Container,
+      // and toggling this checkbox twice must not inflate the count.
+      if (def.kind === 'counter') return bump({ locations });
+
+      const held = state.items[entry.itemId] ?? 0;
+      const raised = Math.max(held, Math.min(entry.value, maxValue(def)));
+      return bump({ locations, items: { ...state.items, [entry.itemId]: raised } });
+    }
+
+    case 'addFloorSlot': {
+      const key = String(action.level);
+      const next = Math.min(Math.max((state.extraFloorSlots[key] ?? 0) + action.delta, 0), 8);
+      if (next === (state.extraFloorSlots[key] ?? 0)) return state;
+      return bump({ extraFloorSlots: { ...state.extraFloorSlots, [key]: next } });
     }
 
     case 'replace':
