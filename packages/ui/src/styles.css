@@ -552,6 +552,24 @@
   outline: 1px solid var(--z1r-accent);
 }
 
+/*
+ * A native <select> popup is drawn by the browser, not by this stylesheet.
+ * An <option> inherits the control's `color` but lands on the platform's own
+ * popup background — so the muted placeholder colour below came out as grey
+ * text on grey, effectively unreadable once opened. Options therefore carry
+ * explicit, opaque colours of their own rather than inheriting anything.
+ */
+.z1r-input option {
+  background-color: var(--z1r-panel);
+  color: var(--z1r-text);
+}
+
+.z1r-input optgroup {
+  background-color: var(--z1r-panel);
+  color: var(--z1r-muted);
+  font-style: normal;
+}
+
 .z1r-quest-split {
   display: flex;
   flex-direction: column;
