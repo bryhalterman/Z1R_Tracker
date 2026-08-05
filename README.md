@@ -130,7 +130,7 @@ npm run sprites:check -- --fetch
 
 ## OBS
 
-Add `apps/obs/dist/index.html` as a **Browser Source** for the on-stream overlay, and
+Add `apps/obs/dist/overlay.html` as a **Browser Source** for the on-stream overlay, and
 `dock.html` as a **Custom Browser Dock** for the half you click. Both must load from the same
 origin so they can sync. Full walkthrough in [`docs/OBS.md`](docs/OBS.md).
 

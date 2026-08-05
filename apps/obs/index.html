@@ -2,12 +2,97 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Z1R Tracker — OBS Overlay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Z1R Tracker — OBS setup</title>
     <meta name="color-scheme" content="dark" />
+    <!--
+      A chooser, not a tracker.
+
+      The overlay used to live here, which meant pointing a Custom Browser Dock
+      at the root URL produced a read-only page with every control disabled and
+      nothing explaining why. The two pages now have names that say what they
+      are, and this page hands out the URLs.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #1b1b1b;
+        color: #f2f2f2;
+        font-family: system-ui, "Segoe UI", Roboto, -apple-system, sans-serif;
+        line-height: 1.5;
+      }
+      main { max-inline-size: 640px; margin-inline: auto; }
+      h1 { margin: 0 0 4px; font-size: 20px; }
+      .lede { margin: 0 0 20px; color: #afafaf; font-size: 14px; }
+      .card {
+        display: block;
+        margin-block-end: 12px;
+        padding: 14px 16px;
+        color: inherit;
+        text-decoration: none;
+        background: #2c2c2c;
+        border: 1px solid #444;
+        border-radius: 6px;
+      }
+      .card:hover { border-color: #da9f00; }
+      .card h2 { margin: 0 0 2px; font-size: 15px; color: #da9f00; }
+      .card p { margin: 0 0 8px; font-size: 13px; color: #afafaf; }
+      code {
+        display: inline-block;
+        padding: 2px 6px;
+        font-family: Consolas, ui-monospace, monospace;
+        font-size: 12px;
+        color: #f2f2f2;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 4px;
+        user-select: all;
+      }
+      .note {
+        margin-block-start: 20px;
+        padding: 12px 14px;
+        font-size: 13px;
+        color: #afafaf;
+        background: #222;
+        border-inline-start: 3px solid #da9f00;
+        border-radius: 4px;
+      }
+      .note strong { color: #f2f2f2; }
+    </style>
   </head>
-  <body class="overlay spectrum spectrum--dark spectrum--medium">
-    <!-- Read-only display. Add as a Browser Source; the dock does the clicking. -->
-    <main id="tracker"></main>
-    <script type="module" src="/src/overlay.ts"></script>
+  <body>
+    <main>
+      <h1>Z1R Tracker — OBS setup</h1>
+      <p class="lede">Two pages. One goes on stream, one is where you click.</p>
+
+      <a class="card" href="./overlay.html">
+        <h2>Overlay → add as a Browser Source</h2>
+        <p>
+          Read-only and transparent, for compositing over the game capture. Every control is
+          disabled on purpose. Append <code>?sections=</code> to choose panels.
+        </p>
+        <code id="overlay-url">overlay.html</code>
+      </a>
+
+      <a class="card" href="./dock.html">
+        <h2>Dock → add as a Custom Browser Dock</h2>
+        <p>
+          The interactive half, with full tracking: seed, items, Triforce, locations, hints and
+          the overworld map. Never on camera, so it carries everything.
+        </p>
+        <code id="dock-url">dock.html</code>
+      </a>
+
+      <p class="note">
+        <strong>Both must load from this same address.</strong> They sync through localStorage and
+        a BroadcastChannel, which are scoped to an origin — two <code>file://</code> pages do not
+        share one in OBS, so keep using this server for both.
+      </p>
+    </main>
+
+    <script type="module" src="/src/chooser.ts"></script>
   </body>
 </html>

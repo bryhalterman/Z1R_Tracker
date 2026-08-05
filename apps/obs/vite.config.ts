@@ -14,7 +14,11 @@ export default defineConfig({
     target: 'es2022',
     rollupOptions: {
       input: {
-        overlay: fileURLToPath(new URL('./index.html', import.meta.url)),
+        // `index.html` is a setup page, not a tracker. The overlay has its own
+        // name now: serving it at the root URL meant a dock pointed at `/` got
+        // a read-only page with no explanation.
+        index: fileURLToPath(new URL('./index.html', import.meta.url)),
+        overlay: fileURLToPath(new URL('./overlay.html', import.meta.url)),
         dock: fileURLToPath(new URL('./dock.html', import.meta.url)),
       },
     },

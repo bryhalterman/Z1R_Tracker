@@ -10,6 +10,20 @@ enabled a stray one during a run would edit the tracker live on camera.
 
 Requires OBS 28 or newer.
 
+## 0. Which page is which
+
+Three pages ship, and the names matter:
+
+| Page | What it is |
+| --- | --- |
+| `index.html` | A setup page. Lists the other two with their full URLs — open it first. |
+| `overlay.html` | The read-only overlay. Goes on stream as a Browser Source. |
+| `dock.html` | The interactive tracker. Goes in OBS as a Custom Browser Dock. |
+
+The overlay used to live at `index.html`, which meant a dock pointed at the root URL loaded a page
+with every control disabled and nothing explaining why. If you hit that, the overlay now says so
+when clicked.
+
 ## 1. Get a build
 
 ```bash
@@ -26,7 +40,7 @@ The result is in `apps/obs/dist`. You can also point OBS at the hosted Pages bui
 | Field | Value |
 | --- | --- |
 | Local file | ✔ checked |
-| Local file path | `apps/obs/dist/index.html` |
+| Local file path | `apps/obs/dist/overlay.html` |
 | Width / Height | `420` × `700` to start |
 | Shutdown source when not visible | ✖ unchecked |
 | Refresh browser when scene becomes active | ✖ unchecked |
@@ -41,7 +55,7 @@ re-reads state from storage — briefly flashing an empty tracker on stream.
 Append query parameters to the local file path:
 
 ```
-apps/obs/dist/index.html?sections=items,hintlog&size=32&scale=1.25
+apps/obs/dist/overlay.html?sections=items,hintlog&size=32&scale=1.25
 ```
 
 | Parameter | Default | Meaning |

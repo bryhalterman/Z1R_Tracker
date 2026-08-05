@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     const note = document.createElement('p');
     note.className = 'z1r-readonly-note';
     note.textContent =
-      'This is the read-only overlay. Add dock.html as a Custom Browser Dock to make changes.';
+      'Read-only overlay. Add dock.html as a Custom Browser Dock to make changes.';
     document.body.append(note);
     window.setTimeout(() => note.remove(), 8000);
   });
