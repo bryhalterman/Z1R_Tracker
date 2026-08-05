@@ -106,6 +106,11 @@ const PAIRS = [
   ['--z1r-bad', '--z1r-panel', 'destructive actions'],
   ['--z1r-text', '--z1r-field', 'input and option text'],
   ['--z1r-muted', '--z1r-field', 'placeholder text'],
+  // Slot-kind chips render these as text, not just as a tint. Omitting them is
+  // how a 3.98:1 heart chip passed review.
+  ['--z1r-floor', '--z1r-panel', 'FLOOR slot chip'],
+  ['--z1r-stair', '--z1r-panel', 'STAIR slot chip'],
+  ['--z1r-heart', '--z1r-panel', 'HEART slot chip'],
 ];
 
 let failures = 0;

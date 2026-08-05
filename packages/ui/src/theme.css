@@ -1,8 +1,10 @@
 /*
  * Theme layer — Adobe Spectrum tokens bound to the tracker's semantic names.
  *
- * Everything the tracker paints resolves to a Spectrum token. Nothing in this
- * repo picks a hex value any more, which is the point: Spectrum's scales carry
+ * Everything the tracker's chrome paints resolves to a Spectrum token. The
+ * exceptions are deliberate and live outside this file: `overworld.ts` and
+ * `regions.ts` hold categorical map colours, and `styles.css` keeps one `#000`
+ * for overlay text outlines. Spectrum's scales carry
  * documented contrast behaviour, so "is this readable" becomes a property of
  * the step you chose rather than something to remember to check.
  *
@@ -40,9 +42,11 @@
   --z1r-text: var(--spectrum-gray-900);
   --z1r-muted: var(--spectrum-gray-700);
 
-  /* Accent stays Triforce gold; yellow-1100 lands within a few points of the
-     hand-picked #d9a441 it replaces, and clears AA at 5.95:1. */
-  --z1r-accent: var(--spectrum-yellow-1100);
+  /* Spectrum's guidance is to bind alias tokens, not the raw scale, so the
+     product tracks the design system as it moves. `yellow-visual-color`
+     resolves to yellow-1100 in dark — the same Triforce gold as the hand-picked
+     #d9a441 it replaced — and clears AA at 5.95:1. */
+  --z1r-accent: var(--spectrum-yellow-visual-color);
   --z1r-good: var(--spectrum-green-1000);
   --z1r-bad: var(--spectrum-red-1000);
 
@@ -50,7 +54,10 @@
      the codes and labels carry the meaning. See ARCHITECTURE.md. */
   --z1r-floor: var(--spectrum-seafoam-1000);
   --z1r-stair: var(--spectrum-purple-1000);
-  --z1r-heart: var(--spectrum-red-900);
+  /* magenta-1000, not red-900: this is rendered as *text* on the slot chip, and
+     red-900 measures 3.98:1 there — below AA. Magenta also keeps it distinct
+     from the destructive red. */
+  --z1r-heart: var(--spectrum-magenta-1000);
   --z1r-overworld: var(--spectrum-yellow-1000);
 
   /* Geometry. */

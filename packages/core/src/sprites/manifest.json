@@ -78,6 +78,11 @@
       "name": "Red Ring",
       "glyph": "RG"
     },
+    "item.shield.magical": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Magical%20Shield.gif",
+      "name": "Magical Shield",
+      "glyph": "MS"
+    },
     "item.raft": {
       "url": "https://www.videogamesprites.net/Zelda1/Objects/Raft1.gif",
       "name": "Raft",

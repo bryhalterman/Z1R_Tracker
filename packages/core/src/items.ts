@@ -120,6 +120,14 @@ export const ITEMS: readonly ItemDef[] = [
     ],
   },
   {
+    id: 'shield',
+    name: 'Magical Shield',
+    kind: 'toggle',
+    group: 'equipment',
+    sprite: 'item.shield.magical',
+    note: 'Bought in shops; blocks projectiles the small shield cannot.',
+  },
+  {
     id: 'raft',
     name: 'Raft',
     kind: 'toggle',
