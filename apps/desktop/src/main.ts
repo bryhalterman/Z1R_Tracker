@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   const note = document.querySelector<HTMLElement>('#mode-note');
   if (note && isFileProtocol) {
     note.textContent =
-      'Left click adds, right click removes. Running from a local file — run start.cmd for offline sprite caching.';
+      'Items: left click adds, right click or Shift+click removes. Map: click a screen to pick a marker. Running from a local file — run start.cmd for offline sprite caching.';
   }
 
   if (!isFileProtocol && 'serviceWorker' in navigator) {

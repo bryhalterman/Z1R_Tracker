@@ -25,14 +25,22 @@ export interface CapabilityResult extends Capability {
 }
 
 /**
- * Only conjunctions earn a chip.
+ * Every obstacle gets a chip, including the single-item ones.
  *
- * "Burn bushes needs the candle" is a restatement of one cell in the item grid
- * two panels up — the same redundancy the summary bar was removed for. What
- * the grid can't show is a requirement spanning several items, so those are
- * what's left.
+ * These were once cut on the argument that "Burn bushes" merely restates
+ * "you have the candle". That was wrong. The question you ask mid-run is
+ * *can I get past this*, and answering it from a grid of eighteen small
+ * sprites is real work — the panel exists precisely so you don't have to.
+ * Naming the obstacle in plain language is the feature, not redundancy.
  */
 export const CAPABILITIES: readonly Capability[] = [
+  { id: 'burn', label: 'Burn bushes', requires: [['candle', 1]] },
+  { id: 'blast', label: 'Blast walls', requires: [['bomb', 1]] },
+  { id: 'push', label: 'Push rocks', requires: [['bracelet', 1]] },
+  { id: 'water', label: 'Cross water', requires: [['raft', 1]] },
+  { id: 'river', label: 'Cross rivers', requires: [['ladder', 1]] },
+  { id: 'read', label: 'Read tablets', requires: [['book', 1]] },
+  { id: 'digdogger', label: 'Split Digdogger', requires: [['recorder', 1]] },
   { id: 'gohma', label: 'Damage Gohma', requires: [['bow', 1], ['arrow', 1]] },
   { id: 'ganon', label: 'Finish Ganon', requires: [['sword', 1], ['bow', 1], ['arrow', 2]] },
 ];

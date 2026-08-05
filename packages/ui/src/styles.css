@@ -1025,3 +1025,70 @@
     max-inline-size: none;
   }
 }
+
+/* ------------------------------------------------------------ mark palette */
+
+.z1r-map-panel {
+  position: relative;
+}
+
+/*
+ * Pick a marker directly instead of cycling through nine to reach the one you
+ * want. Doubles as the map's legend: every marker is listed with its name, so
+ * the icons never have to be decoded from memory or from colour.
+ */
+.z1r-mark-palette {
+  position: absolute;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  inline-size: max-content;
+  max-inline-size: 320px;
+  padding: var(--z1r-space-sm);
+  background: var(--z1r-panel);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  box-shadow: 0 6px 18px #000a;
+}
+
+.z1r-mark-palette[hidden] {
+  display: none;
+}
+
+.z1r-mark-option {
+  display: flex;
+  align-items: center;
+  gap: var(--z1r-space-sm);
+  min-block-size: var(--spectrum-component-height-75);
+  padding: 2px var(--z1r-space-sm);
+  font: inherit;
+  font-size: var(--z1r-text-md);
+  text-align: start;
+  white-space: nowrap;
+  color: var(--z1r-text);
+  background: transparent;
+  /* The per-marker colour rides on a left bar, never on the label, so the
+     palette stays readable without colour vision. */
+  border: var(--z1r-border-width) solid transparent;
+  border-inline-start: 3px solid var(--mark-color, transparent);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+}
+
+.z1r-mark-option:hover {
+  background: var(--z1r-inset);
+  border-color: var(--z1r-accent);
+  border-inline-start-color: var(--mark-color, var(--z1r-accent));
+}
+
+.z1r-mark-option-clear {
+  inline-size: 18px;
+  text-align: center;
+  color: var(--z1r-muted);
+}
+
+.z1r-mark-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

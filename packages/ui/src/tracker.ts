@@ -10,6 +10,7 @@
 import {
   DUNGEONS,
   ITEMS_BY_ID,
+  MARKS,
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
@@ -261,6 +262,8 @@ function buildMap(
   interactive: boolean,
 ): HTMLElement {
   const { root, body } = section('Overworld', 'z1r-map');
+  // The palette is positioned against this panel.
+  root.classList.add('z1r-map-panel');
   body.style.setProperty('--map-columns', String(OVERWORLD_COLUMNS));
   const heading = root.querySelector('.z1r-panel-title');
 
@@ -292,6 +295,85 @@ function buildMap(
   const mapKey = () =>
     store.getState().seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld';
 
+  /*
+   * Mark palette.
+   *
+   * Built once and moved, rather than one popover per cell. It also serves as
+   * the map's legend — every mark is shown with its icon and its name, which
+   * is the non-colour channel the icons alone don't provide.
+   */
+  const palette = el('div', 'z1r-mark-palette');
+  palette.hidden = true;
+  palette.setAttribute('role', 'menu');
+  palette.setAttribute('aria-label', 'Choose a marker for this screen');
+  let paletteScreen = '';
+
+  const closePalette = () => {
+    palette.hidden = true;
+    paletteScreen = '';
+    document.removeEventListener('pointerdown', onOutside, true);
+    document.removeEventListener('keydown', onEscape, true);
+  };
+
+  function onOutside(event: Event) {
+    if (!palette.contains(event.target as Node)) closePalette();
+  }
+  function onEscape(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    const cell = body.querySelector<HTMLElement>(`[data-screen="${paletteScreen}"]`);
+    closePalette();
+    cell?.focus();
+  }
+
+  for (const mark of MARKS) {
+    const option = el('button', 'z1r-mark-option');
+    option.type = 'button';
+    option.setAttribute('role', 'menuitem');
+    option.dataset.mark = mark.kind;
+    option.style.setProperty('--mark-color', mark.color);
+    if (mark.sprite) {
+      option.append(createSprite(resolver, mark.sprite, { size: 18, label: mark.name }));
+    } else {
+      option.append(el('span', 'z1r-mark-option-clear', '—'));
+    }
+    option.append(el('span', 'z1r-mark-option-name', mark.name));
+    option.addEventListener('click', () => {
+      const screen = paletteScreen;
+      const cell = body.querySelector<HTMLElement>(`[data-screen="${screen}"]`);
+      store.dispatch({ type: 'setMark', screen, mark: mark.kind });
+      closePalette();
+      cell?.focus();
+    });
+    palette.append(option);
+  }
+  root.append(palette);
+
+  function openPalette(screen: string, cell: HTMLElement) {
+    // Clicking the screen whose palette is already open closes it.
+    if (paletteScreen === screen && !palette.hidden) {
+      closePalette();
+      return;
+    }
+    paletteScreen = screen;
+    palette.hidden = false;
+    palette.dataset.screen = screen;
+
+    const cellBox = cell.getBoundingClientRect();
+    const panelBox = root.getBoundingClientRect();
+    palette.style.insetInlineStart = `${cellBox.left - panelBox.left + cellBox.width / 2}px`;
+    palette.style.insetBlockStart = `${cellBox.top - panelBox.top + cellBox.height}px`;
+    // Nudge back inside the panel when the cell is near an edge.
+    const paletteBox = palette.getBoundingClientRect();
+    const overflowRight = paletteBox.right - panelBox.right + 8;
+    if (overflowRight > 0) {
+      palette.style.insetInlineStart = `${cellBox.left - panelBox.left + cellBox.width / 2 - overflowRight}px`;
+    }
+
+    document.addEventListener('pointerdown', onOutside, true);
+    document.addEventListener('keydown', onEscape, true);
+    palette.querySelector<HTMLElement>('.z1r-mark-option')?.focus();
+  }
+
   const focusNote = el('span', 'z1r-map-focus');
   heading?.append(focusNote);
   patches.push((state) => {
@@ -309,18 +391,23 @@ function buildMap(
       cell.title = id;
       if (!interactive) cell.disabled = true;
       else {
-        const step = (direction: 1 | -1) =>
-          store.dispatch({ type: 'cycleMark', screen: id, direction });
-        cell.addEventListener('click', (event) => step(event.shiftKey ? -1 : 1));
+        cell.addEventListener('click', () => openPalette(id, cell));
+        // Right-click clears outright — the common correction, and faster than
+        // opening the palette to pick "Unmarked".
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
-          step(-1);
+          store.dispatch({ type: 'setMark', screen: id, mark: 'none' });
         });
+        // Arrow keys still step through the marks without opening anything,
+        // which is quicker than the palette when tagging a run of screens.
         cell.addEventListener('keydown', (event) => {
-          if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-            event.preventDefault();
-            step(-1);
-          }
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+          event.preventDefault();
+          store.dispatch({
+            type: 'cycleMark',
+            screen: id,
+            direction: event.key === 'ArrowRight' ? 1 : -1,
+          });
         });
       }
 
