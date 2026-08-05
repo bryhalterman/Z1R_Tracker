@@ -28,8 +28,6 @@
     "item.potion.blue": { "url": "", "name": "Life Potion", "glyph": "PT" },
     "item.potion.red": { "url": "", "name": "2nd Potion", "glyph": "PT" },
     "item.heart": { "url": "", "name": "Heart Container", "glyph": "HC" },
-    "item.key": { "url": "", "name": "Key", "glyph": "KY" },
-    "item.rupee": { "url": "", "name": "Rupee", "glyph": "RU" },
     "dungeon.1": { "url": "", "name": "Level 1 - Eagle", "glyph": "1" },
     "dungeon.2": { "url": "", "name": "Level 2 - Moon", "glyph": "2" },
     "dungeon.3": { "url": "", "name": "Level 3 - Manji", "glyph": "3" },
@@ -49,14 +47,6 @@
     "mark.warp": { "url": "", "name": "Warp", "glyph": "W" },
     "mark.empty": { "url": "", "name": "Checked", "glyph": "-" },
     "ui.triforce": { "url": "", "name": "Triforce Piece", "glyph": "▲" },
-    "ui.map": { "url": "", "name": "Map", "glyph": "M" },
-    "ui.compass": { "url": "", "name": "Compass", "glyph": "C" },
-    "ui.ganon": { "url": "", "name": "Ganon", "glyph": "G" },
-    "ui.triforce.full": { "url": "", "name": "Triforce", "glyph": "▲" },
-    "ref.owHints": {
-      "url": "https://static.wikia.nocookie.net/z1r/images/1/1b/OW_Hint_Locations.png/revision/latest/scale-to-width-down/1000",
-      "name": "Overworld Hint Locations",
-      "glyph": "?"
-    }
+    "ref.owHints": { "url": "https://static.wikia.nocookie.net/z1r/images/1/1b/OW_Hint_Locations.png/revision/latest/scale-to-width-down/1000", "name": "Overworld Hint Locations", "glyph": "?" }
   }
 }

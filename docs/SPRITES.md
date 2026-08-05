@@ -131,7 +131,7 @@ Dot-separated, most general first:
 item.<item>[.<tier>]     item.sword.magical, item.bow
 dungeon.<level>          dungeon.1 … dungeon.9
 mark.<kind>              mark.shop, mark.bombable
-ui.<element>             ui.triforce, ui.compass
+ui.<element>             ui.triforce
 ```
 
 Keys are referenced from `items.ts`, `dungeons.ts` and `overworld.ts`. Renaming one means updating

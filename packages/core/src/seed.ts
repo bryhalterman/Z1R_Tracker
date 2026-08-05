@@ -275,7 +275,9 @@ export const SHUFFLE_POOL: readonly PoolEntry[] = [
   { id: 'book', name: 'Book', itemId: 'book', value: 1, sprite: 'item.book' },
   { id: 'boomerang', name: 'Boomerang', itemId: 'boomerang', value: 1, sprite: 'item.boomerang.wood' },
   { id: 'bow', name: 'Bow', itemId: 'bow', value: 1, sprite: 'item.bow' },
-  { id: 'heart', name: 'Heart Container', itemId: 'heartContainers', value: 1, sprite: 'item.heart' },
+  // Heart Containers are still placeable, but the running total is on the
+  // game's own HUD, so there is no inventory item to grant.
+  { id: 'heart', name: 'Heart Container', itemId: '', value: 0, sprite: 'item.heart' },
   { id: 'ladder', name: 'Ladder', itemId: 'ladder', value: 1, sprite: 'item.ladder' },
   {
     id: 'magicalBoomerang',

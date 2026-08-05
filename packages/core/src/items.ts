@@ -13,9 +13,11 @@ export type ItemGroup = 'weapons' | 'equipment' | 'quest' | 'consumables';
 /**
  * - `toggle`      have it or not (0 | 1)
  * - `progressive` ordered upgrade chain; state is the index into `stages`
- * - `counter`     numeric, clamped to `max`
+ *
+ * There is no counter kind: rupees, keys and hearts are all on the game's own
+ * HUD, and re-typing a number the screen already shows is busywork.
  */
-export type ItemKind = 'toggle' | 'progressive' | 'counter';
+export type ItemKind = 'toggle' | 'progressive';
 
 export interface ItemStage {
   /** Sprite key for this stage. */
@@ -30,12 +32,10 @@ export interface ItemDef {
   readonly group: ItemGroup;
   /** Which builds show this item. Vanilla-only helpers are hidden in `z1r`. */
   readonly games: readonly Game[];
-  /** Sprite key for `toggle` and `counter` items. */
+  /** Sprite key for `toggle` items. */
   readonly sprite?: string;
   /** Stage 1..n for `progressive` items. Stage 0 is always "not obtained". */
   readonly stages?: readonly ItemStage[];
-  /** Upper bound for `counter` items. */
-  readonly max?: number;
   /** Shown in the item tooltip. */
   readonly note?: string;
 }
@@ -202,33 +202,6 @@ export const ITEMS: readonly ItemDef[] = [
       { sprite: 'item.potion.red', name: '2nd Potion' },
     ],
   },
-  {
-    id: 'heartContainers',
-    name: 'Heart Containers',
-    kind: 'counter',
-    group: 'consumables',
-    games: BOTH,
-    sprite: 'item.heart',
-    max: 16,
-  },
-  {
-    id: 'keys',
-    name: 'Keys',
-    kind: 'counter',
-    group: 'consumables',
-    games: BOTH,
-    sprite: 'item.key',
-    max: 99,
-  },
-  {
-    id: 'rupees',
-    name: 'Rupees',
-    kind: 'counter',
-    group: 'consumables',
-    games: BOTH,
-    sprite: 'item.rupee',
-    max: 255,
-  },
 ];
 
 export const ITEMS_BY_ID: ReadonlyMap<string, ItemDef> = new Map(
@@ -246,8 +219,6 @@ export function maxValue(def: ItemDef): number {
       return 1;
     case 'progressive':
       return def.stages?.length ?? 1;
-    case 'counter':
-      return def.max ?? 99;
   }
 }
 
@@ -270,9 +241,6 @@ export function labelFor(def: ItemDef, value: number): string {
   if (def.kind === 'progressive' && value > 0) {
     const stages = def.stages ?? [];
     return stages[Math.min(value, stages.length) - 1]?.name ?? def.name;
-  }
-  if (def.kind === 'counter') {
-    return `${def.name}: ${value}`;
   }
   return def.name;
 }

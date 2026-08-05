@@ -17,7 +17,7 @@ import {
   TRIFORCE_REQUIRED_FOR_L9,
   regionForScreen,
   canEnterLevel9,
-  clearedCount,
+  deriveLocations,
   evaluateAll,
   itemsForGame,
   labelFor,
@@ -151,8 +151,7 @@ function buildSummary(patches: Patch[]): HTMLElement {
   };
 
   const triforce = stat('Triforce');
-  const cleared = stat('Cleared');
-  const hearts = stat('Hearts');
+  const found = stat('Found');
 
   const status = el('div', 'z1r-status');
   root.append(status);
@@ -160,8 +159,9 @@ function buildSummary(patches: Patch[]): HTMLElement {
   patches.push((state) => {
     const pieces = triforceCount(state);
     triforce.textContent = `${pieces}/${TRIFORCE_REQUIRED_FOR_L9}`;
-    cleared.textContent = `${clearedCount(state)}/${DUNGEONS.length}`;
-    hearts.textContent = String(state.items['heartContainers'] ?? 0);
+    const locations = deriveLocations(state.seed, state.extraFloorSlots);
+    const collected = locations.filter((l) => state.locations[l.id]?.collected).length;
+    found.textContent = `${collected}/${locations.length}`;
     const ready = canEnterLevel9(state);
     status.textContent = ready ? 'Level 9 is open' : `${TRIFORCE_REQUIRED_FOR_L9 - pieces} to go`;
     status.dataset.ready = String(ready);
@@ -228,16 +228,6 @@ function buildItemCell(
       event.preventDefault();
       store.dispatch({ type: 'cycleItem', id: def.id, direction: -1 });
     });
-    if (def.kind === 'counter') {
-      cell.addEventListener(
-        'wheel',
-        (event) => {
-          event.preventDefault();
-          store.dispatch({ type: 'cycleItem', id: def.id, direction: event.deltaY < 0 ? 1 : -1 });
-        },
-        { passive: false },
-      );
-    }
   }
 
   let renderedSprite: string | null = null;
@@ -252,10 +242,7 @@ function buildItemCell(
     cell.dataset.owned = String(value > 0);
     cell.title = def.note ? `${labelFor(def, value)} — ${def.note}` : labelFor(def, value);
 
-    if (def.kind === 'counter') {
-      badge.textContent = String(value);
-      badge.hidden = false;
-    } else if (def.kind === 'progressive' && value > 0 && maxValue(def) > 1) {
+    if (def.kind === 'progressive' && value > 0 && maxValue(def) > 1) {
       badge.textContent = String(value);
       badge.hidden = false;
     } else {
@@ -268,12 +255,12 @@ function buildItemCell(
 
 /* ----------------------------------------------------------------- dungeons */
 
-const DUNGEON_FLAGS = [
-  { key: 'triforce', label: 'Triforce', sprite: 'ui.triforce' },
-  { key: 'cleared', label: 'Boss', sprite: 'ui.ganon' },
-  { key: 'map', label: 'Map', sprite: 'ui.map' },
-  { key: 'compass', label: 'Compass', sprite: 'ui.compass' },
-] as const;
+/**
+ * Boss kills, maps and compasses used to live here. They came out because the
+ * game already shows them: the map and compass are on the pause screen, and a
+ * dead boss is a walked-through room. Only the Triforce is worth a toggle.
+ */
+const DUNGEON_FLAGS = [{ key: 'triforce', label: 'Triforce', sprite: 'ui.triforce' }] as const;
 
 function buildDungeons(
   store: Store,
@@ -345,7 +332,6 @@ function buildDungeons(
       const dungeon = state.dungeons[String(def.level)];
       // Never stomp what the user is mid-way through typing.
       if (document.activeElement !== location) location.value = dungeon?.location ?? '';
-      row.dataset.cleared = String(dungeon?.cleared ?? false);
       row.dataset.found = String(dungeon?.found ?? false);
     });
 

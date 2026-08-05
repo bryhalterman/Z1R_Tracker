@@ -2,8 +2,8 @@
  * Built-in vector sprites.
  *
  * A middle tier between "lettered glyph" and "remote NES art": shapes simple
- * enough to draw in code. A Triforce piece is three triangles; a rupee is a
- * hexagon. Drawing them costs a few hundred bytes, needs no third-party host,
+ * enough to draw in code. A Triforce piece is three triangles; a bomb is a
+ * circle with a fuse. Drawing them costs a few hundred bytes, needs no host,
  * survives being offline, and carries no attribution burden — so the tracker
  * looks finished out of the box.
  *
@@ -21,42 +21,12 @@ export interface VectorSprite {
 
 const V = (markup: string): VectorSprite => ({ viewBox: '0 0 16 16', markup });
 
-/** One Triforce wedge, plus the assembled trio for the summary readout. */
+/** One Triforce wedge — the per-dungeon toggle. */
 const TRIANGLE = 'M8 2 L14.5 13.5 L1.5 13.5 Z';
 
 export const VECTORS: Readonly<Record<string, VectorSprite>> = {
   'ui.triforce': V(
     `<path d="${TRIANGLE}" fill="#f4c542" stroke="#7a5a10" stroke-width="1" stroke-linejoin="round"/>`,
-  ),
-
-  // The full Triforce: three wedges around a hollow centre.
-  'ui.triforce.full': V(
-    `<g fill="#f4c542" stroke="#7a5a10" stroke-width=".8" stroke-linejoin="round">
-       <path d="M8 1 L11.4 7 L4.6 7 Z"/>
-       <path d="M4.4 7.6 L7.8 13.6 L1 13.6 Z"/>
-       <path d="M11.6 7.6 L15 13.6 L8.2 13.6 Z"/>
-     </g>`,
-  ),
-
-  'ui.map': V(
-    `<path d="M1.5 3.5 L5.8 2 L10.2 4 L14.5 2.5 L14.5 12.5 L10.2 14 L5.8 12 L1.5 13.5 Z"
-        fill="#d8cba4" stroke="#6b5c38" stroke-width="1" stroke-linejoin="round"/>
-     <path d="M5.8 2 L5.8 12 M10.2 4 L10.2 14" stroke="#6b5c38" stroke-width=".8" fill="none"/>`,
-  ),
-
-  'ui.compass': V(
-    `<circle cx="8" cy="8" r="6.2" fill="#3f6fa8" stroke="#1d3a5c" stroke-width="1"/>
-     <path d="M8 3.4 L9.8 8 L8 12.6 L6.2 8 Z" fill="#f0f0f0"/>
-     <circle cx="8" cy="8" r="1" fill="#1d3a5c"/>`,
-  ),
-
-  // Ganon reads best as his trident.
-  'ui.ganon': V(
-    `<g fill="none" stroke="#c34a4a" stroke-width="1.6" stroke-linecap="round">
-       <path d="M3.2 2.5 L3.2 6.2 M8 2 L8 6.2 M12.8 2.5 L12.8 6.2"/>
-       <path d="M3.2 6.2 L12.8 6.2"/>
-       <path d="M8 6.2 L8 14"/>
-     </g>`,
   ),
 
   'item.heart': V(
@@ -65,22 +35,10 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
         fill="#e0405c" stroke="#7d1524" stroke-width="1" stroke-linejoin="round"/>`,
   ),
 
-  'item.rupee': V(
-    `<path d="M8 1.5 L12.5 5.5 L8 14.5 L3.5 5.5 Z"
-        fill="#d9a441" stroke="#6d4d10" stroke-width="1" stroke-linejoin="round"/>
-     <path d="M8 1.5 L8 14.5 M3.5 5.5 L12.5 5.5" stroke="#6d4d10" stroke-width=".7" fill="none"/>`,
-  ),
-
   'item.bomb': V(
     `<circle cx="7.5" cy="10" r="5" fill="#2f3550" stroke="#12151f" stroke-width="1"/>
      <path d="M10.6 5.6 L12.6 3.2" stroke="#8a6a3a" stroke-width="1.6" stroke-linecap="round" fill="none"/>
      <circle cx="13.2" cy="2.6" r="1.4" fill="#e8813a"/>`,
-  ),
-
-  'item.key': V(
-    `<circle cx="5" cy="5" r="3.2" fill="none" stroke="#d9b64a" stroke-width="1.8"/>
-     <path d="M7.2 7.2 L13.5 13.5 M11 13 L13 11 M12.4 14.4 L14.4 12.4"
-        stroke="#d9b64a" stroke-width="1.8" stroke-linecap="round" fill="none"/>`,
   ),
 
   'item.key.magical': V(
@@ -140,9 +98,4 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
   'mark.empty': V(
     `<path d="M4 8 L12 8" stroke="#5a5a5a" stroke-width="2" stroke-linecap="round" fill="none"/>`,
   ),
-
 };
-
-export function hasVector(key: string): boolean {
-  return Object.hasOwn(VECTORS, key);
-}

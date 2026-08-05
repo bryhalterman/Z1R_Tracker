@@ -83,9 +83,8 @@ long before you can get there, and the tracker should be able to hold "known but
 inventory change from a checkbox is ambiguous once two locations can grant the same thing, so the
 tracker refuses to guess. Fix a mistake on the item grid directly.
 
-Heart Containers are the exception: collecting one does **not** bump the heart counter, because
-several locations can each hold one and a toggled checkbox would inflate the count. Manage hearts on
-the item grid.
+Heart Containers are the exception: they're placeable, so they get location slots, but there's no
+inventory item to mark. Your heart total is on the game's HUD.
 
 ## Named overworld locations
 

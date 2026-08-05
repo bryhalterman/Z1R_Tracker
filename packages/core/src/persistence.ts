@@ -8,10 +8,48 @@
  * as a fallback for contexts where BroadcastChannel is unavailable.
  */
 
-import { createInitialState, STATE_VERSION, type Store, type TrackerState } from './state.js';
+import {
+  createInitialState,
+  STATE_VERSION,
+  type DungeonState,
+  type Store,
+  type TrackerState,
+} from './state.js';
 
 export const STORAGE_KEY = 'z1r-tracker:state';
 export const CHANNEL_NAME = 'z1r-tracker';
+
+/**
+ * Keeps only the keys `template` defines, so a save can gain fields the model
+ * has added and lose ones it has dropped.
+ */
+function conform<T extends object>(template: T, saved: unknown): T {
+  if (!saved || typeof saved !== 'object') return { ...template };
+  const source = saved as Record<string, unknown>;
+  const result = { ...template } as Record<string, unknown>;
+  for (const key of Object.keys(template)) {
+    if (key in source && typeof source[key] === typeof result[key]) result[key] = source[key];
+  }
+  return result as T;
+}
+
+function pruneItems(
+  base: Record<string, number>,
+  saved: Record<string, number> | undefined,
+): Record<string, number> {
+  return conform(base, saved);
+}
+
+function pruneDungeons(
+  base: Record<string, DungeonState>,
+  saved: Record<string, DungeonState> | undefined,
+): Record<string, DungeonState> {
+  const result: Record<string, DungeonState> = {};
+  for (const [level, empty] of Object.entries(base)) {
+    result[level] = conform(empty, saved?.[level]);
+  }
+  return result;
+}
 
 /** Accepts anything shaped like a tracker state; repairs older versions. */
 export function migrate(raw: unknown): TrackerState | null {
@@ -27,8 +65,11 @@ export function migrate(raw: unknown): TrackerState | null {
     version: STATE_VERSION,
     // Saves written before `rev` existed have none; start them at 0.
     rev: typeof candidate.rev === 'number' ? candidate.rev : 0,
-    items: { ...base.items, ...(candidate.items ?? {}) },
-    dungeons: { ...base.dungeons, ...(candidate.dungeons ?? {}) },
+    // Prune, don't just merge. A plain spread would carry keys for items and
+    // dungeon flags that have since been removed from the model — they'd
+    // survive every future load and get written back into exported saves.
+    items: pruneItems(base.items, candidate.items),
+    dungeons: pruneDungeons(base.dungeons, candidate.dungeons),
     marks: { ...(candidate.marks ?? {}) },
     // v1 saves predate seed tracking; merging over the defaults fills in any
     // setting added since without discarding what the save does carry.

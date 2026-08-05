@@ -76,7 +76,6 @@ Every stateful element carries a second, non-colour channel:
 | Capability hint | green when met | `✓` / `✕` prefix, solid vs dashed border |
 | Item cell | accent border when held | dashed border + desaturated + dimmed when not |
 | Dungeon flag | accent border when on | dashed border + desaturated when off |
-| Dungeon row | green tint when cleared | `✓` at the end of the row |
 | Location slot kind | per-kind tint | the words `FLOOR` / `STAIR` / `HEART` / `OW` |
 | Overworld mark | per-mark tint | a distinct drawn shape per mark |
 | Overworld region | faint region tint | a two-letter code (`DM`, `LK`, …) on every screen |
@@ -151,5 +150,19 @@ the click cycle automatically.
 
 ## Testing
 
-There isn't a test suite yet. The reducer and `logic.ts` are pure functions over plain data and are
-the obvious first thing to cover when one is added.
+```bash
+npm test
+```
+
+`scripts/test.mjs` bundles every `packages/**/*.test.ts` with esbuild and hands the result to Node's
+built-in test runner. The bundle step exists because the sources import each other with `.js`
+specifiers that only a bundler resolves; there's no framework and no config.
+
+Coverage is deliberately narrow: the reducer and `migrate` are pure functions over plain data, and
+they're where the bugs have actually been. `migrate` in particular earned its tests — a plain spread
+merge silently kept item keys and dungeon fields that had been removed from the model, so they
+survived every load and got written back into exported saves. Browser testing couldn't confirm the
+fix (the page wasn't re-executing), which is what prompted the harness.
+
+Rendering isn't covered. It's DOM-patching against a live store; the cost of testing it well is high
+and the failure mode is visible the moment you open the page.

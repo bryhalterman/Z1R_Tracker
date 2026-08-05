@@ -44,11 +44,7 @@ export interface DungeonState {
   found: boolean;
   /** Free-text screen reference, e.g. "H7". */
   location: string;
-  /** Boss defeated. */
-  cleared: boolean;
   triforce: boolean;
-  map: boolean;
-  compass: boolean;
   /** Item id recovered here — randomizer bookkeeping. */
   item: string;
   notes: string;
@@ -123,10 +119,7 @@ function emptyDungeon(): DungeonState {
   return {
     found: false,
     location: '',
-    cleared: false,
     triforce: false,
-    map: false,
-    compass: false,
     item: '',
     notes: '',
   };
@@ -190,12 +183,8 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       if (!def) return state;
       const current = state.items[action.id] ?? 0;
       const limit = maxValue(def);
-      // Toggles and progressives wrap back to 0; counters clamp so a stray
-      // click near the cap doesn't wipe a 200-rupee count.
-      const next =
-        def.kind === 'counter'
-          ? Math.min(Math.max(current + action.direction, 0), limit)
-          : (current + action.direction + (limit + 1)) % (limit + 1);
+      // Both kinds wrap back round to 0, so a click past the top clears.
+      const next = (current + action.direction + (limit + 1)) % (limit + 1);
       if (next === current) return state;
       return bump({ items: { ...state.items, [action.id]: next } });
     }
@@ -265,12 +254,10 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       const entry = POOL_BY_ID.get(current.item);
       if (!action.collected || !entry) return bump({ locations });
 
+      // A pool entry with no `itemId` — a Heart Container — records where it
+      // was without touching inventory, since hearts aren't tracked there.
       const def = ITEMS_BY_ID.get(entry.itemId);
       if (!def) return bump({ locations });
-
-      // Counters are left alone: two locations can both hold a Heart Container,
-      // and toggling this checkbox twice must not inflate the count.
-      if (def.kind === 'counter') return bump({ locations });
 
       const held = state.items[entry.itemId] ?? 0;
       const raised = Math.max(held, Math.min(entry.value, maxValue(def)));
@@ -362,7 +349,3 @@ export function triforceCount(state: TrackerState): number {
   return Object.values(state.dungeons).filter((d) => d.triforce).length;
 }
 
-/** Dungeons whose boss is down. */
-export function clearedCount(state: TrackerState): number {
-  return Object.values(state.dungeons).filter((d) => d.cleared).length;
-}

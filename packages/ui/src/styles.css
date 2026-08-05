@@ -195,24 +195,6 @@
   background: #00000026;
 }
 
-.z1r-dungeon[data-cleared="true"] {
-  background: #58b3681f;
-}
-
-/* Cleared is also marked structurally, for readers who can't use the tint. */
-.z1r-dungeon::after {
-  content: "";
-  flex: none;
-  inline-size: 14px;
-  font-size: 13px;
-  font-weight: 700;
-  text-align: center;
-  color: var(--z1r-good);
-}
-
-.z1r-dungeon[data-cleared="true"]::after {
-  content: "✓";
-}
 
 .z1r-dungeon-head {
   display: flex;

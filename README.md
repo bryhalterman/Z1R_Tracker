@@ -32,7 +32,9 @@ the same for the other two targets.
 - **Left click** an item to add it, **right click** to remove it.
 - Progressive items (Sword, Arrow, Boomerang, Candle, Ring, Potion) step up through their tiers and
   wrap back to nothing.
-- Counters (Hearts, Keys, Rupees) also respond to the **scroll wheel** and clamp instead of wrapping.
+- Rupees, keys and heart totals aren't tracked — the game's own HUD already shows them. Nor are
+  boss kills, maps or compasses. What's tracked is items, Triforce pieces, and where things were
+  found.
 - Overworld screens cycle through Dungeon → Shop → Heart → Item → Bombable → Burnable → Pushable →
   Warp → Checked. Right click walks backwards.
 - Progress saves in the browser automatically. **Export** writes a JSON file; **Import** reads one
@@ -85,8 +87,8 @@ to it when adding panels.
 logical key (`item.sword.wood`) to a remote URL, and every renderer asks the resolver instead of
 hard-coding a path.
 
-Sprites simple enough to draw — the Triforce, hearts, rupees, bombs, keys, and every overworld mark
-— are **inline SVG** in `sprites/vectors.ts`, so they need no host, work offline, and look right out
+Sprites simple enough to draw — the Triforce, hearts, bombs, the Magical Key, and every overworld
+mark — are **inline SVG** in `sprites/vectors.ts`, so they need no host, work offline, and look right out
 of the box. Anything left over renders as a lettered glyph. Supplying a URL overrides either.
 
 To wire up real art, put a CSV next to the repo and run:
@@ -117,6 +119,15 @@ The overlay accepts query parameters:
 | `sections` | `summary,items,dungeons` | Any of `summary`, `seed`, `items`, `dungeons`, `locations`, `hintlog`, `map`, `hints` |
 | `size` | `40` | Item cell size in pixels |
 | `scale` | `1` | Scales the whole overlay |
+
+## Testing
+
+```bash
+npm test
+```
+
+Node's built-in test runner over the pure parts — the reducer and save migration. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#testing).
 
 ## Building
 
@@ -150,8 +161,8 @@ the only dev dependencies.
 Functional end to end: items, dungeons, seed settings, derived item locations, the hint log and the
 region-labelled overworld all work and persist.
 
-The sprite manifest holds no remote art yet. The Triforce, hearts, rupees, bombs, keys and overworld
-marks are drawn as vectors; detailed item sprites (swords, bow, recorder, and friends) still render
+The sprite manifest holds no remote art yet. The Triforce, hearts, bombs and overworld marks are
+drawn as vectors; detailed item sprites (swords, bow, recorder, and friends) still render
 as lettered glyphs until URLs are supplied. `npm run sprites:check` lists what's outstanding.
 
 ## License
