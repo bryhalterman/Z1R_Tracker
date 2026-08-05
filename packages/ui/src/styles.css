@@ -226,10 +226,12 @@
 }
 
 .z1r-tri-piece polygon {
-  /* Unheld: hatched fill, thin stroke. Held: solid accent, thick stroke, and a
-     bolder numeral. Three channels, so the state never rests on colour. */
+  /* Unheld reads as hatched texture, held as solid fill, and the numeral weight
+     changes with it — so state survives without colour. The stroke is only a
+     separator between adjacent wedges, in the panel colour rather than white,
+     which previously ringed every held piece in a heavy halo. */
   fill: url(#z1r-triforce-hatch);
-  stroke: var(--z1r-border);
+  stroke: var(--z1r-panel);
   stroke-width: 1;
   stroke-linejoin: round;
   transition: fill 90ms linear;
@@ -237,8 +239,8 @@
 
 .z1r-tri-piece[data-on="true"] polygon {
   fill: var(--z1r-accent);
-  stroke: var(--z1r-text);
-  stroke-width: 2;
+  stroke: var(--z1r-panel);
+  stroke-width: 1.25;
 }
 
 .z1r-tri-piece text {
@@ -320,9 +322,8 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  /* Region tint is deliberately faint — the two-letter code carries the
-     meaning, the tint only groups neighbours at a glance. */
-  background: color-mix(in srgb, var(--region-color, transparent) 14%, var(--z1r-field));
+  overflow: hidden;
+  background: var(--z1r-field);
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: 2px;
   cursor: pointer;
@@ -343,6 +344,25 @@
   border-color: var(--z1r-accent);
 }
 
+.z1r-screen-terrain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.z1r-screen-terrain img {
+  position: absolute;
+  max-inline-size: none;
+  /* NES art at one screen per cell; never let the browser smooth it. */
+  image-rendering: pixelated;
+}
+
+/* Without the map the cells are empty, so the codes need to stand alone. */
+.z1r-map[data-regions="false"] .z1r-screen-terrain {
+  opacity: 0.55;
+}
+
 .z1r-screen-region {
   position: absolute;
   inset-block-start: 1px;
@@ -352,17 +372,17 @@
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.02em;
-  color: var(--z1r-muted);
-  opacity: 0.75;
+  color: var(--z1r-text);
+  /* Over map art a flat colour is not enough; the chip keeps the two letters
+     legible on sand, water or forest alike. */
+  padding: 0 2px;
+  border-radius: 0 0 3px 0;
+  background: color-mix(in srgb, var(--z1r-bg) 78%, transparent);
   pointer-events: none;
 }
 
 .z1r-map[data-regions="false"] .z1r-screen-region {
   display: none;
-}
-
-.z1r-map[data-regions="false"] .z1r-screen {
-  background: var(--z1r-field);
 }
 
 .z1r-screen-mark {
@@ -372,18 +392,22 @@
   pointer-events: none;
 }
 
-/* A focused region is called out by a solid ring, a brightened code and a
-   raised tint — three channels, none of which is colour on its own. */
+/* A focused region is called out by a ring, a bolder code, and by every other
+   screen dimming — three channels, none of which is colour on its own. */
+.z1r-map:has(.z1r-screen[data-focused="true"]) .z1r-screen:not([data-focused="true"])
+  .z1r-screen-terrain {
+  opacity: 0.3;
+}
+
 .z1r-screen[data-focused="true"] {
   border-color: var(--z1r-accent);
   border-width: 2px;
-  background: color-mix(in srgb, var(--region-color, transparent) 34%, var(--z1r-field));
 }
 
 .z1r-screen[data-focused="true"] .z1r-screen-region {
-  color: var(--z1r-text);
-  opacity: 1;
-  text-shadow: 0 0 3px #000;
+  font-weight: 800;
+  background: var(--z1r-accent);
+  color: var(--z1r-bg);
 }
 
 .z1r-map-focus {
@@ -613,6 +637,7 @@
 /* SVG exception: an outline on a <g> is drawn around its bounding box, which
    over a triangle reads as a stray rectangle. Draw the indicator on the
    polygon instead so it follows the actual shape. */
+.z1r-tri-piece:focus,
 .z1r-tri-piece:focus-visible {
   outline: none;
 }
@@ -943,6 +968,7 @@
    and left most of its own panel blank. */
 .z1r-pair {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--z1r-space-md);
   align-items: flex-start;
 }
@@ -951,13 +977,16 @@
   margin: 0;
 }
 
+/* A real basis, not `auto`: the grid inside must keep enough width for several
+   columns, and the pair wraps rather than squeezing the items into one. */
 .z1r-pair > .z1r-items-panel {
-  flex: 1 1 auto;
-  min-inline-size: 0;
+  flex: 1 1 340px;
+  min-inline-size: 300px;
 }
 
 .z1r-pair > .z1r-triforce-panel {
-  flex: 0 0 auto;
+  flex: 1 1 240px;
+  max-inline-size: 320px;
 }
 
 .z1r-triforce {
@@ -968,9 +997,13 @@
 @media (max-width: 720px) {
   .z1r-pair {
     flex-direction: column;
+    /* `flex-start` is right on a row — it stops a short panel stretching to a
+       tall neighbour's height — but on a column it becomes the *cross* axis and
+       shrinks both panels to their minimum width. */
+    align-items: stretch;
   }
 
   .z1r-pair > .z1r-triforce-panel {
-    align-self: stretch;
+    max-inline-size: none;
   }
 }

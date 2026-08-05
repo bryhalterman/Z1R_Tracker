@@ -3,8 +3,13 @@
  *
  * Two different strategies, because the two kinds of request fail differently:
  *
- *  - App shell (same origin): cache-first. It only changes when you download a
- *    new release, and a stale shell is better than a blank window.
+ *  - Navigations and sprites.json: network-first, cache as fallback. These are
+ *    the two things that change between releases, and serving a stale
+ *    index.html permanently pins the app to the previous build's assets — it
+ *    references them by content hash, and those are cached too, so nothing
+ *    ever upgrades.
+ *  - Hashed assets (same origin): cache-first. Safe precisely because the hash
+ *    changes when the content does.
  *  - Sprite art (cross origin): stale-while-revalidate. Art is fetched from
  *    third-party hosts that may rate-limit or vanish. Once an image has been
  *    seen it is served from cache forever, and refreshed in the background.
@@ -46,6 +51,20 @@ async function cacheFirst(request) {
   return response;
 }
 
+/** Fresh when the network allows, cached when it doesn't. */
+async function networkFirst(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch (error) {
+    const hit = await cache.match(request);
+    if (hit) return hit;
+    throw error;
+  }
+}
+
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(SPRITE_CACHE);
   const hit = await cache.match(request);
@@ -67,7 +86,11 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirst(request));
+    // A navigation or the sprite manifest must never pin the app to an old
+    // build; everything else same-origin is content-hashed and safe to keep.
+    const mustBeFresh =
+      request.mode === 'navigate' || url.pathname.endsWith('/sprites.json');
+    event.respondWith(mustBeFresh ? networkFirst(request) : cacheFirst(request));
   } else if (request.destination === 'image') {
     event.respondWith(staleWhileRevalidate(request));
   }

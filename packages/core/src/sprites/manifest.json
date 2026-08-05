@@ -228,10 +228,15 @@
       "name": "Triforce Piece",
       "glyph": "▲"
     },
-    "ref.owHints": {
-      "url": "https://static.wikia.nocookie.net/z1r/images/1/1b/OW_Hint_Locations.png/revision/latest/scale-to-width-down/1000",
-      "name": "Overworld Hint Locations",
-      "glyph": "?"
+    "ref.overworld": {
+      "url": "https://static.wikia.nocookie.net/z1r/images/4/47/1QOW.png",
+      "name": "Overworld map",
+      "glyph": ""
+    },
+    "ref.overworld.mirrored": {
+      "url": "https://static.wikia.nocookie.net/z1r/images/5/5c/1QOWM.png",
+      "name": "Overworld map (mirrored)",
+      "glyph": ""
     }
   }
 }

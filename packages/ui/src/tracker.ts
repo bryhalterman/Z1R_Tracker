@@ -279,30 +279,18 @@ function buildMap(
   body.dataset.regions = 'true';
   heading?.append(regionToggle);
 
-  // Kept alongside as the source of truth people already know.
-  const reference = resolver.resolve('ref.owHints');
-  if (reference.kind === 'image') {
-    const toggle = el('button', 'z1r-map-ref-toggle', 'Hint map');
-    toggle.type = 'button';
-    toggle.title = 'Show the original overworld hint-region reference map';
-
-    const figure = el('figure', 'z1r-map-ref');
-    figure.hidden = true;
-    const image = el('img');
-    image.alt = reference.name;
-    image.loading = 'lazy';
-    figure.append(image);
-
-    toggle.addEventListener('click', () => {
-      figure.hidden = !figure.hidden;
-      toggle.dataset.open = String(!figure.hidden);
-      // Fetch only on first reveal — it's a 135 kB third-party image.
-      if (!figure.hidden && !image.src) image.src = reference.url;
-    });
-
-    heading?.append(toggle);
-    root.append(figure);
-  }
+  /*
+   * Each cell shows its own screen from the real overworld map.
+   *
+   * The map is 1280x468 with a legend strip below y=440, so the map proper is
+   * exactly 16x8 screens of 80x55 — which is the NES screen aspect (1.4545)
+   * and the grid's existing 16/11 cell ratio. One image is positioned inside
+   * every cell rather than sliced into 128 files.
+   */
+  const MAP_COLUMNS_PERCENT = 16 * 100;
+  const MAP_ROWS_PERCENT = (468 / 440) * 8 * 100;
+  const mapKey = () =>
+    store.getState().seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld';
 
   const focusNote = el('span', 'z1r-map-focus');
   heading?.append(focusNote);
@@ -336,11 +324,33 @@ function buildMap(
         });
       }
 
+      const terrain = el('span', 'z1r-screen-terrain');
+      const terrainImage = el('img');
+      terrainImage.alt = '';
+      terrainImage.loading = 'lazy';
+      terrainImage.decoding = 'async';
+      terrainImage.style.width = `${MAP_COLUMNS_PERCENT}%`;
+      terrainImage.style.height = `${MAP_ROWS_PERCENT}%`;
+      terrainImage.style.insetInlineStart = `${-(col - 1) * 100}%`;
+      terrainImage.style.insetBlockStart = `${-(row - 1) * 100}%`;
+      terrain.append(terrainImage);
+
       // The region code is the non-colour channel: two letters, always legible,
       // where a tint alone would be unreadable to a colour-blind viewer.
       const code = el('span', 'z1r-screen-region');
       const slot = el('span', 'z1r-screen-mark');
-      cell.append(code, slot);
+      cell.append(terrain, code, slot);
+
+      let renderedMap: string | null = null;
+      patches.push(() => {
+        const key = mapKey();
+        if (key === renderedMap) return;
+        renderedMap = key;
+        const resolved = resolver.resolve(key);
+        // A missing or unreachable map just leaves the cell blank; the codes
+        // and marks carry the tracker's own information regardless.
+        terrainImage.src = resolved.kind === 'image' ? resolved.url : '';
+      });
 
       let renderedMark: string | null = null;
       let renderedRegion: string | null = null;
