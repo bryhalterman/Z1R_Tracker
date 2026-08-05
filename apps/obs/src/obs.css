@@ -17,10 +17,28 @@ body {
 
 body.overlay {
   background: transparent;
-  padding: 8px;
+  padding: var(--overlay-pad, 8px);
   /* `?scale=` on the browser source URL sizes the whole overlay at once. */
   transform: scale(var(--overlay-scale, 1));
   transform-origin: top left;
+}
+
+/*
+ * Clip rather than scroll.
+ *
+ * A transform does not change layout, so the scaled overlay always overflows
+ * the body box it came from. Left alone that raises a scrollbar, which is both
+ * visible on stream and self-amplifying: the scrollbar narrows the viewport,
+ * the next fit computes a smaller scale, and the overlay walks itself down to
+ * nothing as the source is resized.
+ *
+ * The root element is clipped from `overlay.ts` rather than here. Scoping it
+ * in CSS needs `html:has(body.overlay)` — the dock shares this file and must
+ * still scroll — and the minifier folds that selector away, leaving the rule
+ * silently doing nothing.
+ */
+body.overlay {
+  overflow: hidden;
 }
 
 body.dock {

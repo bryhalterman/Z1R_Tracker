@@ -21,7 +21,9 @@
     "sprites:import": "node scripts/csv-to-manifest.mjs",
     "sprites:check": "node scripts/check-sprites.mjs",
     "test": "node scripts/test.mjs",
-    "theme:check": "node scripts/theme-report.mjs"
+    "theme:check": "node scripts/theme-report.mjs",
+    "serve:obs": "node scripts/serve.mjs",
+    "start:obs": "npm run build:obs && node scripts/serve.mjs"
   },
   "devDependencies": {
     "@spectrum-css/tokens": "^16.0.2",

@@ -47,6 +47,10 @@ async function main(): Promise<void> {
   const baseWidth = Math.max(200, Number(params.get('width') ?? '420') || 420);
   const fixedScale = Number(params.get('scale') ?? '');
   root.style.inlineSize = `${baseWidth}px`;
+  // Set here, not in obs.css: the dock shares that stylesheet and must still
+  // scroll, and the selector needed to scope it there does not survive
+  // minification. See the note beside `body.overlay { overflow: hidden }`.
+  document.documentElement.style.overflow = 'hidden';
 
   /*
    * Measured from `offsetHeight`, which is layout height and therefore
@@ -61,10 +65,27 @@ async function main(): Promise<void> {
       return;
     }
     const height = root.offsetHeight || 1;
-    const padding = 16; // body padding, both axes
+    /*
+     * The padding is *inside* the scaled box, so it scales with everything
+     * else. Subtracting it from the viewport first — as this did — measures
+     * against a width the overlay never occupies, and the result overflows by
+     * a little at every size. Add it to the content instead.
+     */
+    const pad = Number.parseFloat(
+      getComputedStyle(document.body).getPropertyValue('--overlay-pad') || '8',
+    );
+    const gutter = 2 * (Number.isFinite(pad) ? pad : 8);
+    /*
+     * `documentElement.clientWidth`, not `window.innerWidth`.
+     *
+     * innerWidth is the *visual* viewport: it includes any page zoom and
+     * ignores scrollbars, so the two diverge and the fit is computed against
+     * space the layout does not actually have.
+     */
+    const view = document.documentElement;
     const factor = Math.min(
-      (window.innerWidth - padding) / baseWidth,
-      (window.innerHeight - padding) / height,
+      view.clientWidth / (baseWidth + gutter),
+      view.clientHeight / (height + gutter),
     );
     const next = String(Math.max(factor, 0.1));
     // Compare before writing: a ResizeObserver that always writes re-triggers
