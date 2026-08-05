@@ -30,6 +30,7 @@ import { createSprite } from './sprite.js';
 import { buildSeedPanel } from './seed-panel.js';
 import { buildLocations } from './locations.js';
 import { buildHintTracker } from './hints.js';
+import { buildTriforce } from './triforce.js';
 
 export type TrackerSection =
   | 'seed'
@@ -105,7 +106,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   const builders: Record<TrackerSection, () => HTMLElement> = {
     seed: () => buildSeedPanel(store, patches, interactive),
     items: () => buildItems(store, resolver, patches, { interactive, itemSize }),
-    dungeons: () => buildDungeons(store, resolver, patches, interactive),
+    dungeons: () => buildTriforce(store, patches, interactive),
     locations: () => buildLocations(store, resolver, patches, interactive),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),
@@ -172,12 +173,18 @@ function buildItemCell(
   cell.append(slot, badge);
 
   if (opts.interactive) {
-    cell.addEventListener('click', () => {
-      store.dispatch({ type: 'cycleItem', id: def.id, direction: 1 });
-    });
+    const step = (direction: 1 | -1) =>
+      store.dispatch({ type: 'cycleItem', id: def.id, direction });
+    cell.addEventListener('click', (event) => step(event.shiftKey ? -1 : 1));
     cell.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      store.dispatch({ type: 'cycleItem', id: def.id, direction: -1 });
+      step(-1);
+    });
+    cell.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        step(-1);
+      }
     });
   }
 
@@ -192,6 +199,8 @@ function buildItemCell(
     }
     cell.dataset.owned = String(value > 0);
     cell.title = def.note ? `${labelFor(def, value)} — ${def.note}` : labelFor(def, value);
+    cell.setAttribute('aria-pressed', String(value > 0));
+    cell.setAttribute('aria-label', `${labelFor(def, value)} — ${value > 0 ? 'held' : 'not held'}`);
 
     if (def.kind === 'progressive' && value > 0 && maxValue(def) > 1) {
       badge.textContent = String(value);
@@ -202,94 +211,6 @@ function buildItemCell(
   });
 
   return cell;
-}
-
-/* ----------------------------------------------------------------- dungeons */
-
-/**
- * Boss kills, maps and compasses used to live here. They came out because the
- * game already shows them: the map and compass are on the pause screen, and a
- * dead boss is a walked-through room. Only the Triforce is worth a toggle.
- */
-const DUNGEON_FLAGS = [{ key: 'triforce', label: 'Triforce', sprite: 'ui.triforce' }] as const;
-
-function buildDungeons(
-  store: Store,
-  resolver: SpriteResolver,
-  patches: Patch[],
-  interactive: boolean,
-): HTMLElement {
-  const { root, body } = section('Dungeons', 'z1r-dungeon-list');
-
-  for (const def of DUNGEONS) {
-    const row = el('div', 'z1r-dungeon');
-    row.dataset.level = String(def.level);
-
-    const head = el('div', 'z1r-dungeon-head');
-    // The hint phrase is how the game refers to this level, so surface it where
-    // you'd look when an old man has just said it.
-    head.title = `Level ${def.level} — “${def.hint}”`;
-    head.append(createSprite(resolver, def.sprite, { size: 24, label: `Level ${def.level}` }));
-    head.append(el('span', 'z1r-dungeon-name', `${def.level}`));
-    row.append(head);
-
-    const flags = el('div', 'z1r-dungeon-flags');
-    for (const flag of DUNGEON_FLAGS) {
-      // Level 9 holds Ganon rather than a Triforce piece.
-      if (flag.key === 'triforce' && def.level === 9) continue;
-
-      const button = el('button', 'z1r-flag');
-      button.type = 'button';
-      button.dataset.flag = flag.key;
-      button.title = `${flag.label} — Level ${def.level}`;
-      button.append(createSprite(resolver, flag.sprite, { size: 22, label: flag.label }));
-      if (!interactive) button.disabled = true;
-      else {
-        button.addEventListener('click', () => {
-          const current = store.getState().dungeons[String(def.level)];
-          store.dispatch({
-            type: 'setDungeon',
-            level: def.level,
-            patch: { [flag.key]: !(current?.[flag.key] ?? false) },
-          });
-        });
-      }
-      flags.append(button);
-      patches.push((state) => {
-        button.dataset.on = String(state.dungeons[String(def.level)]?.[flag.key] ?? false);
-      });
-    }
-    row.append(flags);
-
-    const location = el('input', 'z1r-dungeon-location');
-    location.type = 'text';
-    location.placeholder = 'screen';
-    location.maxLength = 4;
-    location.spellcheck = false;
-    location.title = `Where Level ${def.level} was found`;
-    if (!interactive) location.readOnly = true;
-    else {
-      location.addEventListener('change', () => {
-        store.dispatch({
-          type: 'setDungeon',
-          level: def.level,
-          patch: { location: location.value.trim().toUpperCase(), found: !!location.value.trim() },
-        });
-      });
-    }
-    row.append(location);
-
-    patches.push((state) => {
-      const dungeon = state.dungeons[String(def.level)];
-      // Never stomp what the user is mid-way through typing.
-      if (document.activeElement !== location) location.value = dungeon?.location ?? '';
-      row.dataset.found = String(dungeon?.found ?? false);
-    });
-
-    body.append(row);
-  }
-
-  return root;
 }
 
 /* ---------------------------------------------------------------- overworld */
@@ -361,12 +282,18 @@ function buildMap(
       cell.title = id;
       if (!interactive) cell.disabled = true;
       else {
-        cell.addEventListener('click', () => {
-          store.dispatch({ type: 'cycleMark', screen: id, direction: 1 });
-        });
+        const step = (direction: 1 | -1) =>
+          store.dispatch({ type: 'cycleMark', screen: id, direction });
+        cell.addEventListener('click', (event) => step(event.shiftKey ? -1 : 1));
         cell.addEventListener('contextmenu', (event) => {
           event.preventDefault();
-          store.dispatch({ type: 'cycleMark', screen: id, direction: -1 });
+          step(-1);
+        });
+        cell.addEventListener('keydown', (event) => {
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            step(-1);
+          }
         });
       }
 

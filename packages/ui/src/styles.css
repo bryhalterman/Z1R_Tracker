@@ -130,23 +130,6 @@
   pointer-events: none;
 }
 
-/* ----------------------------------------------------------------- dungeons */
-
-.z1r-dungeon-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.z1r-dungeon {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 1px 5px;
-  border-radius: var(--z1r-radius);
-  background: var(--z1r-inset);
-}
-
 
 .z1r-dungeon-head {
   display: flex;
@@ -202,8 +185,98 @@
   border-radius: var(--z1r-radius);
 }
 
-.z1r-dungeon-location:focus {
-  outline: 1px solid var(--z1r-accent);
+/* ----------------------------------------------------------------- triforce */
+
+.z1r-triforce {
+  inline-size: 100%;
+  max-inline-size: 260px;
+  block-size: auto;
+  display: block;
+  margin-inline: auto;
+}
+
+.z1r-triforce #z1r-triforce-hatch line {
+  stroke: var(--z1r-border);
+}
+
+.z1r-tri-piece polygon {
+  /* Unheld: hatched fill, thin stroke. Held: solid accent, thick stroke, and a
+     bolder numeral. Three channels, so the state never rests on colour. */
+  fill: url(#z1r-triforce-hatch);
+  stroke: var(--z1r-border);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  transition: fill 90ms linear;
+}
+
+.z1r-tri-piece[data-on="true"] polygon {
+  fill: var(--z1r-accent);
+  stroke: var(--z1r-text);
+  stroke-width: 2;
+}
+
+.z1r-tri-piece text {
+  font-family: var(--z1r-font);
+  font-size: 9px;
+  font-weight: 400;
+  fill: var(--z1r-muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+.z1r-tri-piece[data-on="true"] text {
+  font-weight: 800;
+  fill: var(--z1r-bg);
+}
+
+.z1r-tracker[data-interactive="true"] .z1r-tri-piece {
+  cursor: pointer;
+}
+
+.z1r-tracker[data-interactive="true"] .z1r-tri-piece:hover polygon {
+  stroke: var(--z1r-accent);
+}
+
+/* Mixed and Random seeds don't reveal the quest split until the player records
+   it, so the numbering shown may not be the seed's. */
+.z1r-triforce[data-unsure="true"] .z1r-tri-piece text {
+  font-style: italic;
+  text-decoration: underline dotted;
+}
+
+.z1r-triforce-status {
+  margin: var(--z1r-space-md) 0 0;
+  font-size: var(--z1r-text-md);
+  text-align: center;
+  color: var(--z1r-muted);
+}
+
+.z1r-triforce-status[data-ready="true"] {
+  color: var(--z1r-good);
+  font-weight: 600;
+}
+
+.z1r-dungeon-where {
+  display: flex;
+  align-items: center;
+  gap: var(--z1r-space-sm);
+  flex-wrap: wrap;
+  margin-block-start: var(--z1r-space-md);
+}
+
+.z1r-where-cell {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--z1r-text-sm);
+  color: var(--z1r-muted);
+}
+
+.z1r-where-cell .z1r-where-input {
+  inline-size: 42px;
+  block-size: var(--spectrum-component-height-75);
+  text-align: center;
+  text-transform: uppercase;
 }
 
 /* ---------------------------------------------------------------- overworld */
@@ -305,6 +378,7 @@
 .z1r-hint-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 2px 4px;
   border: var(--z1r-border-width) solid transparent;
@@ -320,19 +394,16 @@
 .z1r-hint-row .z1r-hint-subject {
   flex: 2 1 190px;
   min-inline-size: 0;
-  font-size: var(--z1r-text-md);
 }
 
 .z1r-hint-row .z1r-hint-region {
   flex: 1 1 130px;
   min-inline-size: 0;
-  font-size: var(--z1r-text-md);
 }
 
 .z1r-hint-row .z1r-hint-screen {
   flex: none;
   inline-size: 62px;
-  font-size: var(--z1r-text-md);
   text-align: center;
   text-transform: uppercase;
 }
@@ -340,11 +411,11 @@
 .z1r-hint-row .z1r-hint-note {
   flex: 2 1 120px;
   min-inline-size: 0;
-  font-size: var(--z1r-text-md);
 }
 
 .z1r-hint-show {
   flex: none;
+  min-block-size: var(--spectrum-component-height-75);
   padding: 2px 7px;
   font: inherit;
   font-size: var(--z1r-text-sm);
@@ -369,7 +440,8 @@
 
 .z1r-hint-remove {
   flex: none;
-  inline-size: 20px;
+  inline-size: var(--spectrum-component-height-75);
+  block-size: var(--spectrum-component-height-75);
   padding: 0;
   font: inherit;
   font-size: 15px;
@@ -391,7 +463,8 @@
 }
 
 .z1r-map-ref-toggle {
-  margin-inline-start: 10px;
+  margin-inline-start: var(--z1r-space-md);
+  min-block-size: var(--spectrum-component-height-75);
   padding: 1px 8px;
   font: inherit;
   font-size: var(--z1r-text-2xs);
@@ -463,8 +536,8 @@
 .z1r-seed-body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 5px 12px;
-  align-items: end;
+  gap: var(--z1r-space-sm) var(--z1r-space-lg);
+  align-items: start;
 }
 
 .z1r-field {
@@ -491,17 +564,24 @@
 .z1r-input {
   inline-size: 100%;
   min-inline-size: 0;
-  padding: 4px 6px;
+  /* Explicit height: `input` and `select` disagree on intrinsic height by
+     1.4px, which was enough to stagger every row that mixed them. */
+  block-size: var(--spectrum-component-height-100);
+  padding-block: 0;
+  padding-inline: var(--z1r-space-sm);
   font: inherit;
-  font-size: var(--z1r-text-lg);
+  font-size: var(--z1r-text-md);
+  line-height: normal;
   color: var(--z1r-text);
   background: var(--z1r-field);
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
 }
 
-.z1r-input:focus {
-  outline: 1px solid var(--z1r-accent);
+.z1r-tracker :focus-visible,
+.z1r-controls :focus-visible {
+  outline: var(--spectrum-focus-indicator-thickness) solid var(--spectrum-focus-indicator-color);
+  outline-offset: var(--spectrum-focus-indicator-gap);
 }
 
 /*
@@ -552,6 +632,7 @@
 .z1r-check {
   display: flex;
   align-items: center;
+  min-block-size: var(--spectrum-component-height-75);
   gap: 6px;
   font-size: var(--z1r-text-md);
   color: var(--z1r-text);
@@ -653,7 +734,8 @@
 
 .z1r-location-label {
   flex: none;
-  inline-size: 56px;
+  min-inline-size: 56px;
+  flex: 0 1 auto;
   font-size: var(--z1r-text-sm);
   color: var(--z1r-muted);
 }
@@ -667,16 +749,20 @@
 .z1r-location-picker {
   flex: 1;
   min-inline-size: 0;
-  font-size: var(--z1r-text-md);
-  padding: 2px 4px;
+  block-size: var(--spectrum-component-height-75);
 }
 
 .z1r-location[data-known="false"] .z1r-location-picker {
   color: var(--z1r-muted);
 }
 
+/* Native checkboxes render at 13x13. Padding the label out to 24px gives the
+   required hit area without resorting to a custom control. */
 .z1r-location-check {
   flex: none;
+  inline-size: 16px;
+  block-size: 16px;
+  margin: 4px;
   cursor: pointer;
 }
 
@@ -696,7 +782,16 @@
   display: inline-flex;
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
-  overflow: hidden;
+}
+
+.z1r-segmented button:first-child {
+  border-start-start-radius: var(--z1r-radius);
+  border-end-start-radius: var(--z1r-radius);
+}
+
+.z1r-segmented button:last-child {
+  border-start-end-radius: var(--z1r-radius);
+  border-end-end-radius: var(--z1r-radius);
 }
 
 .z1r-segmented button {
@@ -788,5 +883,20 @@
   .z1r-item,
   .z1r-screen {
     transition: none;
+  }
+}
+
+/* Below roughly a dock's width the six hint controls cannot share one line
+   legibly, so they wrap to two rather than shrinking into ellipsis. */
+@media (max-width: 640px) {
+  .z1r-hint-row .z1r-hint-subject,
+  .z1r-hint-row .z1r-hint-region {
+    flex: 1 1 45%;
+    min-inline-size: 8ch;
+  }
+
+  .z1r-hint-row .z1r-hint-screen,
+  .z1r-hint-row .z1r-hint-note {
+    flex: 1 1 30%;
   }
 }

@@ -38,8 +38,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         format: 'iife',
-        entryFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name][extname]',
+        // Content-hashed, like the other two targets. Fixed names meant a
+        // browser that had seen assets/index.js once would keep serving the old
+        // one after an update — which is exactly what happened during review.
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
   },

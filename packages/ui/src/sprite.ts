@@ -73,7 +73,9 @@ export function createSprite(
 
   const resolved = resolver.resolve(key);
   element.title = label ?? resolved.name;
-  element.setAttribute('aria-label', label ?? resolved.name);
+  // Decorative. When a sprite sits inside a button, the button's own label must
+  // win — otherwise screen readers announce the art and drop the state.
+  element.setAttribute('aria-hidden', 'true');
   element.dataset.spriteKey = key;
 
   paint(element, resolved, size);
