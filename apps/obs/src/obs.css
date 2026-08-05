@@ -41,3 +41,23 @@ body.dock .z1r-map {
 body.dock .z1r-item-grid {
   grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
 }
+
+/*
+ * Only ever shown if someone clicks the overlay, which on a real browser source
+ * cannot happen — OBS discards clicks unless Interact is enabled. So its
+ * presence means the page is being used as a dock by mistake.
+ */
+.z1r-readonly-note {
+  position: fixed;
+  inset-inline: 8px;
+  inset-block-end: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--z1r-bg);
+  background: var(--z1r-accent);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px #000a;
+  z-index: 999;
+}

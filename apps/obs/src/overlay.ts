@@ -44,6 +44,26 @@ async function main(): Promise<void> {
 
   const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
 
+  /*
+   * Say so when someone clicks.
+   *
+   * This page is read-only on purpose, and it is served at `/` — so pointing a
+   * Custom Browser Dock at the root URL instead of dock.html yields a tracker
+   * where every control is disabled and dimmed, with nothing on screen to
+   * explain why. A real browser source never receives clicks (OBS discards them
+   * unless you enable Interact), so a click here almost certainly means the
+   * page is being used as a dock by mistake.
+   */
+  document.addEventListener('click', () => {
+    if (document.querySelector('.z1r-readonly-note')) return;
+    const note = document.createElement('p');
+    note.className = 'z1r-readonly-note';
+    note.textContent =
+      'This is the read-only overlay. Add dock.html as a Custom Browser Dock to make changes.';
+    document.body.append(note);
+    window.setTimeout(() => note.remove(), 8000);
+  });
+
   mountTracker(root, {
     store,
     resolver,
