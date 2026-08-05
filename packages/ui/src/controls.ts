@@ -1,11 +1,11 @@
 /**
- * Toolbar: game selector, reset, and save file import/export.
+ * Toolbar: reset, and save file import/export.
  *
  * Kept out of `tracker.ts` because the OBS browser source renders the tracker
  * without any of it — viewers should never see a Reset button.
  */
 
-import { exportState, importState, type Game, type Store } from '@z1r/core';
+import { exportState, importState, type Store } from '@z1r/core';
 
 export interface ControlsOptions {
   readonly store: Store;
@@ -15,25 +15,10 @@ export interface ControlsOptions {
 
 export function mountControls(root: HTMLElement, options: ControlsOptions): () => void {
   const { store, footnote } = options;
-  root.classList.add('z1r-controls');
+  // Mounted separately from the tracker, so it needs the Spectrum theme
+  // classes of its own — see the note in `mountTracker`.
+  root.classList.add('z1r-controls', 'spectrum', 'spectrum--dark', 'spectrum--medium');
   root.replaceChildren();
-
-  const games: { value: Game; label: string }[] = [
-    { value: 'z1r', label: 'Randomizer' },
-    { value: 'z1', label: 'Vanilla' },
-  ];
-
-  const group = document.createElement('div');
-  group.className = 'z1r-segmented';
-  const buttons = games.map(({ value, label }) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = label;
-    button.dataset.game = value;
-    button.addEventListener('click', () => store.dispatch({ type: 'setGame', game: value }));
-    group.append(button);
-    return button;
-  });
 
   const action = (label: string, onClick: () => void, className = '') => {
     const button = document.createElement('button');
@@ -94,7 +79,7 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
     'z1r-action-danger',
   );
 
-  root.append(group, exportButton, importButton, resetButton, filePicker, status);
+  root.append(exportButton, importButton, resetButton, filePicker, status);
 
   if (footnote) {
     const note = document.createElement('span');
@@ -103,17 +88,7 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
     root.append(note);
   }
 
-  const apply = () => {
-    const current = store.getState().game;
-    for (const button of buttons) {
-      button.dataset.active = String(button.dataset.game === current);
-    }
-  };
-  apply();
-  const unsubscribe = store.subscribe(apply);
-
   return () => {
-    unsubscribe();
     root.replaceChildren();
   };
 }

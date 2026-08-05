@@ -7,12 +7,12 @@
  */
 
 import {
+  allowedSections,
   attachPersistence,
   createInitialState,
   createStore,
   load,
   loadResolver,
-  type TrackerSectionName,
 } from './options.js';
 import { mountTracker } from '@z1r/ui';
 import '@z1r/ui/styles.css';
@@ -24,10 +24,11 @@ async function main(): Promise<void> {
 
   const params = new URLSearchParams(window.location.search);
 
-  const sections = (params.get('sections') ?? 'summary,items,dungeons')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean) as TrackerSectionName[];
+  // Filtered rather than trusted: the overworld grid isn't offered in the OBS
+  // build at all, and a typo shouldn't put an empty panel on stream.
+  const sections = allowedSections(
+    (params.get('sections') ?? 'items,dungeons').split(',').map((value) => value.trim()),
+  );
 
   const scale = Number(params.get('scale') ?? '1');
   const itemSize = Number(params.get('size') ?? '40');
@@ -35,7 +36,7 @@ async function main(): Promise<void> {
     document.body.style.setProperty('--overlay-scale', String(scale));
   }
 
-  const store = createStore(load() ?? createInitialState('z1r'));
+  const store = createStore(load() ?? createInitialState());
   // `write: false` — the overlay must never be the source of truth. If the
   // dock and overlay both wrote, a stale overlay could clobber a live edit.
   attachPersistence(store, { write: false });

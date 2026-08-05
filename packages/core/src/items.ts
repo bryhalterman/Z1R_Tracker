@@ -6,8 +6,6 @@
  * touching game data. See docs/SPRITES.md.
  */
 
-export type Game = 'z1' | 'z1r';
-
 export type ItemGroup = 'weapons' | 'equipment' | 'quest' | 'consumables';
 
 /**
@@ -30,8 +28,6 @@ export interface ItemDef {
   readonly name: string;
   readonly kind: ItemKind;
   readonly group: ItemGroup;
-  /** Which builds show this item. Vanilla-only helpers are hidden in `z1r`. */
-  readonly games: readonly Game[];
   /** Sprite key for `toggle` items. */
   readonly sprite?: string;
   /** Stage 1..n for `progressive` items. Stage 0 is always "not obtained". */
@@ -40,15 +36,12 @@ export interface ItemDef {
   readonly note?: string;
 }
 
-const BOTH: readonly Game[] = ['z1', 'z1r'];
-
 export const ITEMS: readonly ItemDef[] = [
   {
     id: 'sword',
     name: 'Sword',
     kind: 'progressive',
     group: 'weapons',
-    games: BOTH,
     stages: [
       { sprite: 'item.sword.wood', name: 'Wooden Sword' },
       { sprite: 'item.sword.white', name: 'White Sword' },
@@ -60,7 +53,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Bow',
     kind: 'toggle',
     group: 'weapons',
-    games: BOTH,
     sprite: 'item.bow',
     note: 'Useless without arrows.',
   },
@@ -69,7 +61,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Arrow',
     kind: 'progressive',
     group: 'weapons',
-    games: BOTH,
     stages: [
       { sprite: 'item.arrow.wood', name: 'Wooden Arrow' },
       { sprite: 'item.arrow.silver', name: 'Silver Arrow' },
@@ -81,7 +72,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Boomerang',
     kind: 'progressive',
     group: 'weapons',
-    games: BOTH,
     stages: [
       { sprite: 'item.boomerang.wood', name: 'Boomerang' },
       { sprite: 'item.boomerang.magical', name: 'Magical Boomerang' },
@@ -92,7 +82,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Bombs',
     kind: 'toggle',
     group: 'weapons',
-    games: BOTH,
     sprite: 'item.bomb',
   },
   {
@@ -100,7 +89,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Magical Rod',
     kind: 'toggle',
     group: 'weapons',
-    games: BOTH,
     sprite: 'item.rod',
   },
   {
@@ -108,7 +96,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Book of Magic',
     kind: 'toggle',
     group: 'weapons',
-    games: BOTH,
     sprite: 'item.book',
     note: 'Upgrades the Magical Rod to fire beams.',
   },
@@ -117,7 +104,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Candle',
     kind: 'progressive',
     group: 'equipment',
-    games: BOTH,
     stages: [
       { sprite: 'item.candle.blue', name: 'Blue Candle' },
       { sprite: 'item.candle.red', name: 'Red Candle' },
@@ -128,7 +114,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Ring',
     kind: 'progressive',
     group: 'equipment',
-    games: BOTH,
     stages: [
       { sprite: 'item.ring.blue', name: 'Blue Ring' },
       { sprite: 'item.ring.red', name: 'Red Ring' },
@@ -139,7 +124,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Raft',
     kind: 'toggle',
     group: 'equipment',
-    games: BOTH,
     sprite: 'item.raft',
   },
   {
@@ -147,7 +131,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Step Ladder',
     kind: 'toggle',
     group: 'equipment',
-    games: BOTH,
     sprite: 'item.ladder',
   },
   {
@@ -155,7 +138,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Recorder',
     kind: 'toggle',
     group: 'equipment',
-    games: BOTH,
     sprite: 'item.recorder',
   },
   {
@@ -163,7 +145,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Power Bracelet',
     kind: 'toggle',
     group: 'equipment',
-    games: BOTH,
     sprite: 'item.bracelet',
   },
   {
@@ -171,7 +152,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Magical Key',
     kind: 'toggle',
     group: 'equipment',
-    games: BOTH,
     sprite: 'item.key.magical',
   },
   {
@@ -179,7 +159,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Bait',
     kind: 'toggle',
     group: 'quest',
-    games: BOTH,
     sprite: 'item.bait',
   },
   {
@@ -187,7 +166,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Letter',
     kind: 'toggle',
     group: 'quest',
-    games: BOTH,
     sprite: 'item.letter',
     note: 'Unlocks potion purchases from the old women.',
   },
@@ -196,7 +174,6 @@ export const ITEMS: readonly ItemDef[] = [
     name: 'Potion',
     kind: 'progressive',
     group: 'consumables',
-    games: BOTH,
     stages: [
       { sprite: 'item.potion.blue', name: 'Life Potion' },
       { sprite: 'item.potion.red', name: '2nd Potion' },
@@ -207,10 +184,6 @@ export const ITEMS: readonly ItemDef[] = [
 export const ITEMS_BY_ID: ReadonlyMap<string, ItemDef> = new Map(
   ITEMS.map((item) => [item.id, item]),
 );
-
-export function itemsForGame(game: Game): readonly ItemDef[] {
-  return ITEMS.filter((item) => item.games.includes(game));
-}
 
 /** Highest value `id` can hold. Toggles cap at 1, progressives at their stage count. */
 export function maxValue(def: ItemDef): number {

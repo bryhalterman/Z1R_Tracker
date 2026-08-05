@@ -52,6 +52,11 @@ the sender's `rev` verbatim so both windows converge on one counter. `import` (a
 opened in *this* window) lifts `rev` above both sides, because it should outrank whatever peers are
 holding rather than be judged stale against it.
 
+`STATE_VERSION` is **3**. Version 3 dropped the `game` field, along with the Randomizer/Vanilla
+toggle that was its only reader. `migrate` is what makes a removal like that safe: it rebuilds the
+state from the current model rather than spreading the saved object over the new one, so a field
+that no longer exists doesn't survive a load and get written back into the next export.
+
 ## Rendering
 
 `mountTracker` builds its DOM once and then patches it. Each section pushes a `Patch` closure that
@@ -61,8 +66,14 @@ A full re-render would be simpler and is the obvious first instinct. It's the wr
 view runs inside an OBS browser source next to a game capture, and replacing hundreds of nodes on
 every click is exactly the kind of thing that shows up as a dropped frame on stream.
 
-The items panel is the one exception — it rebuilds wholesale, but only when the *game* changes,
-since vanilla and randomizer show different item sets.
+The locations panel is the one exception, and only when the derived slot list changes *shape* — see
+below. Everything else, items included, is patched in place.
+
+The items panel used to rebuild wholesale whenever the Randomizer/Vanilla toggle flipped. Both the
+toggle and the game concept behind it are gone: every item in `items.ts` carried both games, so the
+filter filtered nothing and the switch cost a full rebuild to produce an identical grid. The
+summary bar (Triforce count, found count, "8 to go") went at the same time — it restated what the
+grid above it already showed.
 
 ## Accessibility
 
@@ -82,10 +93,69 @@ Every stateful element carries a second, non-colour channel:
 | Focused hint region | raised tint | 2px solid ring, brightened code, `◉ on map` on the button |
 | Location collected | dimmed row | the checkbox itself |
 | Level 9 status | green when open | the sentence changes |
+| Select option / optgroup | explicit opaque pair, never inherited | the option's own text; see below |
 
 When adding a panel, pick the second channel first — shape, text, a mark, or a border style — and
 treat colour as reinforcement. The mark-shape requirement is also why `mark.*` sprites are drawn as
 distinct silhouettes rather than as coloured squares.
+
+### The one that got through: `<option>`
+
+Nothing in the stylesheet targeted `<option>` or `<optgroup>`. A native select popup is drawn by the
+platform, not by the page, so the list inherited the control's muted placeholder colour and landed
+it on the operating system's own grey popup background. Grey on grey: the item picker and the hint
+region list were effectively unreadable while open.
+
+It survived review because the part you look at was fine. The *closed* control measured 5.9:1 —
+comfortably passing — and the popup only exists while the mouse is down. Options and optgroups now
+carry explicit opaque colours of their own rather than inheriting; measured 13.5:1 after.
+
+Two rules came out of it. Any element the platform composites against a surface we don't own must
+set both `color` and `background-color` explicitly, never inherit them. And contrast gets measured,
+not judged by eye — which is what `npm run theme:check` is for.
+
+## Theming
+
+`packages/ui/src/theme.css` imports Adobe Spectrum's token package and binds each `--z1r-*` semantic
+alias to a Spectrum token. No hex value is chosen by hand anywhere in the tracker. The single
+literal colour left in `styles.css` is `#000`, for the text outlines on the OBS overlay — that text
+sits on arbitrary gameplay, so there is no backdrop to reason about and a hard outline is the only
+answer.
+
+The reason for Spectrum specifically is that its scales carry documented contrast behaviour, so "is
+this readable" becomes a property of the step you picked rather than something you have to remember
+to check. Measured against the `gray-100` panel, the **1000 step is where a hue first clears WCAG
+AA**. Two consequences worth knowing:
+
+- `--z1r-muted` is `gray-700`, not `gray-600`. `gray-600` measures 4.05:1 and misses AA.
+- The accent stayed Triforce gold. `yellow-1100` lands within a few points of the hand-picked
+  `#d9a441` it replaces and clears AA at 5.95:1, so nothing was traded away for the guarantee.
+
+Spectrum scopes its tokens to the `.spectrum`, `.spectrum--dark` and `.spectrum--medium` classes.
+`mountTracker` and `mountControls` add all three to their own mount roots, so no app HTML has to opt
+in and there's no global class for an embedding page to collide with.
+
+One thing the scale doesn't cover: its type sizes stop at 11px. The overworld region codes and the
+slot chips have to fit inside a ~60x40px grid cell, so `--z1r-text-xs` and `--z1r-text-2xs` derive
+9px and 10px with `calc()` from the smallest token rather than hard-coding them — they still track
+the scale if it moves.
+
+`npm run theme:check` (`scripts/theme-report.mjs`) resolves the alias bindings through Spectrum's
+own token CSS and fails if any foreground/background pair the tracker renders drops below 4.5:1.
+Currently 9 of 9 pass. It exists because the one accessibility bug that shipped came from picking a
+colour by eye.
+
+### The cost
+
+Only the dark theme and the medium (desktop) scale are imported; pulling the light and large sets in
+as well would roughly double the figures below. Even so, the stylesheet went from about 12KB raw /
+2.8KB gzipped to about 134KB raw / 18.5KB gzipped, because all of Spectrum's dark and medium tokens
+ship even though the tracker references roughly 25 of them.
+
+That is a real trade and it hasn't been paid down. Subsetting the imports to the tokens actually
+referenced would recover nearly all of it; nothing in the build does that yet. For a page that is
+served once and then run offline for hours, the size was judged worth the contrast guarantee — but
+if the tracker ever grows a light theme, subset first.
 
 ## Seeds and derived locations
 
@@ -112,8 +182,8 @@ It deliberately is **not** a reachability solver. The randomizer shuffles item p
 entrances and more depending on settings, so any claim of the form "location X is in logic" would be
 wrong under some seed. Capability checks stay true under every shuffle.
 
-`dungeons.ts` carries `vanilla*` fields (screen, item, boss). Those are hints for the vanilla build
-only and are never read as logic.
+`dungeons.ts` used to carry `vanilla*` fields (screen, item, boss). They were never rendered by any
+build and never read as logic, so they've been removed rather than left as furniture.
 
 ## Sprites
 
@@ -130,6 +200,7 @@ without touching a line of game data.
 | Entry points | 1 | 1 | 2 |
 | Service worker | no | yes | no |
 | Interactive | yes | yes | dock only |
+| Panels offered | all | all | six — no overworld |
 
 The desktop IIFE build is the only genuinely unusual choice. Browsers refuse `type="module"` scripts
 over `file://` because they're treated as cross-origin requests, so a module build would open to a
@@ -146,7 +217,11 @@ else; every build picks it up.
 the click cycle automatically.
 
 **A new panel** — add a builder to `tracker.ts`, register it in the `builders` map, add its name to
-`TrackerSection`. It becomes available to the OBS `?sections=` parameter for free.
+`TrackerSection`. That's enough for the web and desktop apps. To offer it on stream as well, add it
+to `OBS_SECTIONS` in `apps/obs/src/options.ts` — that list is both the dock's contents and the
+allow-list `allowedSections()` filters `?sections=` against, so an excluded or misspelled name is
+dropped instead of rendering an empty panel live. The overworld grid is the deliberate exclusion:
+128 cells, each carrying a region code, is unreadable at dock size.
 
 ## Testing
 

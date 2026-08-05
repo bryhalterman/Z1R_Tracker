@@ -38,8 +38,9 @@ an overworld shop is a hut. Those live in `packages/core/src/sprites/vectors.ts`
 
 It costs a few hundred bytes each and buys a lot — no third-party host to go down, no CORS or
 hotlink question, works offline, no attribution burden, and the tracker looks finished the moment
-you clone it. Items with real detail (swords, the bow, the recorder) stay as glyphs, because a
-hand-drawn approximation of a recognisable sprite looks worse than honest letters.
+you clone it. Items with real detail were never going to be drawn by hand — a hand-drawn
+approximation of a recognisable sprite looks worse than honest letters — so those are the ones the
+manifest points at real art for.
 
 Overworld marks are drawn as **distinct silhouettes**, not coloured squares. That is deliberate —
 see the accessibility rule in [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -47,6 +48,34 @@ see the accessibility rule in [ARCHITECTURE.md](ARCHITECTURE.md).
 An image that fails to load — dead host, hotlink blocking, offline — **downgrades to its glyph** at
 runtime rather than leaving an empty cell. That is the single most important property of this layer:
 a tracker that quietly loses half its icons mid-run is worse than one showing letters.
+
+## What the shipped manifest points at
+
+**36 of 45 keys render as art**: 23 from URLs — 22 items plus the overworld hint-map reference image
+— and 13 as drawn vectors. The nine that don't are `dungeon.1` … `dungeon.9`.
+
+The item art — 22 keys, every sword, bow, arrow, boomerang, candle, ring, potion and quest item —
+comes from [videogamesprites.net/Zelda1/Objects](https://www.videogamesprites.net/Zelda1/Objects/):
+individual transparent GIFs, one per item, at true NES resolution. Typical size is 16x32 portrait,
+with outliers from 6px to 32px wide. Because they're original-resolution rather than pre-scaled,
+nearest-neighbour upscaling matters — a smoothed sprite at 40px looks obviously wrong next to a game
+capture, which is why the image tier renders `image-rendering: pixelated` rather than leaving it to
+the browser default.
+
+Hotlinking was checked before committing to it: every URL returns 200 with a third-party referer,
+and the host runs no hotlink protection. What it does *not* send is any CORS header. That's fine for
+`<img>` and `background-image`, which is all the tracker does with them — and the loader
+deliberately doesn't request `crossOrigin='anonymous'`, because an anonymous request to a host with
+no `Access-Control-Allow-Origin` fails outright and drops a perfectly good sprite to a glyph. The
+consequence to remember: **those images would taint a canvas**. Any future feature that reads pixels
+back — recolouring, a generated sheet, a screenshot composite — won't work on them, and would need
+either a CORS-sending mirror or locally hosted copies.
+
+### Why the level numerals stay as glyphs
+
+`dungeon.1` through `dungeon.9` have no art and don't need any. The site has no per-level numeral
+sprites to point at, and a numeral is a glyph in the first place — a boxed `7` reads exactly as well
+as a picture of one, at any size, offline, with no host involved. This isn't an outstanding task.
 
 ## Filling in the manifest
 
@@ -98,9 +127,10 @@ One remote file, many keys:
 npm run sprites:check
 ```
 
-Lists every key still falling back to a glyph. Add `-- --fetch` to HEAD each URL and flag dead
-links; that form exits non-zero on a dead link, so it's safe to wire into CI. Unfilled keys never
-fail the check — a glyph is a valid state, not a build error.
+Lists every key still falling back to a glyph — currently the nine level numerals, by choice. Add
+`-- --fetch` to HEAD each URL and flag dead links; that form exits non-zero on a dead link, so it's
+safe to wire into CI, and it's the cheap way to notice that videogamesprites.net has moved or
+started blocking. Unfilled keys never fail the check — a glyph is a valid state, not a build error.
 
 ## Overriding at runtime
 
@@ -117,11 +147,17 @@ its bundled copy.
 
 ## Choosing a host
 
-Whatever you point at needs to allow hotlinking and send permissive CORS headers — the loader
-requests images with `crossOrigin="anonymous"` so a hostile host can't be handed credentials. Hosts
-that block hotlinking will silently serve a placeholder or 403, and the tracker will show glyphs.
+Whatever you point at has to allow hotlinking. Hosts that block it will silently serve a placeholder
+or a 403, and the tracker will show glyphs instead. Check with a third-party referer, not just by
+pasting the URL into a browser bar — plenty of hosts only object when there's a referer to object
+to.
 
-If you control the art, a GitHub Pages branch or any static CDN is the least fragile option.
+CORS headers are *not* required. Nothing here reads pixels back, so the loader asks for images
+without `crossOrigin`, and demanding a header the host doesn't send would only cost you working art.
+The trade is that such images can't be read from a canvas — see above.
+
+If you control the art, a GitHub Pages branch or any static CDN is the least fragile option, and
+sidesteps both questions.
 
 ## Key naming
 

@@ -7,6 +7,7 @@
  */
 
 import {
+  OBS_SECTIONS,
   attachPersistence,
   createInitialState,
   createStore,
@@ -22,13 +23,13 @@ async function main(): Promise<void> {
   const controls = document.querySelector<HTMLElement>('#controls');
   if (!root || !controls) throw new Error('Dock mount points are missing.');
 
-  const store = createStore(load() ?? createInitialState('z1r'));
+  const store = createStore(load() ?? createInitialState());
   attachPersistence(store);
 
   const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
 
   mountControls(controls, { store, footnote: 'Browser source: index.html' });
-  mountTracker(root, { store, resolver, itemSize: 34 });
+  mountTracker(root, { store, resolver, itemSize: 34, sections: OBS_SECTIONS });
 }
 
 void main();

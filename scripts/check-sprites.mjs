@@ -56,12 +56,17 @@ if (unfilled.length) {
 
 if (!process.argv.includes('--fetch')) process.exit(0);
 
-console.log('\nChecking URLs…');
+// Only entries with real art to fetch. `filled` also counts vector-backed
+// keys, which have no URL — including them built a bare "/" and reported
+// every drawn sprite as a dead link.
+const remote = filled.filter(([, entry]) => entry.url || entry.sheet);
+
+console.log(`\nChecking ${remote.length} URL(s)…`);
 const base = manifest.baseUrl ?? '';
 const dead = [];
 
 await Promise.all(
-  filled.map(async ([key, entry]) => {
+  remote.map(async ([key, entry]) => {
     const raw = entry.url ?? entry.sheet ?? '';
     const url = /^(https?:)?\/\//i.test(raw) ? raw : `${base.replace(/\/+$/, '')}/${raw}`;
     try {

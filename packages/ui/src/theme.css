@@ -1,0 +1,79 @@
+/*
+ * Theme layer — Adobe Spectrum tokens bound to the tracker's semantic names.
+ *
+ * Everything the tracker paints resolves to a Spectrum token. Nothing in this
+ * repo picks a hex value any more, which is the point: Spectrum's scales carry
+ * documented contrast behaviour, so "is this readable" becomes a property of
+ * the step you chose rather than something to remember to check.
+ *
+ * The step numbers below aren't arbitrary. Against the `gray-100` panel,
+ * Spectrum's 1000 step is where a hue first clears WCAG AA (4.5:1) — measured,
+ * not assumed. `npm run theme:check` re-measures every pair we render and
+ * fails if one drops below AA.
+ *
+ * Only the dark theme and the `medium` (desktop) scale are imported. Pulling
+ * the light and large sets too would roughly double the CSS for variables
+ * nothing references.
+ */
+
+@import '@spectrum-css/tokens/dist/css/global-vars.css';
+@import '@spectrum-css/tokens/dist/css/medium-vars.css';
+@import '@spectrum-css/tokens/dist/css/dark-vars.css';
+
+/*
+ * Spectrum scopes its tokens to `.spectrum`, `.spectrum--dark` and
+ * `.spectrum--medium`, so the mount roots carry all three (see `mountTracker`
+ * and `mountControls`). Binding the aliases on the same selector keeps this
+ * file self-contained — no app HTML has to opt in.
+ */
+.z1r-tracker,
+.z1r-controls {
+  /* Surfaces. */
+  --z1r-bg: var(--spectrum-gray-50);
+  --z1r-panel: var(--spectrum-gray-100);
+  /* Wells: inputs and grouped rows, one step below the panel they sit on. */
+  --z1r-field: var(--spectrum-gray-75);
+  --z1r-inset: var(--spectrum-gray-200);
+  --z1r-border: var(--spectrum-gray-400);
+
+  /* Text. gray-700 rather than gray-600 — 600 measures 4.05:1 and misses AA. */
+  --z1r-text: var(--spectrum-gray-900);
+  --z1r-muted: var(--spectrum-gray-700);
+
+  /* Accent stays Triforce gold; yellow-1100 lands within a few points of the
+     hand-picked #d9a441 it replaces, and clears AA at 5.95:1. */
+  --z1r-accent: var(--spectrum-yellow-1100);
+  --z1r-good: var(--spectrum-green-1000);
+  --z1r-bad: var(--spectrum-red-1000);
+
+  /* Slot-kind and region hues, kept distinguishable by step, not by hue —
+     the codes and labels carry the meaning. See ARCHITECTURE.md. */
+  --z1r-floor: var(--spectrum-seafoam-1000);
+  --z1r-stair: var(--spectrum-purple-1000);
+  --z1r-heart: var(--spectrum-red-900);
+  --z1r-overworld: var(--spectrum-yellow-1000);
+
+  /* Geometry. */
+  --z1r-radius: var(--spectrum-corner-radius-75);
+  --z1r-radius-sm: var(--spectrum-corner-radius-0);
+  --z1r-border-width: var(--spectrum-border-width-100);
+  --z1r-border-width-thick: var(--spectrum-border-width-200);
+
+  /* Spacing steps, used instead of ad-hoc pixel values. */
+  --z1r-space-xs: var(--spectrum-spacing-50); /* 2px */
+  --z1r-space-sm: var(--spectrum-spacing-75); /* 4px */
+  --z1r-space-md: var(--spectrum-spacing-100); /* 8px */
+  --z1r-space-lg: var(--spectrum-spacing-200); /* 12px */
+
+  /* Type. */
+  --z1r-font: var(--spectrum-sans-font-family-stack);
+  --z1r-font-mono: var(--spectrum-code-font-family-stack);
+  /* Spectrum's type scale stops at 11px. The overworld region codes and the
+     slot chips have to fit inside a ~60x40px grid cell, so they step below it
+     — derived from the token rather than hard-coded, so they track the scale. */
+  --z1r-text-xs: calc(var(--spectrum-font-size-50) - 2px); /* 9px */
+  --z1r-text-2xs: calc(var(--spectrum-font-size-50) - 1px); /* 10px */
+  --z1r-text-sm: var(--spectrum-font-size-50); /* 11px */
+  --z1r-text-md: var(--spectrum-font-size-75); /* 12px */
+  --z1r-text-lg: var(--spectrum-font-size-100); /* 14px */
+}

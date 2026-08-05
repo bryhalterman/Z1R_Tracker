@@ -141,6 +141,21 @@ export class SpriteResolver {
   }
 
   /**
+   * What to draw when remote art fails to load.
+   *
+   * Not the same as `resolve` — that prefers the URL, which is exactly what
+   * just failed. A key with both a URL and a drawn vector should degrade to
+   * the vector rather than all the way down to letters.
+   */
+  fallback(key: string): ResolvedSprite {
+    const entry = this.entry(key);
+    const name = entry?.name ?? key;
+    const vector = VECTORS[key];
+    if (vector) return { kind: 'svg', vector, name };
+    return { kind: 'glyph', text: entry?.glyph ?? name.slice(0, 2), name };
+  }
+
+  /**
    * Manifest keys with neither remote art nor a drawn vector — the ones that
    * still render as letters. Used by `npm run sprites:check`.
    */

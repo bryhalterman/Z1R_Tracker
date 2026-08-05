@@ -3,50 +3,230 @@
   "baseUrl": "",
   "note": "Fill in `url` per sprite, or run `npm run sprites:import -- sprites.csv` to generate this file from a CSV of name,url. Entries with an empty url fall back to the glyph renderer, so the tracker stays usable while art is missing.",
   "sprites": {
-    "item.sword.wood": { "url": "", "name": "Wooden Sword", "glyph": "SW" },
-    "item.sword.white": { "url": "", "name": "White Sword", "glyph": "SW" },
-    "item.sword.magical": { "url": "", "name": "Magical Sword", "glyph": "SW" },
-    "item.bow": { "url": "", "name": "Bow", "glyph": "BW" },
-    "item.arrow.wood": { "url": "", "name": "Wooden Arrow", "glyph": "AR" },
-    "item.arrow.silver": { "url": "", "name": "Silver Arrow", "glyph": "AR" },
-    "item.boomerang.wood": { "url": "", "name": "Boomerang", "glyph": "BM" },
-    "item.boomerang.magical": { "url": "", "name": "Magical Boomerang", "glyph": "BM" },
-    "item.bomb": { "url": "", "name": "Bombs", "glyph": "BO" },
-    "item.rod": { "url": "", "name": "Magical Rod", "glyph": "RD" },
-    "item.book": { "url": "", "name": "Book of Magic", "glyph": "BK" },
-    "item.candle.blue": { "url": "", "name": "Blue Candle", "glyph": "CA" },
-    "item.candle.red": { "url": "", "name": "Red Candle", "glyph": "CA" },
-    "item.ring.blue": { "url": "", "name": "Blue Ring", "glyph": "RG" },
-    "item.ring.red": { "url": "", "name": "Red Ring", "glyph": "RG" },
-    "item.raft": { "url": "", "name": "Raft", "glyph": "RF" },
-    "item.ladder": { "url": "", "name": "Step Ladder", "glyph": "LD" },
-    "item.recorder": { "url": "", "name": "Recorder", "glyph": "RC" },
-    "item.bracelet": { "url": "", "name": "Power Bracelet", "glyph": "PB" },
-    "item.key.magical": { "url": "", "name": "Magical Key", "glyph": "MK" },
-    "item.bait": { "url": "", "name": "Bait", "glyph": "BT" },
-    "item.letter": { "url": "", "name": "Letter", "glyph": "LT" },
-    "item.potion.blue": { "url": "", "name": "Life Potion", "glyph": "PT" },
-    "item.potion.red": { "url": "", "name": "2nd Potion", "glyph": "PT" },
-    "item.heart": { "url": "", "name": "Heart Container", "glyph": "HC" },
-    "dungeon.1": { "url": "", "name": "Level 1 - Eagle", "glyph": "1" },
-    "dungeon.2": { "url": "", "name": "Level 2 - Moon", "glyph": "2" },
-    "dungeon.3": { "url": "", "name": "Level 3 - Manji", "glyph": "3" },
-    "dungeon.4": { "url": "", "name": "Level 4 - Snake", "glyph": "4" },
-    "dungeon.5": { "url": "", "name": "Level 5 - Lizard", "glyph": "5" },
-    "dungeon.6": { "url": "", "name": "Level 6 - Dragon", "glyph": "6" },
-    "dungeon.7": { "url": "", "name": "Level 7 - Demon", "glyph": "7" },
-    "dungeon.8": { "url": "", "name": "Level 8 - Lion", "glyph": "8" },
-    "dungeon.9": { "url": "", "name": "Level 9 - Death Mountain", "glyph": "9" },
-    "mark.dungeon": { "url": "", "name": "Dungeon", "glyph": "D" },
-    "mark.shop": { "url": "", "name": "Shop", "glyph": "$" },
-    "mark.heart": { "url": "", "name": "Heart Container", "glyph": "H" },
-    "mark.item": { "url": "", "name": "Item", "glyph": "I" },
-    "mark.bombable": { "url": "", "name": "Bombable", "glyph": "B" },
-    "mark.burnable": { "url": "", "name": "Burnable", "glyph": "F" },
-    "mark.pushable": { "url": "", "name": "Pushable", "glyph": "P" },
-    "mark.warp": { "url": "", "name": "Warp", "glyph": "W" },
-    "mark.empty": { "url": "", "name": "Checked", "glyph": "-" },
-    "ui.triforce": { "url": "", "name": "Triforce Piece", "glyph": "▲" },
-    "ref.owHints": { "url": "https://static.wikia.nocookie.net/z1r/images/1/1b/OW_Hint_Locations.png/revision/latest/scale-to-width-down/1000", "name": "Overworld Hint Locations", "glyph": "?" }
+    "item.sword.wood": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Wooden%20Sword%20(Up).gif",
+      "name": "Wooden Sword",
+      "glyph": "SW"
+    },
+    "item.sword.white": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/White%20Sword%20(Up).gif",
+      "name": "White Sword",
+      "glyph": "SW"
+    },
+    "item.sword.magical": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Magical%20Sword%20(Menu).gif",
+      "name": "Magical Sword",
+      "glyph": "SW"
+    },
+    "item.bow": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Bow.gif",
+      "name": "Bow",
+      "glyph": "BW"
+    },
+    "item.arrow.wood": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Arrow%20(Up).gif",
+      "name": "Wooden Arrow",
+      "glyph": "AR"
+    },
+    "item.arrow.silver": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Silver%20Arrow%20(Up).gif",
+      "name": "Silver Arrow",
+      "glyph": "AR"
+    },
+    "item.boomerang.wood": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Boomerang.gif",
+      "name": "Boomerang",
+      "glyph": "BM"
+    },
+    "item.boomerang.magical": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Magical%20Boomerang.gif",
+      "name": "Magical Boomerang",
+      "glyph": "BM"
+    },
+    "item.bomb": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Bomb.gif",
+      "name": "Bombs",
+      "glyph": "BO"
+    },
+    "item.rod": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Magical%20Rod.gif",
+      "name": "Magical Rod",
+      "glyph": "RD"
+    },
+    "item.book": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Book%20of%20Magic.gif",
+      "name": "Book of Magic",
+      "glyph": "BK"
+    },
+    "item.candle.blue": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Blue%20Candle.gif",
+      "name": "Blue Candle",
+      "glyph": "CA"
+    },
+    "item.candle.red": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Red%20Candle.gif",
+      "name": "Red Candle",
+      "glyph": "CA"
+    },
+    "item.ring.blue": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Blue%20Ring.gif",
+      "name": "Blue Ring",
+      "glyph": "RG"
+    },
+    "item.ring.red": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Red%20Ring.gif",
+      "name": "Red Ring",
+      "glyph": "RG"
+    },
+    "item.raft": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Raft1.gif",
+      "name": "Raft",
+      "glyph": "RF"
+    },
+    "item.ladder": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Stepladder.gif",
+      "name": "Step Ladder",
+      "glyph": "LD"
+    },
+    "item.recorder": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Recorder.gif",
+      "name": "Recorder",
+      "glyph": "RC"
+    },
+    "item.bracelet": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Power%20Bracelet.gif",
+      "name": "Power Bracelet",
+      "glyph": "PB"
+    },
+    "item.key.magical": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Magical%20Key.gif",
+      "name": "Magical Key",
+      "glyph": "MK"
+    },
+    "item.bait": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Food.gif",
+      "name": "Bait",
+      "glyph": "BT"
+    },
+    "item.letter": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Letter.gif",
+      "name": "Letter",
+      "glyph": "LT"
+    },
+    "item.potion.blue": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Life%20Potion.gif",
+      "name": "Life Potion",
+      "glyph": "PT"
+    },
+    "item.potion.red": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/2nd%20Potion.gif",
+      "name": "2nd Potion",
+      "glyph": "PT"
+    },
+    "item.heart": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Heart%20Container.gif",
+      "name": "Heart Container",
+      "glyph": "HC"
+    },
+    "dungeon.1": {
+      "url": "",
+      "name": "Level 1 - Eagle",
+      "glyph": "1"
+    },
+    "dungeon.2": {
+      "url": "",
+      "name": "Level 2 - Moon",
+      "glyph": "2"
+    },
+    "dungeon.3": {
+      "url": "",
+      "name": "Level 3 - Manji",
+      "glyph": "3"
+    },
+    "dungeon.4": {
+      "url": "",
+      "name": "Level 4 - Snake",
+      "glyph": "4"
+    },
+    "dungeon.5": {
+      "url": "",
+      "name": "Level 5 - Lizard",
+      "glyph": "5"
+    },
+    "dungeon.6": {
+      "url": "",
+      "name": "Level 6 - Dragon",
+      "glyph": "6"
+    },
+    "dungeon.7": {
+      "url": "",
+      "name": "Level 7 - Demon",
+      "glyph": "7"
+    },
+    "dungeon.8": {
+      "url": "",
+      "name": "Level 8 - Lion",
+      "glyph": "8"
+    },
+    "dungeon.9": {
+      "url": "",
+      "name": "Level 9 - Death Mountain",
+      "glyph": "9"
+    },
+    "mark.dungeon": {
+      "url": "",
+      "name": "Dungeon",
+      "glyph": "D"
+    },
+    "mark.shop": {
+      "url": "",
+      "name": "Shop",
+      "glyph": "$"
+    },
+    "mark.heart": {
+      "url": "",
+      "name": "Heart Container",
+      "glyph": "H"
+    },
+    "mark.item": {
+      "url": "",
+      "name": "Item",
+      "glyph": "I"
+    },
+    "mark.bombable": {
+      "url": "",
+      "name": "Bombable",
+      "glyph": "B"
+    },
+    "mark.burnable": {
+      "url": "",
+      "name": "Burnable",
+      "glyph": "F"
+    },
+    "mark.pushable": {
+      "url": "",
+      "name": "Pushable",
+      "glyph": "P"
+    },
+    "mark.warp": {
+      "url": "",
+      "name": "Warp",
+      "glyph": "W"
+    },
+    "mark.empty": {
+      "url": "",
+      "name": "Checked",
+      "glyph": "-"
+    },
+    "ui.triforce": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Triforce1.gif",
+      "name": "Triforce Piece",
+      "glyph": "▲"
+    },
+    "ref.owHints": {
+      "url": "https://static.wikia.nocookie.net/z1r/images/1/1b/OW_Hint_Locations.png/revision/latest/scale-to-width-down/1000",
+      "name": "Overworld Hint Locations",
+      "glyph": "?"
+    }
   }
 }

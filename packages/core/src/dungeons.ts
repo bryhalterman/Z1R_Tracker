@@ -13,12 +13,6 @@ export interface DungeonDef {
   readonly name: string;
   /** Sprite key for the level marker. */
   readonly sprite: string;
-  /** Vanilla overworld screen, as an 8x16 grid reference (col,row). Hint only. */
-  readonly vanillaScreen: string;
-  /** Vanilla major item. Hint only — never used as logic in `z1r`. */
-  readonly vanillaItem: string;
-  /** Vanilla boss. Hint only. */
-  readonly vanillaBoss: string;
   /**
    * How in-game hints refer to this level, verbatim from the Dungeon Quest
    * tables. Identical across 1st and 2nd Quest — a hint reads as this phrase
@@ -33,81 +27,54 @@ export const DUNGEONS: readonly DungeonDef[] = [
     level: 1,
     name: 'Eagle',
     sprite: 'dungeon.1',
-    vanillaScreen: 'H7',
-    vanillaItem: 'bow',
-    vanillaBoss: 'Aquamentus',
     hint: 'Aquamentus awaits…',
   },
   {
     level: 2,
     name: 'Moon',
     sprite: 'dungeon.2',
-    vanillaScreen: 'M4',
-    vanillaItem: 'boomerang',
-    vanillaBoss: 'Dodongo',
     hint: 'Dodongo dwells…',
   },
   {
     level: 3,
     name: 'Manji',
     sprite: 'dungeon.3',
-    vanillaScreen: 'D6',
-    vanillaItem: 'raft',
-    vanillaBoss: 'Manhandla',
     hint: 'Manhandla threatens…',
   },
   {
     level: 4,
     name: 'Snake',
     sprite: 'dungeon.4',
-    vanillaScreen: 'N2',
-    vanillaItem: 'ladder',
-    vanillaBoss: 'Gleeok',
     hint: 'Gleeok lurks…',
   },
   {
     level: 5,
     name: 'Lizard',
     sprite: 'dungeon.5',
-    vanillaScreen: 'H1',
-    vanillaItem: 'recorder',
-    vanillaBoss: 'Digdogger',
     hint: 'Digdogger gazes…',
   },
   {
     level: 6,
     name: 'Dragon',
     sprite: 'dungeon.6',
-    vanillaScreen: 'C3',
-    vanillaItem: 'rod',
-    vanillaBoss: 'Gohma',
     hint: 'Gohma creeps…',
   },
   {
     level: 7,
     name: 'Demon',
     sprite: 'dungeon.7',
-    vanillaScreen: 'F5',
-    vanillaItem: 'boomerang.magical',
-    vanillaBoss: 'Aquamentus',
     hint: 'Goriya grumbles…',
   },
   {
     level: 8,
     name: 'Lion',
     sprite: 'dungeon.8',
-    vanillaScreen: 'K6',
-    vanillaItem: 'book',
-    vanillaBoss: 'Gleeok',
     hint: 'Gleeok returns…',
   },
   {
     level: 9,
     name: 'Death Mountain',
     sprite: 'dungeon.9',
-    vanillaScreen: 'B1',
-    vanillaItem: 'arrow.silver',
-    vanillaBoss: 'Ganon',
     hint: '…is an entrance to death',
   },
 ];

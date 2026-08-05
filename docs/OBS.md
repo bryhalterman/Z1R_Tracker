@@ -41,17 +41,29 @@ re-reads state from storage — briefly flashing an empty tracker on stream.
 Append query parameters to the local file path:
 
 ```
-apps/obs/dist/index.html?sections=summary,items&size=32&scale=1.25
+apps/obs/dist/index.html?sections=items,hintlog&size=32&scale=1.25
 ```
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `sections` | `summary,items,dungeons` | Any of `summary`, `seed`, `items`, `dungeons`, `locations`, `hintlog`, `map`, `hints` |
+| `sections` | `items,dungeons` | Any of `seed`, `items`, `dungeons`, `locations`, `hintlog`, `hints` |
 | `size` | `40` | Item cell size in pixels |
 | `scale` | `1` | Scales the whole overlay |
 
 A vertical item strip beside a 4:3 game capture is usually `?sections=items&size=36`. Add
 `dungeons` if you're tracking a full randomizer seed.
+
+Anything not in that list is dropped, not rendered. Misspell a name, or ask for a panel the OBS
+build doesn't carry, and you lose that panel rather than getting an empty box on stream. The list
+lives in `apps/obs/src/options.ts` as `OBS_SECTIONS`, and the dock shows the same six in the same
+order.
+
+### No overworld map on stream
+
+The overworld grid isn't available to either OBS page. It's 128 cells with a two-letter region code
+on each — legible in a browser window, unreadable squeezed into a dock beside a game capture, and
+pointless as a static overlay. Overworld tracking lives in the web and desktop apps, which have the
+room for it. If you want it during a run, keep one of those open on a second monitor.
 
 The overlay has no background by design. If you want a backing plate, add a Color Source behind it
 in OBS rather than styling one in — that way it stays independent of the tracker's own layout.
@@ -86,8 +98,9 @@ Pick one and use it for both.
 Different origins — see above. Check that both URLs start the same way.
 
 **Everything shows two-letter boxes instead of icons.**
-That's the glyph fallback: the sprite manifest has no URLs yet, or the art host is unreachable. See
-[SPRITES.md](SPRITES.md).
+That's the glyph fallback, and it means the art host is unreachable from the machine OBS is running
+on — every item key ships with a URL. If only the level numerals `1`…`9` are boxes, that's
+expected: they have no art and don't need any. See [SPRITES.md](SPRITES.md).
 
 **The overlay went blank after a scene switch.**
 "Shutdown source when not visible" is checked. Uncheck it.

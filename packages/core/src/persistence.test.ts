@@ -10,7 +10,6 @@ function legacySave(): Record<string, unknown> {
   return {
     version: 2,
     rev: 7,
-    game: 'z1r',
     items: { sword: 2, bow: 1, heartContainers: 9, keys: 4, rupees: 120 },
     dungeons: {
       '1': {
@@ -89,7 +88,7 @@ test('hintSeq never lands on an id the save already uses', () => {
 
 test('rev increases on every change, so same-tick edits still sync', () => {
   // The whole reason sync orders by rev instead of updatedAt.
-  let state: TrackerState = createInitialState('z1r', 1000);
+  let state: TrackerState = createInitialState(1000);
   const revs: number[] = [];
   for (const id of ['bow', 'raft', 'ladder', 'book']) {
     state = reduce(state, { type: 'cycleItem', id, direction: 1 }, 1000);
@@ -100,7 +99,7 @@ test('rev increases on every change, so same-tick edits still sync', () => {
 });
 
 test('collecting a Heart Container records the slot without touching inventory', () => {
-  let state = createInitialState('z1r');
+  let state = createInitialState();
   state = reduce(state, { type: 'setLocation', id: 'd1.heart', item: 'heart' });
   state = reduce(state, { type: 'collectLocation', id: 'd1.heart', collected: true });
   assert.equal(state.locations['d1.heart']?.collected, true);
@@ -108,7 +107,7 @@ test('collecting a Heart Container records the slot without touching inventory',
 });
 
 test('collecting a real item raises it but unticking never revokes', () => {
-  let state = createInitialState('z1r');
+  let state = createInitialState();
   state = reduce(state, { type: 'setLocation', id: 'd9.stair.0', item: 'silverArrow' });
   state = reduce(state, { type: 'collectLocation', id: 'd9.stair.0', collected: true });
   assert.equal(state.items['arrow'], 2);

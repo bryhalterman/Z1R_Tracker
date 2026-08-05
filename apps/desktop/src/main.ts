@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   const controlsRoot = document.querySelector<HTMLElement>('#controls');
   if (!trackerRoot || !controlsRoot) throw new Error('Tracker mount points are missing.');
 
-  const store = createStore(load() ?? createInitialState('z1r'));
+  const store = createStore(load() ?? createInitialState());
   attachPersistence(store);
 
   // Over file:// the fetch always fails, so skip it and use the bundled manifest.

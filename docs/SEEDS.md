@@ -125,7 +125,9 @@ Each row in the **Hints** panel is one hint:
    item from the shuffle pool.
 2. **Region** — one of the ten above.
 3. **Show** — lights that region's screens up on the grid. The button reads `○ show` or `◉ on map`,
-   so its state is legible without colour.
+   so its state is legible without colour. The grid itself is a web and desktop panel only; the OBS
+   build carries the hint log but not the map, because 128 labelled cells can't be read at dock
+   size. See [OBS.md](OBS.md).
 4. **Heard at** and **note** — optional bookkeeping.
 
 Both halves are optional. You often note the subject before the region, or vice versa, and a

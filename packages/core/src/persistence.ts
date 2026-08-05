@@ -58,7 +58,7 @@ export function migrate(raw: unknown): TrackerState | null {
   if (typeof candidate.version !== 'number') return null;
   if (candidate.version > STATE_VERSION) return null;
 
-  const base = createInitialState(candidate.game === 'z1' ? 'z1' : 'z1r');
+  const base = createInitialState();
   return {
     ...base,
     ...candidate,

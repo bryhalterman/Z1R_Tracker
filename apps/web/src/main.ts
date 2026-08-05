@@ -15,7 +15,7 @@ async function main(): Promise<void> {
   if (!trackerRoot || !controlsRoot) throw new Error('Tracker mount points are missing.');
 
   // A run in progress must survive a refresh — restore before the first paint.
-  const store = createStore(load() ?? createInitialState('z1r'));
+  const store = createStore(load() ?? createInitialState());
   attachPersistence(store);
 
   // A `sprites.json` beside index.html wins over the bundled manifest, so an

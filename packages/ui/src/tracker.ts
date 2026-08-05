@@ -14,17 +14,13 @@ import {
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
   REGIONS_BY_ID,
-  TRIFORCE_REQUIRED_FOR_L9,
   regionForScreen,
-  canEnterLevel9,
-  deriveLocations,
   evaluateAll,
-  itemsForGame,
+  ITEMS,
   labelFor,
   maxValue,
   screenId,
   spriteFor,
-  triforceCount,
   type ItemDef,
   type SpriteResolver,
   type Store,
@@ -36,7 +32,6 @@ import { buildLocations } from './locations.js';
 import { buildHintTracker } from './hints.js';
 
 export type TrackerSection =
-  | 'summary'
   | 'seed'
   | 'items'
   | 'dungeons'
@@ -58,7 +53,6 @@ export interface MountOptions {
 }
 
 const DEFAULT_SECTIONS: readonly TrackerSection[] = [
-  'summary',
   'seed',
   'items',
   'dungeons',
@@ -99,14 +93,16 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     itemSize = 40,
   } = options;
 
-  root.classList.add('z1r-tracker');
+  // Spectrum scopes its tokens to these classes, so the mount root carries them
+  // rather than requiring each app's HTML to opt in. `medium` is the desktop
+  // scale; `large` is for touch and would inflate every control.
+  root.classList.add('z1r-tracker', 'spectrum', 'spectrum--dark', 'spectrum--medium');
   root.dataset.mode = mode;
   root.dataset.interactive = String(interactive);
   root.replaceChildren();
 
   const patches: Patch[] = [];
   const builders: Record<TrackerSection, () => HTMLElement> = {
-    summary: () => buildSummary(patches),
     seed: () => buildSeedPanel(store, patches, interactive),
     items: () => buildItems(store, resolver, patches, { interactive, itemSize }),
     dungeons: () => buildDungeons(store, resolver, patches, interactive),
@@ -123,7 +119,6 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   }
 
   const apply = (state: TrackerState) => {
-    root.dataset.game = state.game;
     for (const patch of patches) patch(state);
   };
 
@@ -137,39 +132,6 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   };
 }
 
-/* ------------------------------------------------------------------ summary */
-
-function buildSummary(patches: Patch[]): HTMLElement {
-  const root = el('section', 'z1r-panel z1r-summary');
-
-  const stat = (label: string) => {
-    const wrap = el('div', 'z1r-stat');
-    const value = el('span', 'z1r-stat-value', '0');
-    wrap.append(value, el('span', 'z1r-stat-label', label));
-    root.append(wrap);
-    return value;
-  };
-
-  const triforce = stat('Triforce');
-  const found = stat('Found');
-
-  const status = el('div', 'z1r-status');
-  root.append(status);
-
-  patches.push((state) => {
-    const pieces = triforceCount(state);
-    triforce.textContent = `${pieces}/${TRIFORCE_REQUIRED_FOR_L9}`;
-    const locations = deriveLocations(state.seed, state.extraFloorSlots);
-    const collected = locations.filter((l) => state.locations[l.id]?.collected).length;
-    found.textContent = `${collected}/${locations.length}`;
-    const ready = canEnterLevel9(state);
-    status.textContent = ready ? 'Level 9 is open' : `${TRIFORCE_REQUIRED_FOR_L9 - pieces} to go`;
-    status.dataset.ready = String(ready);
-  });
-
-  return root;
-}
-
 /* -------------------------------------------------------------------- items */
 
 function buildItems(
@@ -179,23 +141,12 @@ function buildItems(
   opts: { interactive: boolean; itemSize: number },
 ): HTMLElement {
   const { root, body } = section('Items', 'z1r-item-grid');
-  // Rebuilt whenever the game switches, since the visible item set differs.
-  let renderedGame: string | null = null;
   const cellPatches: Patch[] = [];
-
-  const build = (state: TrackerState) => {
-    body.replaceChildren();
-    cellPatches.length = 0;
-    for (const def of itemsForGame(state.game)) {
-      body.append(buildItemCell(store, resolver, def, cellPatches, opts));
-    }
-  };
+  for (const def of ITEMS) {
+    body.append(buildItemCell(store, resolver, def, cellPatches, opts));
+  }
 
   patches.push((state) => {
-    if (state.game !== renderedGame) {
-      renderedGame = state.game;
-      build(state);
-    }
     for (const patch of cellPatches) patch(state);
   });
 

@@ -7,12 +7,12 @@
  * hold a DOM node, a class instance, or a function.
  */
 
-import { ITEMS_BY_ID, itemsForGame, maxValue, type Game } from './items.js';
+import { ITEMS, ITEMS_BY_ID, maxValue } from './items.js';
 import { DUNGEONS } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
 import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 export interface LocationState {
   /** Pool entry id known to be here. Empty until identified. */
@@ -61,7 +61,6 @@ export interface TrackerState {
    * second one. A counter can't tie.
    */
   rev: number;
-  game: Game;
   /** item id -> stage/count. Absent keys read as 0. */
   items: Record<string, number>;
   /** level number (as string) -> dungeon progress. */
@@ -92,7 +91,6 @@ export interface TrackerState {
 }
 
 export type Action =
-  | { type: 'setGame'; game: Game }
   | { type: 'cycleItem'; id: string; direction: 1 | -1 }
   | { type: 'setItem'; id: string; value: number }
   | { type: 'setDungeon'; level: number; patch: Partial<DungeonState> }
@@ -113,7 +111,7 @@ export type Action =
   | { type: 'replace'; state: TrackerState }
   /** A save file loaded by the user here. Outranks whatever peers currently hold. */
   | { type: 'import'; state: TrackerState }
-  | { type: 'reset'; game?: Game };
+  | { type: 'reset' };
 
 function emptyDungeon(): DungeonState {
   return {
@@ -125,9 +123,9 @@ function emptyDungeon(): DungeonState {
   };
 }
 
-export function createInitialState(game: Game = 'z1r', now = Date.now()): TrackerState {
+export function createInitialState(now = Date.now()): TrackerState {
   const items: Record<string, number> = {};
-  for (const def of itemsForGame(game)) {
+  for (const def of ITEMS) {
     items[def.id] = 0;
   }
   const dungeons: Record<string, DungeonState> = {};
@@ -137,7 +135,6 @@ export function createInitialState(game: Game = 'z1r', now = Date.now()): Tracke
   return {
     version: STATE_VERSION,
     rev: 0,
-    game,
     items,
     dungeons,
     marks: {},
@@ -168,16 +165,6 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
   });
 
   switch (action.type) {
-    case 'setGame': {
-      if (action.game === state.game) return state;
-      // Keep whatever the player already has; just widen/narrow the visible set.
-      const items = { ...state.items };
-      for (const def of itemsForGame(action.game)) {
-        items[def.id] ??= 0;
-      }
-      return bump({ game: action.game, items });
-    }
-
     case 'cycleItem': {
       const def = ITEMS_BY_ID.get(action.id);
       if (!def) return state;
@@ -313,7 +300,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       };
 
     case 'reset':
-      return { ...createInitialState(action.game ?? state.game, now), rev: state.rev + 1 };
+      return { ...createInitialState(now), rev: state.rev + 1 };
   }
 }
 
