@@ -141,11 +141,27 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   // here would otherwise leave every later panel showing the previous one.
   const apply = (state: TrackerState) => runPatches(patches, state);
 
+  /*
+   * Publish the tracker's own width as a band.
+   *
+   * Layout rules key off this rather than a media query, because the OBS
+   * overlay lays out at a fixed composition width inside a Browser Source of
+   * some other size — so the viewport describes the wrong box entirely.
+   */
+  const applyWidthBand = () => {
+    const width = root.offsetWidth;
+    root.dataset.width = width < 640 ? 'xs' : width < 720 ? 'sm' : 'md';
+  };
+  applyWidthBand();
+  const widthObserver = new ResizeObserver(applyWidthBand);
+  widthObserver.observe(root);
+
   apply(store.getState());
   const unsubscribe = store.subscribe(apply);
 
   return () => {
     unsubscribe();
+    widthObserver.disconnect();
     root.replaceChildren();
     root.classList.remove('z1r-tracker');
   };

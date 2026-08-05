@@ -935,17 +935,23 @@
 
 /* Below roughly a dock's width the six hint controls cannot share one line
    legibly, so they wrap to two rather than shrinking into ellipsis. */
-@media (max-width: 640px) {
-  .z1r-hint-row .z1r-hint-subject,
-  .z1r-hint-row .z1r-hint-region {
-    flex: 1 1 45%;
-    min-inline-size: 8ch;
-  }
+/*
+ * Width-band rules.
+ *
+ * Driven by `data-width` on the tracker root, measured from the element, not
+ * from the viewport. A media query is the wrong tool here: the OBS overlay
+ * lays out at a fixed composition width inside whatever size the Browser
+ * Source happens to be, so viewport-keyed rules describe the wrong box.
+ */
+.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-subject,
+.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-region {
+  flex: 1 1 45%;
+  min-inline-size: 8ch;
+}
 
-  .z1r-hint-row .z1r-hint-screen,
-  .z1r-hint-row .z1r-hint-note {
-    flex: 1 1 30%;
-  }
+.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-screen,
+.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-note {
+  flex: 1 1 30%;
 }
 
 /* The items grid and the Triforce share a row: the triangle is naturally narrow
@@ -977,19 +983,30 @@
   max-inline-size: 230px;
 }
 
-/* Below dock width they stack rather than squeezing the triangle to nothing. */
-@media (max-width: 720px) {
-  .z1r-pair {
-    flex-direction: column;
-    /* `flex-start` is right on a row — it stops a short panel stretching to a
-       tall neighbour's height — but on a column it becomes the *cross* axis and
-       shrinks both panels to their minimum width. */
-    align-items: stretch;
-  }
+/*
+ * Below dock width the two panels stack — as plain blocks, not a column flex.
+ *
+ * Flipping the flex direction re-purposes every sizing value on the children:
+ * `flex: 1 1 340px` means "340px wide" on a row and "340px tall" on a column,
+ * and the panels ended up over 1000px tall around 140px of content. A block
+ * layout has none of that ambiguity, and stacked panels need nothing flex
+ * offers.
+ */
+.z1r-tracker[data-width="xs"] .z1r-pair,
+.z1r-tracker[data-width="sm"] .z1r-pair {
+  display: block;
+}
 
-  .z1r-pair > .z1r-triforce-panel {
-    max-inline-size: none;
-  }
+.z1r-tracker[data-width="xs"] .z1r-pair > .z1r-panel,
+.z1r-tracker[data-width="sm"] .z1r-pair > .z1r-panel {
+  min-inline-size: 0;
+  max-inline-size: none;
+  block-size: auto;
+}
+
+.z1r-tracker[data-width="xs"] .z1r-pair > .z1r-panel + .z1r-panel,
+.z1r-tracker[data-width="sm"] .z1r-pair > .z1r-panel + .z1r-panel {
+  margin-block-start: var(--z1r-space-md);
 }
 
 /* ------------------------------------------------------------ mark palette */
@@ -1225,7 +1242,7 @@
  * width is in viewBox units against a 9-unit font, so 2.5 swallowed the glyph
  * entirely. Roughly a tenth of the font size is enough to separate it.
  */
-.z1r-tracker[data-mode="overlay"] .z1r-tri-piece text {
+.z1r-tracker[data-mode="overlay"] .z1r-tri-piece[data-on="false"] text {
   paint-order: stroke fill;
   stroke: #000;
   stroke-width: 0.9;
