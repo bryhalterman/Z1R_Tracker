@@ -333,7 +333,6 @@
 
 .z1r-screen:not([data-mark="none"]) {
   box-shadow: inset 0 0 0 2px var(--mark-color, transparent);
-  background: color-mix(in srgb, var(--mark-color, transparent) 22%, var(--z1r-field));
 }
 
 .z1r-screen[data-mark="empty"] {
@@ -347,6 +346,10 @@
 .z1r-screen-terrain {
   position: absolute;
   inset: 0;
+  /* Explicitly the bottom layer. Positioned elements paint above static ones,
+     so without this the terrain covered the marks entirely — they were being
+     drawn, just behind the map. */
+  z-index: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -358,13 +361,9 @@
   image-rendering: pixelated;
 }
 
-/* Without the map the cells are empty, so the codes need to stand alone. */
-.z1r-map[data-regions="false"] .z1r-screen-terrain {
-  opacity: 0.55;
-}
-
 .z1r-screen-region {
   position: absolute;
+  z-index: 1;
   inset-block-start: 1px;
   inset-inline-start: 2px;
   font-family: var(--z1r-font-mono);
@@ -377,7 +376,8 @@
      legible on sand, water or forest alike. */
   padding: 0 2px;
   border-radius: 0 0 3px 0;
-  background: color-mix(in srgb, var(--z1r-bg) 78%, transparent);
+  background: color-mix(in srgb, var(--z1r-bg) 88%, transparent);
+  opacity: 0.85;
   pointer-events: none;
 }
 
@@ -385,11 +385,29 @@
   display: none;
 }
 
+/* A focused hint labels its own region even with the codes switched off —
+   that is the moment the label is worth the space. */
+.z1r-map[data-regions="false"] .z1r-screen[data-focused="true"] .z1r-screen-region {
+  display: block;
+}
+
 .z1r-screen-mark {
-  display: flex;
+  display: none;
+  position: relative;
+  z-index: 2;
   align-items: center;
   justify-content: center;
+  padding: 2px;
+  border-radius: 50%;
+  /* A constant dark disc under the icon: terrain art underneath varies wildly,
+     and a mark that disappears over forest is worse than no mark. */
+  background: color-mix(in srgb, var(--z1r-bg) 80%, transparent);
+  box-shadow: 0 0 0 1.5px var(--mark-color, transparent);
   pointer-events: none;
+}
+
+.z1r-screen:not([data-mark="none"]) .z1r-screen-mark {
+  display: flex;
 }
 
 /* A focused region is called out by a ring, a bolder code, and by every other
@@ -512,7 +530,7 @@
   color: var(--z1r-muted);
 }
 
-.z1r-map-ref-toggle {
+.z1r-chip-button {
   margin-inline-start: var(--z1r-space-md);
   min-block-size: var(--spectrum-component-height-75);
   padding: 1px 8px;
@@ -527,8 +545,8 @@
   cursor: pointer;
 }
 
-.z1r-map-ref-toggle:hover,
-.z1r-map-ref-toggle[data-open="true"] {
+.z1r-chip-button:hover,
+.z1r-chip-button[data-open="true"] {
   color: var(--z1r-accent);
   border-color: var(--z1r-accent);
 }

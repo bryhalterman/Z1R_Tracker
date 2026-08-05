@@ -39,7 +39,7 @@ export function buildHintTracker(
   if (interactive) {
     const add = document.createElement('button');
     add.type = 'button';
-    add.className = 'z1r-map-ref-toggle';
+    add.className = 'z1r-chip-button';
     add.textContent = '+ hint';
     add.addEventListener('click', () => store.dispatch({ type: 'addHint' }));
     title.append(add);

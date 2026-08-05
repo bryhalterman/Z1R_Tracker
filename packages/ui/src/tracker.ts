@@ -267,16 +267,16 @@ function buildMap(
   // Hint regions are baked into the grid rather than left in a reference
   // image: a hint names a region, so the map should be able to answer "which
   // screens is that?" directly.
-  const regionToggle = el('button', 'z1r-map-ref-toggle', 'Regions');
+  const regionToggle = el('button', 'z1r-chip-button z1r-regions-toggle', 'Regions');
   regionToggle.type = 'button';
-  regionToggle.dataset.open = 'true';
-  regionToggle.title = 'Show the hint region code on each screen';
+  regionToggle.dataset.open = 'false';
+  regionToggle.title = 'Label every screen with its hint region code';
   regionToggle.addEventListener('click', () => {
     const on = regionToggle.dataset.open !== 'true';
     regionToggle.dataset.open = String(on);
     body.dataset.regions = String(on);
   });
-  body.dataset.regions = 'true';
+  body.dataset.regions = 'false';
   heading?.append(regionToggle);
 
   /*
