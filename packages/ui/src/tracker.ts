@@ -227,24 +227,28 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    * most fifteen pixels of width and puts every screen on an exact boundary.
    */
   const applyMapScale = () => {
-    const map = root.querySelector<HTMLElement>('.z1r-map');
-    if (!map) return;
-    const gap = Number.parseFloat(getComputedStyle(map).columnGap) || 0;
-    // `clientWidth` excludes the border and includes padding, which is the box
-    // the columns are actually laid out in.
-    const inner = map.clientWidth;
+    // Measured on the frame, written to the grid. The grid is only as wide as
+    // its own columns, so measuring it to decide the column width would be
+    // circular — it would settle wherever it happened to start.
+    const frame = root.querySelector<HTMLElement>('.z1r-map');
+    const grid = frame?.querySelector<HTMLElement>('.z1r-map-grid');
+    if (!frame || !grid) return;
+    const inner = frame.clientWidth;
     if (inner <= 0) return;
 
-    const cell = Math.floor((inner - gap * (OVERWORLD_COLUMNS - 1)) / OVERWORLD_COLUMNS);
+    // No gaps: the map behind is one continuous image, and a gutter between
+    // cells would slice it. Cells are separated by their own inset borders,
+    // which sit inside the cell and so do not shift anything.
+    const cell = Math.floor(inner / OVERWORLD_COLUMNS);
     if (cell < 8) return;
     // Height rounded independently rather than left to `aspect-ratio`, which
     // would reintroduce a fraction on the other axis.
     const height = Math.max(6, Math.round((cell * 11) / 16));
 
     // Compare before writing, or this re-enters the observer that calls it.
-    if (map.style.getPropertyValue('--map-cell') !== `${cell}px`) {
-      map.style.setProperty('--map-cell', `${cell}px`);
-      map.style.setProperty('--map-cell-height', `${height}px`);
+    if (grid.style.getPropertyValue('--map-cell') !== `${cell}px`) {
+      grid.style.setProperty('--map-cell', `${cell}px`);
+      grid.style.setProperty('--map-cell-height', `${height}px`);
     }
   };
 
@@ -372,8 +376,34 @@ function buildMap(
   const { root, body } = section('Overworld', 'z1r-map');
   // The palette is positioned against this panel.
   root.classList.add('z1r-map-panel');
-  body.style.setProperty('--map-columns', String(OVERWORLD_COLUMNS));
   const heading = root.querySelector('.z1r-panel-title');
+
+  /*
+   * One canvas behind the whole grid, with the cells as transparent overlays.
+   *
+   * Each cell used to position its own copy of the shared map image. That is
+   * correct but soft in OBS: a cell is smaller than the 80x55 screen it shows,
+   * so the art is being *reduced*, and `image-rendering: pixelated` is only
+   * honoured on reduction by newer Chromium — the build OBS embeds falls back
+   * to smoothing. Drawing into a canvas with `imageSmoothingEnabled = false`
+   * is honoured everywhere.
+   *
+   * One canvas rather than 128: a canvas per screen was tried and left all but
+   * three cells blank in OBS, a worse failure than the blur. It is also the
+   * better shape — the overworld is one continuous image, and slicing it into
+   * 128 pieces to lay them back edge to edge was working against the source.
+   *
+   * The grid sits inside a frame so the two can be measured independently: the
+   * frame reports the space available, and the grid is sized to a whole number
+   * of pixels inside it. Sizing the grid from its own width would be circular.
+   */
+  const grid = el('div', 'z1r-map-grid');
+  grid.style.setProperty('--map-columns', String(OVERWORLD_COLUMNS));
+  const mapCanvas = document.createElement('canvas');
+  mapCanvas.className = 'z1r-map-canvas';
+  mapCanvas.setAttribute('aria-hidden', 'true');
+  grid.append(mapCanvas);
+  body.append(grid);
 
   // Hint regions are baked into the grid rather than left in a reference
   // image: a hint names a region, so the map should be able to answer "which
@@ -391,17 +421,83 @@ function buildMap(
   heading?.append(regionToggle);
 
   /*
-   * Each cell shows its own screen from the real overworld map.
-   *
-   * The map is 1280x468 with a legend strip below y=440, so the map proper is
-   * exactly 16x8 screens of 80x55 — which is the NES screen aspect (1.4545)
-   * and the grid's existing 16/11 cell ratio. One image is positioned inside
-   * every cell rather than sliced into 128 files.
+   * The reference map is 1280x468 with a legend strip below y=440, so the map
+   * proper is exactly 16x8 screens of 80x55 — the NES screen aspect, and the
+   * grid's own 16/11 cell ratio. Only that top region is drawn.
    */
-  const MAP_COLUMNS_PERCENT = 16 * 100;
-  const MAP_ROWS_PERCENT = (468 / 440) * 8 * 100;
-  const mapKey = () =>
-    store.getState().seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld';
+  const MAP_SOURCE_WIDTH = 1280;
+  const MAP_SOURCE_HEIGHT = 440;
+
+  let mapSource: HTMLImageElement | null = null;
+  let mapSourceKey = '';
+  let paintedSignature = '';
+
+  const paintMap = (force = false) => {
+    const source = mapSource;
+    if (!source || !source.complete || source.naturalWidth === 0) return;
+    const cssWidth = grid.clientWidth;
+    const cssHeight = grid.clientHeight;
+    if (cssWidth <= 0 || cssHeight <= 0) return;
+
+    // Device pixels, so the canvas is not resampled again on a HiDPI display or
+    // under Windows display scaling. Capped because the backing store is real
+    // memory and nothing is gained past a few times the CSS size.
+    const ratio = Math.max(1, Math.min(globalThis.devicePixelRatio || 1, 3));
+    const width = Math.round(cssWidth * ratio);
+    const height = Math.round(cssHeight * ratio);
+
+    const signature = mapSourceKey + '|' + width + 'x' + height;
+    if (!force && signature === paintedSignature) return;
+    paintedSignature = signature;
+
+    if (mapCanvas.width !== width) mapCanvas.width = width;
+    if (mapCanvas.height !== height) mapCanvas.height = height;
+    const context = mapCanvas.getContext('2d');
+    if (!context) return;
+    context.imageSmoothingEnabled = false;
+    context.clearRect(0, 0, width, height);
+    context.drawImage(source, 0, 0, MAP_SOURCE_WIDTH, MAP_SOURCE_HEIGHT, 0, 0, width, height);
+  };
+
+  /**
+   * Loads the reference map once per key, then repaints.
+   *
+   * The art comes from a third-party host that sends no CORS headers, so the
+   * canvas is tainted the moment it is drawn into. That is fine — it is only
+   * ever displayed. Reading it back, as producing a data URL would, is what
+   * would throw.
+   */
+  const ensureMapSource = (key: string) => {
+    if (key === mapSourceKey) return;
+    mapSourceKey = key;
+    const resolved = resolver.resolve(key);
+    if (resolved.kind !== 'image') {
+      // No map art reachable. The grid stays bare; the region codes and marks
+      // carry the tracker's own information regardless.
+      mapSource = null;
+      return;
+    }
+    const image = new Image();
+    image.decoding = 'async';
+    image.addEventListener('load', () => {
+      if (mapSourceKey !== key) return;
+      mapSource = image;
+      paintMap(true);
+    });
+    image.addEventListener('error', () => {
+      if (mapSourceKey === key) mapSource = null;
+    });
+    image.src = resolved.url;
+  };
+
+  // Cell size is set by the layout pass on the tracker root, so the repaint is
+  // driven from the grid's own size rather than plumbed through it.
+  new ResizeObserver(() => paintMap()).observe(grid);
+
+  // Mirroring swaps the reference art, so this follows the seed setting.
+  patches.push((state) =>
+    ensureMapSource(state.seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld'),
+  );
 
   /*
    * Mark palette.
@@ -649,17 +745,6 @@ function buildMap(
         });
       }
 
-      const terrain = el('span', 'z1r-screen-terrain');
-      const terrainImage = el('img');
-      terrainImage.alt = '';
-      terrainImage.loading = 'lazy';
-      terrainImage.decoding = 'async';
-      terrainImage.style.width = `${MAP_COLUMNS_PERCENT}%`;
-      terrainImage.style.height = `${MAP_ROWS_PERCENT}%`;
-      terrainImage.style.insetInlineStart = `${-(col - 1) * 100}%`;
-      terrainImage.style.insetBlockStart = `${-(row - 1) * 100}%`;
-      terrain.append(terrainImage);
-
       // The region code is the non-colour channel: two letters, always legible,
       // where a tint alone would be unreadable to a colour-blind viewer.
       const code = el('span', 'z1r-screen-region');
@@ -668,18 +753,7 @@ function buildMap(
       // as two-letter tags. Both are text, so they survive being shrunk into a
       // dock and read without depending on colour.
       const detail = el('span', 'z1r-screen-detail');
-      cell.append(terrain, code, slot, detail);
-
-      let renderedMap: string | null = null;
-      patches.push(() => {
-        const key = mapKey();
-        renderedMap = memoise(renderedMap, key, () => {
-          const resolved = resolver.resolve(key);
-          // A missing or unreachable map just leaves the cell blank; the codes
-          // and marks carry the tracker's own information regardless.
-          terrainImage.src = resolved.kind === 'image' ? resolved.url : '';
-        });
-      });
+      cell.append(code, slot, detail);
 
       let renderedMark: string | null = null;
       let renderedRegion: string | null = null;
@@ -760,7 +834,7 @@ function buildMap(
         cell.title = parts.join(' — ');
       });
 
-      body.append(cell);
+      grid.append(cell);
     }
   }
 

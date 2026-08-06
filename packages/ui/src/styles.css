@@ -498,23 +498,54 @@
 
 /* ---------------------------------------------------------------- overworld */
 
+/*
+ * The frame reports how much room the grid has. It is a plain block so its
+ * width is the panel's, independent of whatever the grid settles on.
+ */
 .z1r-map {
+  display: block;
+}
+
+/*
+ * Whole-pixel columns, sized from JS — see `applyMapScale`.
+ *
+ * `1fr` shares out the remainder, so 16 columns in a panel that is not a
+ * multiple of 16 gives fractional cell widths and the map behind lands on
+ * half-pixel boundaries. The fallback keeps the grid sane before the first
+ * measure. No gap: the canvas behind is one continuous image.
+ */
+.z1r-map-grid {
+  position: relative;
   display: grid;
-  /*
-   * Whole-pixel columns, sized from JS — see `applyMapScale`.
-   *
-   * `1fr` shares out the remainder, so 16 columns in a panel that is not a
-   * multiple of 16 gives fractional cell widths, and the terrain image inside
-   * each one then lands on half-pixel boundaries. That is soft however it is
-   * sampled. The fallback keeps the grid sane before the first measure.
-   */
   grid-template-columns: repeat(var(--map-columns, 16), var(--map-cell, 1fr));
-  justify-content: center;
-  gap: 2px;
+  gap: 0;
+  inline-size: fit-content;
+  margin-inline: auto;
+}
+
+/*
+ * The map itself, drawn once behind every cell.
+ *
+ * `inset: 0` against a `fit-content` grid means it covers exactly the columns,
+ * so screen boundaries and cell boundaries coincide without any arithmetic.
+ */
+.z1r-map-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  /* Belt and braces for the moment between layout and the first paint; the
+     canvas is drawn at its own size, so there is normally nothing to resample. */
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 
 .z1r-screen {
   position: relative;
+  /* Above the shared canvas. Both are positioned, so this is explicit rather
+     than relying on the canvas coming first in the markup. */
+  z-index: 1;
   /* Both are whole pixels once measured; `aspect-ratio` covers the first paint,
      and an explicit block-size takes precedence over it afterwards. */
   aspect-ratio: 16 / 11;
@@ -524,7 +555,10 @@
   justify-content: center;
   padding: 0;
   overflow: hidden;
-  background: var(--z1r-field);
+  /* Transparent: the map is drawn behind, and a fill here would hide it. The
+     grid lines come from the border below, which sits inside the cell box and
+     so does not shift the map underneath. */
+  background: transparent;
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: 2px;
   cursor: pointer;
@@ -544,32 +578,6 @@
   border-color: var(--z1r-accent);
 }
 
-.z1r-screen-terrain {
-  position: absolute;
-  inset: 0;
-  /* Explicitly the bottom layer. Positioned elements paint above static ones,
-     so without this the terrain covered the marks entirely — they were being
-     drawn, just behind the map. */
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-/*
- * Nearest neighbour at every size.
- *
- * This was on `auto` with a note that reducing an 80x55 screen into a small
- * cell wants averaging, since nearest neighbour drops whole rows at that ratio.
- * That is true, and it still reads as blur — which is the wrong trade for pixel
- * art. Sharp with some rows missing looks like the game; smooth looks like a
- * photograph of the game. The cells are whole pixels now, so this is as clean
- * as the ratio allows.
- */
-.z1r-screen-terrain img {
-  position: absolute;
-  max-inline-size: none;
-  image-rendering: pixelated;
-}
 
 .z1r-screen-region {
   position: absolute;
@@ -705,9 +713,15 @@
 
 /* A focused region is called out by a ring, a bolder code, and by every other
    screen dimming — three channels, none of which is colour on its own. */
-.z1r-map:has(.z1r-screen[data-focused="true"]) .z1r-screen:not([data-focused="true"])
-  .z1r-screen-terrain {
-  opacity: 0.3;
+/*
+ * Focusing a region dims every other screen.
+ *
+ * Applied as a scrim over the cell rather than by fading the art, which is no
+ * longer per-cell — there is one canvas behind the whole grid now, and it
+ * cannot be faded a screen at a time.
+ */
+.z1r-map:has(.z1r-screen[data-focused="true"]) .z1r-screen:not([data-focused="true"]) {
+  background: color-mix(in srgb, var(--z1r-bg) 72%, transparent);
 }
 
 .z1r-screen[data-focused="true"] {

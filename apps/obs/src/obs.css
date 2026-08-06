@@ -58,11 +58,6 @@ body.dock #controls {
   margin-block-end: 8px;
 }
 
-/* OBS docks are narrow; let the overworld grid shrink rather than clip. */
-body.dock .z1r-map {
-  gap: 1px;
-}
-
 body.dock .z1r-item-grid {
   grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
 }
