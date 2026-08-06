@@ -282,6 +282,17 @@
  * only, so the finished piece reads as one triangle rather than eight.
  */
 .z1r-triforce-edge {
+  /*
+   * One repeat of the travelling pattern.
+   *
+   * Four bands chained around the perimeter, so the border reads as one moving
+   * surface rather than a single band chasing round it. It has to divide the
+   * path length *exactly* — the path is closed, so a cycle that does not fit a
+   * whole number of times leaves a short segment where the end meets the start
+   * and the flow visibly stutters there once per lap.
+   */
+  --z1r-edge-cycle: calc(var(--z1r-edge-length) / 4);
+
   display: none;
   fill: none;
   pointer-events: none;
@@ -292,35 +303,75 @@
   display: block;
 }
 
-/* The pulse: the whole outline breathing. */
+/*
+ * The lit border: continuous, so no edge is ever dark, and breathing.
+ *
+ * This is the layer that keeps the whole outline lit. The movement rides on
+ * top of it rather than being the only thing drawn.
+ */
 .z1r-triforce-halo {
   stroke: var(--z1r-triforce);
-  stroke-width: 1.2;
-  opacity: 0.35;
+  stroke-width: 1.6;
+  opacity: 0.45;
   animation: z1r-triforce-breathe 2.4s ease-in-out infinite;
 }
 
 /*
- * The flow: the entire border lit, with the brightness travelling around it.
+ * The flow: a broad band travelling the perimeter, clockwise.
  *
- * No dash — the stroke is continuous, and the movement comes from the gradient
- * itself sliding underneath (see `sparkGradient` in triforce.ts). That keeps
- * every edge lit at all times instead of one segment chasing round an
- * otherwise dark outline.
+ * A sliding gradient cannot do this. A linear gradient moves in one fixed
+ * direction across the whole shape, so each edge reads differently depending on
+ * its orientation: the right side flowed with it, the base flowed *against* it,
+ * and the left side — whose tangent is perpendicular to the slide — barely
+ * moved at all. Dashes travel along the path, so every edge agrees, and the
+ * path is wound apex -> right -> left, which is clockwise on screen.
+ *
+ * Two layers on the same period: a wide dim band and a narrower bright one
+ * riding inside it, which gives each band soft shoulders instead of the hard
+ * ends of a single dash. The dim layer leaves only a small gap between bands,
+ * so the chain reads as solid.
+ *
+ * Each cycle travels exactly one `--z1r-edge-cycle` per iteration, which is why
+ * the loop has no seam.
  */
+.z1r-triforce-glow,
 .z1r-triforce-spark {
-  stroke: url(#z1r-triforce-spark);
-  stroke-width: 2.2;
+  stroke: #fff;
+  stroke-linecap: round;
+  animation: z1r-triforce-run 2.8s linear infinite;
 }
 
-.z1r-spark-edge {
-  stop-color: var(--z1r-triforce);
-  stop-opacity: 0.15;
+.z1r-triforce-glow {
+  stroke-width: 3.2;
+  opacity: 0.22;
+  stroke-dasharray: calc(var(--z1r-edge-cycle) * 0.88) calc(var(--z1r-edge-cycle) * 0.12);
 }
 
-.z1r-spark-core {
-  stop-color: #fff;
-  stop-opacity: 0.95;
+.z1r-triforce-spark {
+  stroke-width: 2;
+  opacity: 0.95;
+  stroke-dasharray: calc(var(--z1r-edge-cycle) * 0.55) calc(var(--z1r-edge-cycle) * 0.45);
+  /*
+   * Centres each bright band inside its dim one. It needs to start (0.88 - 0.55)
+   * / 2 of a cycle further along, and a negative delay is how you phase-shift an
+   * animation already running at the same rate — one cycle per 2.8s, so
+   * 0.165 * 2.8.
+   */
+  animation-delay: -0.462s;
+}
+
+/*
+ * Negative offset walks the dashes forward along the path — clockwise here.
+ * One cycle per iteration, not one lap: the pattern repeats every cycle, so
+ * that is the shortest move that lands the bands back on themselves.
+ */
+@keyframes z1r-triforce-run {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: calc(var(--z1r-edge-cycle) * -1);
+  }
 }
 
 @keyframes z1r-triforce-breathe {
@@ -344,8 +395,15 @@
 @media (prefers-reduced-motion: reduce) {
   .z1r-triforce-halo {
     animation: none;
-    opacity: 0.7;
-    stroke-width: 1.6;
+    opacity: 0.75;
+    stroke-width: 1.8;
+  }
+
+  /* The travelling bands are the motion, so they go entirely; the border stays
+     lit by the halo above. */
+  .z1r-triforce-glow,
+  .z1r-triforce-spark {
+    display: none;
   }
 }
 
