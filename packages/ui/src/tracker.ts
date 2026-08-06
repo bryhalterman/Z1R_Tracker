@@ -11,11 +11,11 @@ import {
   canEnterLevel9,
   safeStorage,
   COAST_ITEM_REQUIRES,
-  COAST_ITEM_SCREEN,
+  COAST_SPOT_ID,
   DUNGEONS,
+  OVERWORLD_LOCATIONS,
   MARKS,
   MARKS_BY_KIND,
-  mirrorScreen,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
   POOL_BY_ID,
@@ -30,6 +30,7 @@ import {
   screenId,
   spriteFor,
   type ItemDef,
+  type MarkKind,
   type SpriteResolver,
   type Store,
   type TrackerState,
@@ -84,6 +85,21 @@ function el<K extends keyof HTMLElementTagNameMap>(
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+/**
+ * Two letters for a cell label.
+ *
+ * A cell is under 90px and already carries an icon, so anything longer than
+ * this wraps or clips. Two letters is enough to tell "RA" from "BO" when you
+ * know which handful of items are still missing.
+ */
+function shortCode(name: string | undefined): string {
+  if (!name) return '';
+  const words = name.trim().split(/\s+/);
+  // Initials for a two-word name — "White Sword" reads better as WS than WH.
+  if (words.length > 1) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
 }
 
 function section(title: string, bodyClass: string): { root: HTMLElement; body: HTMLElement } {
@@ -500,105 +516,99 @@ function buildMap(
     store.getState().seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld';
 
   /*
-   * Mark palette.
+   * Marker toolbar, fixed above the map.
    *
-   * Built once and moved, rather than one popover per cell. It also serves as
-   * the map's legend — every mark is shown with its icon and its name, which
-   * is the non-colour channel the icons alone don't provide.
-   */
-  /*
-   * The coast screen moves when the seed mirrors the overworld.
+   * This was a popover anchored to whichever cell you clicked. In play that was
+   * the wrong shape entirely: it covered a big piece of the map, it could not be
+   * dismissed without picking something, and choosing a screen in the lower half
+   * scrolled the page to fit the popover on screen — mid-run, one-handed.
    *
-   * `COAST_ITEM_SCREEN` is the unmirrored position; a mirrored seed flips the
-   * whole map left to right, so the ledge ends up on the opposite edge. Reading
-   * it from state rather than caching it means toggling the setting mid-run
-   * moves the indicator with it.
+   * It works like a brush now. Pick what you are placing here, then click
+   * screens to place it, as many as you like. Marking a row of dead ends takes
+   * one selection and a few clicks rather than a popover each.
    */
-  const coastScreen = (state: TrackerState) =>
-    state.seed.mirroredOverworld ? mirrorScreen(COAST_ITEM_SCREEN) : COAST_ITEM_SCREEN;
+  const toolbar = el('div', 'z1r-map-tools');
+  body.append(toolbar);
 
-  const palette = el('div', 'z1r-mark-palette');
-  palette.hidden = true;
-  palette.setAttribute('role', 'menu');
-  palette.setAttribute('aria-label', 'Choose a marker for this screen');
-  let paletteScreen = '';
+  let brush: MarkKind = 'dungeon';
+  let brushLevel = 0;
+  let brushSpot = '';
+  let brushItem = '';
+  const brushStock = new Set<string>();
 
-  const closePalette = () => {
-    palette.hidden = true;
-    paletteScreen = '';
-    document.removeEventListener('pointerdown', onOutside, true);
-    document.removeEventListener('keydown', onEscape, true);
+  const kindRow = el('div', 'z1r-tool-row z1r-tool-kinds');
+  toolbar.append(kindRow);
+  const kindButtons: HTMLButtonElement[] = [];
+
+  /** Detail rows appear only for the brush that uses them. */
+  const detailRows: { row: HTMLElement; forKind: MarkKind }[] = [];
+  const detailRow = (forKind: MarkKind, label: string) => {
+    const row = el('div', 'z1r-tool-row z1r-tool-detail');
+    row.append(el('span', 'z1r-tool-label', label));
+    toolbar.append(row);
+    detailRows.push({ row, forKind });
+    return row;
   };
 
-  function onOutside(event: Event) {
-    if (!palette.contains(event.target as Node)) closePalette();
-  }
-  function onEscape(event: KeyboardEvent) {
-    if (event.key !== 'Escape') return;
-    const cell = body.querySelector<HTMLElement>(`[data-screen="${paletteScreen}"]`);
-    closePalette();
-    cell?.focus();
-  }
-
-  const kindRow = el('div', 'z1r-mark-kinds');
-  for (const mark of MARKS) {
-    const option = el('button', 'z1r-mark-option');
-    option.type = 'button';
-    option.setAttribute('role', 'menuitem');
-    option.dataset.mark = mark.kind;
-    option.style.setProperty('--mark-color', mark.color);
-    if (mark.sprite) {
-      option.append(createSprite(resolver, mark.sprite, { size: 18, label: mark.name }));
-    } else {
-      option.append(el('span', 'z1r-mark-option-clear', '—'));
+  const syncToolbar = () => {
+    for (const button of kindButtons) {
+      const active = button.dataset.mark === brush;
+      button.dataset.active = String(active);
+      button.setAttribute('aria-pressed', String(active));
     }
-    option.append(el('span', 'z1r-mark-option-name', mark.name));
-    option.addEventListener('click', () => {
-      // Deliberately does not close. Picking Dungeon or Shop is the first half
-      // of the job — the detail controls appear underneath and you carry on in
-      // the same popover.
-      store.dispatch({ type: 'setMark', screen: paletteScreen, mark: mark.kind });
-      if (mark.kind === 'none') {
-        const cell = body.querySelector<HTMLElement>(`[data-screen="${paletteScreen}"]`);
-        closePalette();
-        cell?.focus();
-      }
-    });
-    kindRow.append(option);
-  }
-  palette.append(kindRow);
+    for (const { row, forKind } of detailRows) row.hidden = forKind !== brush;
+    for (const button of levelButtons) {
+      button.dataset.active = String(Number(button.dataset.level) === brushLevel);
+    }
+    for (const button of stockButtons) {
+      button.dataset.active = String(brushStock.has(button.dataset.stock ?? ''));
+    }
+    if (document.activeElement !== spotSelect) spotSelect.value = brushSpot;
+    if (document.activeElement !== itemSelect) itemSelect.value = brushItem;
+  };
 
-  /*
-   * Which dungeon sits here.
-   *
-   * The whole point of marking a dungeon in a randomizer is knowing *which* one
-   * it is — a map covered in identical markers tells you where nine caves are
-   * and nothing else. `?` is a real state, not a placeholder: you routinely
-   * spot an entrance before you go in.
-   */
-  const dungeonRow = el('div', 'z1r-mark-detail z1r-mark-dungeons');
-  dungeonRow.append(el('span', 'z1r-mark-detail-label', 'Which dungeon'));
-  const dungeonButtons: HTMLButtonElement[] = [];
-  const dungeonGrid = el('div', 'z1r-mark-detail-options');
+  for (const mark of MARKS) {
+    const button = el('button', 'z1r-tool-mark');
+    button.type = 'button';
+    button.dataset.mark = mark.kind;
+    button.style.setProperty('--mark-color', mark.color);
+    if (mark.sprite) {
+      button.append(createSprite(resolver, mark.sprite, { size: 18, label: mark.name }));
+    } else {
+      button.append(el('span', 'z1r-tool-mark-clear', '—'));
+    }
+    // Named, not just drawn. The icons alone would put the whole legend on
+    // colour and shape recognition.
+    button.append(el('span', 'z1r-tool-mark-name', mark.name));
+    button.title =
+      mark.kind === 'none' ? 'Clear a screen (or right-click it)' : `Place: ${mark.name}`;
+    button.addEventListener('click', () => {
+      brush = mark.kind;
+      syncToolbar();
+    });
+    kindButtons.push(button);
+    kindRow.append(button);
+  }
+
+  /* Which dungeon the next click places. `?` is found-but-unidentified. */
+  const levelRow = detailRow('dungeon', 'Level');
+  const levelButtons: HTMLButtonElement[] = [];
   for (const level of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     const button = el('button', 'z1r-mark-level', level === 0 ? '?' : String(level));
     button.type = 'button';
     button.dataset.level = String(level);
     button.title = level === 0 ? 'Found, not yet identified' : `Level ${level}`;
-    button.addEventListener('click', () =>
-      store.dispatch({ type: 'setScreenNote', screen: paletteScreen, patch: { dungeon: level } }),
-    );
-    dungeonButtons.push(button);
-    dungeonGrid.append(button);
+    button.addEventListener('click', () => {
+      brushLevel = level;
+      syncToolbar();
+    });
+    levelButtons.push(button);
+    levelRow.append(button);
   }
-  dungeonRow.append(dungeonGrid);
-  palette.append(dungeonRow);
 
-  /* What the shop sells, so "where did I see arrows?" has an answer. */
-  const shopRow = el('div', 'z1r-mark-detail z1r-mark-stock');
-  shopRow.append(el('span', 'z1r-mark-detail-label', 'Sells'));
+  /* What the shop sells. Multi-select, since most sell more than one thing. */
+  const stockRow = detailRow('shop', 'Sells');
   const stockButtons: HTMLButtonElement[] = [];
-  const stockGrid = el('div', 'z1r-mark-detail-options');
   for (const stock of SHOP_STOCK) {
     const button = el('button', 'z1r-mark-stock-option');
     button.type = 'button';
@@ -606,107 +616,77 @@ function buildMap(
     button.title = stock.name;
     button.append(createSprite(resolver, stock.sprite, { size: 16, label: stock.name }));
     button.append(el('span', 'z1r-mark-stock-name', stock.name));
-    button.addEventListener('click', () =>
-      store.dispatch({ type: 'toggleShopStock', screen: paletteScreen, stock: stock.id }),
-    );
+    button.addEventListener('click', () => {
+      if (brushStock.has(stock.id)) brushStock.delete(stock.id);
+      else brushStock.add(stock.id);
+      syncToolbar();
+    });
     stockButtons.push(button);
-    stockGrid.append(button);
+    stockRow.append(button);
   }
-  shopRow.append(stockGrid);
-  palette.append(shopRow);
 
   /*
-   * The coast item, offered only on the screen that has one.
+   * Item screens: which spot it is, and what is sitting in it.
    *
-   * Shown regardless of the mark, because the coast ledge is neither a dungeon
-   * nor a shop — it is the one screen where recording an item matters, and
-   * making it a fourth mark kind to serve a single square is worse than this.
+   * Two questions, because they are answered at different times. You find the
+   * White Sword cave long before you can afford the hearts to open it, and the
+   * Coast is visible from the first lap and unreachable until the Ladder.
    */
-  const coastRow = el('div', 'z1r-mark-detail z1r-mark-coast');
-  coastRow.append(el('span', 'z1r-mark-detail-label', 'Coast item'));
-  const coastSelect = document.createElement('select');
-  coastSelect.className = 'z1r-input z1r-mark-coast-select';
-  const noneOption = document.createElement('option');
-  noneOption.value = '';
-  noneOption.textContent = 'Unknown';
-  coastSelect.append(noneOption);
+  const itemRow = detailRow('item', 'Item spot');
+  const spotSelect = document.createElement('select');
+  spotSelect.className = 'z1r-input z1r-tool-select';
+  spotSelect.title = 'Which named overworld spot this screen is';
+  const anySpot = document.createElement('option');
+  anySpot.value = '';
+  anySpot.textContent = 'Unnamed spot';
+  spotSelect.append(anySpot);
+  for (const location of OVERWORLD_LOCATIONS) {
+    const option = document.createElement('option');
+    option.value = location.id;
+    option.textContent = location.label;
+    spotSelect.append(option);
+  }
+  spotSelect.addEventListener('change', () => {
+    brushSpot = spotSelect.value;
+  });
+
+  const itemSelect = document.createElement('select');
+  itemSelect.className = 'z1r-input z1r-tool-select';
+  itemSelect.title = 'Which item is in it';
+  const unknownItem = document.createElement('option');
+  unknownItem.value = '';
+  unknownItem.textContent = 'Item unknown';
+  itemSelect.append(unknownItem);
   for (const entry of SHUFFLE_POOL) {
     const option = document.createElement('option');
     option.value = entry.id;
     option.textContent = entry.name;
-    coastSelect.append(option);
+    itemSelect.append(option);
   }
-  coastSelect.addEventListener('change', () =>
-    store.dispatch({
-      type: 'setScreenNote',
-      screen: paletteScreen,
-      patch: { item: coastSelect.value },
-    }),
-  );
-  coastRow.append(coastSelect);
-  palette.append(coastRow);
+  itemSelect.addEventListener('change', () => {
+    brushItem = itemSelect.value;
+  });
+  itemRow.append(spotSelect, itemSelect);
 
-  /** Redraws the contextual half for whichever screen is open. */
-  const syncPalette = (state: TrackerState) => {
-    if (!paletteScreen) return;
-    const mark = state.marks[paletteScreen] ?? 'none';
-    const note = state.screenNotes[paletteScreen];
-
-    for (const option of kindRow.querySelectorAll<HTMLElement>('.z1r-mark-option')) {
-      option.dataset.active = String(option.dataset.mark === mark);
+  /** Applies the current brush, detail and all, to one screen. */
+  const paint = (screen: string) => {
+    store.dispatch({ type: 'setMark', screen, mark: brush });
+    if (brush === 'dungeon') {
+      store.dispatch({ type: 'setScreenNote', screen, patch: { dungeon: brushLevel } });
+    } else if (brush === 'shop') {
+      // Sent whole rather than toggled, so a screen ends up with exactly what
+      // the toolbar shows rather than the difference from what was there.
+      store.dispatch({ type: 'setScreenNote', screen, patch: { shop: [...brushStock].sort() } });
+    } else if (brush === 'item') {
+      store.dispatch({
+        type: 'setScreenNote',
+        screen,
+        patch: { spot: brushSpot, item: brushItem },
+      });
     }
-
-    dungeonRow.hidden = mark !== 'dungeon';
-    for (const button of dungeonButtons) {
-      button.dataset.active = String(Number(button.dataset.level) === (note?.dungeon ?? 0));
-    }
-
-    shopRow.hidden = mark !== 'shop';
-    for (const button of stockButtons) {
-      button.dataset.active = String(!!note?.shop.includes(button.dataset.stock ?? ''));
-    }
-
-    coastRow.hidden = paletteScreen !== coastScreen(state);
-    if (document.activeElement !== coastSelect) coastSelect.value = note?.item ?? '';
   };
-  patches.push(syncPalette);
-  root.append(palette);
 
-  function openPalette(screen: string, cell: HTMLElement) {
-    // Clicking the screen whose palette is already open closes it.
-    if (paletteScreen === screen && !palette.hidden) {
-      closePalette();
-      return;
-    }
-    paletteScreen = screen;
-    palette.hidden = false;
-    palette.dataset.screen = screen;
-    /*
-     * Sync before measuring, not just on the next dispatch.
-     *
-     * The contextual rows are driven by a patch, and opening a palette is not a
-     * state change — so without this the popover showed whatever the last
-     * screen left behind: every detail row visible on the first open, and the
-     * coast chooser appearing one screen late. It also has to run before the
-     * positioning below, which measures the palette's height.
-     */
-    syncPalette(store.getState());
-
-    const cellBox = cell.getBoundingClientRect();
-    const panelBox = root.getBoundingClientRect();
-    palette.style.insetInlineStart = `${cellBox.left - panelBox.left + cellBox.width / 2}px`;
-    palette.style.insetBlockStart = `${cellBox.top - panelBox.top + cellBox.height}px`;
-    // Nudge back inside the panel when the cell is near an edge.
-    const paletteBox = palette.getBoundingClientRect();
-    const overflowRight = paletteBox.right - panelBox.right + 8;
-    if (overflowRight > 0) {
-      palette.style.insetInlineStart = `${cellBox.left - panelBox.left + cellBox.width / 2 - overflowRight}px`;
-    }
-
-    document.addEventListener('pointerdown', onOutside, true);
-    document.addEventListener('keydown', onEscape, true);
-    palette.querySelector<HTMLElement>('.z1r-mark-option')?.focus();
-  }
+  syncToolbar();
 
   const focusNote = el('span', 'z1r-map-focus');
   heading?.append(focusNote);
@@ -725,7 +705,7 @@ function buildMap(
       cell.title = id;
       if (!interactive) cell.disabled = true;
       else {
-        cell.addEventListener('click', () => openPalette(id, cell));
+        cell.addEventListener('click', () => paint(id));
         // Right-click clears outright — the common correction, and faster than
         // opening the palette to pick "Unmarked".
         cell.addEventListener('contextmenu', (event) => {
@@ -804,7 +784,7 @@ function buildMap(
         });
 
         const note = state.screenNotes[id];
-        const isCoast = id === coastScreen(state);
+        const isCoast = note?.spot === COAST_SPOT_ID;
         // The coast ledge is reachable the moment the Ladder is in hand — and
         // that is exactly when you have forgotten it is there.
         const coastReady = isCoast && (state.items[COAST_ITEM_REQUIRES] ?? 0) >= 1;
@@ -816,6 +796,7 @@ function buildMap(
           mark,
           note?.dungeon ?? 0,
           note?.shop.join('') ?? '',
+          note?.spot ?? '',
           note?.item ?? '',
           isCoast,
           coastReady,
@@ -832,9 +813,21 @@ function buildMap(
             detail.textContent = note.shop
               .map((stock) => SHOP_STOCK_BY_ID.get(stock)?.code ?? '')
               .join(' ');
-          } else if (isCoast && note?.item) {
-            detail.textContent = POOL_BY_ID.get(note.item)?.name.slice(0, 2).toUpperCase() ?? '';
+          } else if (mark === 'item') {
+            /*
+             * The contents win over the name of the spot. Once you know the
+             * White Sword cave holds the Raft, "RA" is what you are scanning
+             * the map for; that it is the White Sword cave is in the tooltip
+             * and rarely what you need at a glance.
+             */
+            const held = note?.item ? POOL_BY_ID.get(note.item)?.name : '';
+            const spot = note?.spot
+              ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label
+              : '';
+            detail.textContent = shortCode(held) || shortCode(spot) || '?';
           } else {
+            // `visited` says everything in its icon — a screen with nothing on
+            // it needs no label, and the map is mostly these by the end.
             detail.textContent = '';
           }
           detail.hidden = detail.textContent === '';
@@ -857,13 +850,17 @@ function buildMap(
         } else if (mark === 'shop') {
           const stock = note?.shop.map((s) => SHOP_STOCK_BY_ID.get(s)?.name ?? s) ?? [];
           parts.push(stock.length ? `Shop: ${stock.join(', ')}` : 'Shop');
+        } else if (mark === 'item') {
+          const spot = note?.spot
+            ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label
+            : '';
+          parts.push(spot || 'Item');
+          parts.push(note?.item ? (POOL_BY_ID.get(note.item)?.name ?? '') : 'contents unknown');
+          if (isCoast) {
+            parts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');
+          }
         } else if (def && mark !== 'none') {
           parts.push(def.name);
-        }
-        if (isCoast) {
-          const item = note?.item ? POOL_BY_ID.get(note.item)?.name : '';
-          parts.push(item ? `Coast item: ${item}` : 'Coast item');
-          parts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');
         }
         cell.title = parts.join(' — ');
       });

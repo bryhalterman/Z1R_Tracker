@@ -20,7 +20,7 @@ import {
 } from './state.js';
 
 import { MARKS_BY_KIND, SHOP_STOCK_BY_ID, type MarkKind } from './overworld.js';
-import { POOL_BY_ID, type SeedSettings } from './seed.js';
+import { OVERWORLD_LOCATIONS, POOL_BY_ID, type SeedSettings } from './seed.js';
 
 export const STORAGE_KEY = 'z1r-tracker:state';
 export const CHANNEL_NAME = 'z1r-tracker';
@@ -116,9 +116,15 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
           .sort()
       : [];
     const item = typeof note.item === 'string' && POOL_BY_ID.has(note.item) ? note.item : '';
+    // Checked against the real list: an unknown spot id renders as nothing and
+    // would sit in the save forever as an invisible entry.
+    const spot =
+      typeof note.spot === 'string' && OVERWORLD_LOCATIONS.some((l) => l.id === note.spot)
+        ? note.spot
+        : '';
 
-    if (dungeon === 0 && shop.length === 0 && item === '') continue;
-    out[screen] = { dungeon, shop, item };
+    if (dungeon === 0 && shop.length === 0 && spot === '' && item === '') continue;
+    out[screen] = { dungeon, shop, spot, item };
   }
   return out;
 }

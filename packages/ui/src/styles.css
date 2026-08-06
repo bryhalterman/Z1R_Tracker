@@ -1311,26 +1311,44 @@
  * want. Doubles as the map's legend: every marker is listed with its name, so
  * the icons never have to be decoded from memory or from colour.
  */
-.z1r-mark-palette {
-  position: absolute;
-  z-index: 20;
+/*
+ * Marker toolbar, above the map.
+ *
+ * Was a popover anchored to the clicked cell, which covered the map, could not
+ * be dismissed without choosing something, and scrolled the page when the cell
+ * was low on screen. Fixed in the flow, it costs one row and never moves.
+ */
+.z1r-map-tools {
   display: flex;
   flex-direction: column;
-  gap: var(--z1r-space-sm);
-  inline-size: max-content;
-  max-inline-size: 320px;
+  gap: 3px;
+  margin-block-end: var(--z1r-space-sm);
   padding: var(--z1r-space-sm);
-  background: var(--z1r-panel);
+  background: var(--z1r-inset);
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
-  box-shadow: 0 6px 18px #000a;
 }
 
-.z1r-mark-palette[hidden] {
+.z1r-tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+
+.z1r-tool-row[hidden] {
   display: none;
 }
 
-.z1r-mark-option {
+.z1r-tool-label {
+  min-inline-size: 4.5em;
+  font-size: var(--z1r-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--z1r-muted);
+}
+
+.z1r-tool-mark {
   display: flex;
   align-items: center;
   gap: var(--z1r-space-sm);
@@ -1338,73 +1356,40 @@
   padding: 2px var(--z1r-space-sm);
   font: inherit;
   font-size: var(--z1r-text-md);
-  text-align: start;
   white-space: nowrap;
   color: var(--z1r-text);
-  background: transparent;
-  /* The per-marker colour rides on a left bar, never on the label, so the
-     palette stays readable without colour vision. */
-  border: var(--z1r-border-width) solid transparent;
+  background: var(--z1r-field);
+  /* The marker's own colour rides on a left bar, never on the label, so the
+     legend stays readable without colour vision. */
+  border: var(--z1r-border-width) solid var(--z1r-border);
   border-inline-start: 3px solid var(--mark-color, transparent);
   border-radius: var(--z1r-radius);
   cursor: pointer;
 }
 
-.z1r-mark-option:hover {
-  background: var(--z1r-inset);
+.z1r-tool-mark:hover {
   border-color: var(--z1r-accent);
   border-inline-start-color: var(--mark-color, var(--z1r-accent));
 }
 
-.z1r-mark-option-clear {
+/*
+ * The selected brush is what the next click will place, so it has to be
+ * unmistakable: filled, outlined, and bold at once.
+ */
+.z1r-tool-mark[data-active="true"] {
+  color: var(--z1r-bg);
+  background: var(--z1r-accent);
+  border-color: var(--z1r-accent);
+  font-weight: 700;
+}
+
+.z1r-tool-mark-clear {
   inline-size: 18px;
   text-align: center;
-  color: var(--z1r-muted);
 }
 
-.z1r-mark-option-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Three kinds now, so they fit on one row and the detail sits under them. */
-.z1r-mark-kinds {
-  display: flex;
-  gap: 2px;
-}
-
-/* Selected state carries a filled background *and* a solid outline, so which
-   kind is active is not signalled by colour alone. */
-.z1r-mark-option[data-active="true"] {
-  background: var(--z1r-inset);
-  border-color: var(--z1r-accent);
-}
-
-/* ------------------------------------------------------ per-screen detail */
-
-.z1r-mark-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding-block-start: var(--z1r-space-sm);
-  border-block-start: var(--z1r-border-width) solid var(--z1r-border);
-}
-
-.z1r-mark-detail[hidden] {
-  display: none;
-}
-
-.z1r-mark-detail-label {
-  font-size: var(--z1r-text-2xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--z1r-muted);
-}
-
-.z1r-mark-detail-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
+.z1r-tool-select {
+  min-inline-size: 9em;
 }
 
 .z1r-mark-level {
@@ -1436,8 +1421,8 @@
 }
 
 /*
- * Chosen reads as filled + solid-bordered + full-strength icon; unchosen as
- * dimmed with a dashed border. Three channels, none of them hue.
+ * Chosen reads as filled, solid-bordered and bold; unchosen as dimmed with a
+ * dashed border. Three channels, none of them hue.
  */
 .z1r-mark-level[data-active="true"],
 .z1r-mark-stock-option[data-active="true"] {
@@ -1457,8 +1442,16 @@
   border-color: var(--z1r-accent);
 }
 
-.z1r-mark-coast-select {
-  inline-size: 100%;
+/*
+ * A checked-and-empty screen is deliberately quiet: it is the largest group by
+ * the end of a run, and it exists to be skipped over rather than looked at.
+ */
+.z1r-screen[data-mark="visited"] .z1r-screen-mark {
+  opacity: 0.55;
+}
+
+.z1r-screen[data-mark="visited"] .z1r-screen-terrain {
+  opacity: 0.45;
 }
 
 /* ------------------------------------------------- compact locations (OBS) */

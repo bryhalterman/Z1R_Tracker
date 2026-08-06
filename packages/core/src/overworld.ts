@@ -34,7 +34,7 @@ export function allScreenIds(): string[] {
  * order on left-click and backwards on right-click, which is how every
  * randomizer tracker people already use behaves.
  */
-export type MarkKind = 'none' | 'dungeon' | 'shop';
+export type MarkKind = 'none' | 'dungeon' | 'shop' | 'item' | 'visited';
 
 export interface MarkDef {
   readonly kind: MarkKind;
@@ -59,6 +59,11 @@ export const MARKS: readonly MarkDef[] = [
   { kind: 'none', name: 'Unmarked', sprite: null, color: 'transparent' },
   { kind: 'dungeon', name: 'Dungeon', sprite: 'mark.dungeon', color: '#c34a4a' },
   { kind: 'shop', name: 'Shop', sprite: 'mark.shop', color: '#3f8fd0' },
+  { kind: 'item', name: 'Item', sprite: 'mark.item', color: '#d9a441' },
+  // "Been here, nothing to come back for" is as worth recording as a find —
+  // without it every unmarked screen is ambiguous between unchecked and empty,
+  // which is most of the map for most of a run.
+  { kind: 'visited', name: 'Checked, nothing', sprite: 'mark.empty', color: '#8e8e8e' },
 ];
 
 /**
@@ -81,6 +86,9 @@ export const SHOP_STOCK: readonly ShopStockDef[] = [
   { id: 'key', name: 'Keys', sprite: 'item.key.magical', code: 'KY' },
   { id: 'arrow', name: 'Arrows', sprite: 'item.arrow.wood', code: 'AR' },
   { id: 'potion', name: 'Potion', sprite: 'item.potion.blue', code: 'PO' },
+  // The one piece of real progression sold rather than found, and the one you
+  // most want to be able to find your way back to once the rupees are in.
+  { id: 'blueRing', name: 'Blue Ring', sprite: 'item.ring.blue', code: 'BR' },
 ];
 
 export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = new Map(
@@ -88,17 +96,14 @@ export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = new Map(
 );
 
 /**
- * The screen holding the coast item, before mirroring.
+ * The named overworld spot whose item needs the Ladder.
  *
- * There is exactly one of these and it never moves: an item sat on a ledge on
- * the east coast that nothing but the Ladder reaches. It is called out here
- * rather than left as one more thing to mark because it is the classic "come
- * back later" — you see it long before you can take it, and by the time the
- * Ladder shows up you have forgotten it exists.
- *
- * Mirror this with `mirrorScreen` when the seed flips the overworld.
+ * This used to be a hardcoded screen id, which was a guess about where the
+ * coast ledge sits and wrong the moment a seed moved it. It is keyed off the
+ * spot the player tags instead, so the "you can reach it now" hint follows
+ * whichever screen they actually marked.
  */
-export const COAST_ITEM_SCREEN = 'F16';
+export const COAST_SPOT_ID = 'ow.coast';
 
 /** The item the coast ledge is only reachable with. */
 export const COAST_ITEM_REQUIRES = 'ladder';

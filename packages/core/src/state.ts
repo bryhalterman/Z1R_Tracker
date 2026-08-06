@@ -12,7 +12,7 @@ import { DUNGEONS, holdsTriforcePiece } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
 import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
-export const STATE_VERSION = 6;
+export const STATE_VERSION = 7;
 
 /** Upper bound on manual extra floor slots. Shared with `migrate` on purpose. */
 export const MAX_EXTRA_FLOOR_SLOTS = 8;
@@ -66,7 +66,12 @@ export interface ScreenNote {
   dungeon: number;
   /** `ShopStockDef` ids seen for sale here. */
   shop: string[];
-  /** Shuffle-pool entry id sitting on this screen. Used for the coast item. */
+  /**
+   * Which named overworld spot this is — `ow.whiteSword`, `ow.armos`,
+   * `ow.coast`. Empty when the screen holds an item that is not one of them.
+   */
+  spot: string;
+  /** Shuffle-pool entry id sitting on this screen. */
   item: string;
 }
 
@@ -146,12 +151,12 @@ function emptyDungeon(): DungeonState {
 }
 
 function emptyNote(): ScreenNote {
-  return { dungeon: 0, shop: [], item: '' };
+  return { dungeon: 0, shop: [], spot: '', item: '' };
 }
 
 /** True once a note carries nothing worth keeping. */
 function noteIsBare(note: ScreenNote): boolean {
-  return note.dungeon === 0 && note.shop.length === 0 && note.item === '';
+  return note.dungeon === 0 && note.shop.length === 0 && note.spot === '' && note.item === '';
 }
 
 /**
