@@ -9,6 +9,7 @@
 
 import {
   canEnterLevel9,
+  safeStorage,
   COAST_ITEM_REQUIRES,
   COAST_ITEM_SCREEN,
   DUNGEONS,
@@ -91,6 +92,95 @@ function section(title: string, bodyClass: string): { root: HTMLElement; body: H
   const body = el('div', bodyClass);
   root.append(body);
   return { root, body };
+}
+
+/** Which panels are folded away. A view preference, not run data. */
+const COLLAPSE_KEY = 'z1r-tracker:collapsed';
+
+function readCollapsed(): Set<string> {
+  try {
+    const raw = safeStorage()?.getItem(COLLAPSE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((value): value is string => typeof value === 'string'));
+  } catch {
+    // Blocked storage, or a hand-edited value. Everything open is a fine
+    // fallback — this only decides what is folded, never what is tracked.
+    return new Set();
+  }
+}
+
+/**
+ * Let every panel fold away by its heading.
+ *
+ * Wired here by walking the panels rather than built into each one, so the six
+ * existing panels and any later one get it without being touched.
+ *
+ * Kept out of the tracker state deliberately. State is broadcast to the overlay
+ * and written into exported saves, and neither should care which panels someone
+ * folded up on the other monitor — this is a property of the window you are
+ * looking at, so it lives in its own storage key.
+ */
+function wireCollapsing(root: HTMLElement): void {
+  const collapsed = readCollapsed();
+
+  const persist = () => {
+    try {
+      safeStorage()?.setItem(COLLAPSE_KEY, JSON.stringify([...collapsed]));
+    } catch {
+      // Folding still works for this session; it just will not be remembered.
+    }
+  };
+
+  for (const panel of root.querySelectorAll<HTMLElement>('.z1r-panel')) {
+    const title = panel.querySelector<HTMLElement>('.z1r-panel-title');
+    if (!title) continue;
+
+    // The heading's own text, before the counters and buttons appended after
+    // it. Stable across renames of the CSS classes, and readable in storage.
+    const name = title.childNodes[0]?.nodeValue?.trim();
+    if (!name) continue;
+    panel.dataset.section = name;
+
+    const toggle = el('button', 'z1r-panel-toggle');
+    toggle.type = 'button';
+    const setState = (folded: boolean) => {
+      panel.dataset.collapsed = String(folded);
+      toggle.setAttribute('aria-expanded', String(!folded));
+      // Both a glyph and a label, so the state is not carried by rotation alone.
+      toggle.textContent = folded ? '▸' : '▾';
+      toggle.title = folded ? `Show ${name}` : `Hide ${name}`;
+      toggle.setAttribute('aria-label', toggle.title);
+    };
+
+    const flip = () => {
+      const folded = panel.dataset.collapsed !== 'true';
+      if (folded) collapsed.add(name);
+      else collapsed.delete(name);
+      setState(folded);
+      persist();
+    };
+
+    toggle.addEventListener('click', flip);
+    title.prepend(toggle);
+
+    /*
+     * The whole heading is a hit target, not just the caret — a caret alone is
+     * a fiddly thing to hit mid-run. Clicks that land on a control inside the
+     * heading are left alone, though: several headings carry buttons and
+     * counters of their own, and folding the panel out from under one would be
+     * a nasty surprise.
+     */
+    title.addEventListener('click', (event) => {
+      const control = (event.target as HTMLElement | null)?.closest('button, select, input, label, a');
+      // The caret has its own handler, and anything else in the heading is
+      // there to be clicked on its own terms.
+      if (control) return;
+      flip();
+    });
+
+    setState(collapsed.has(name));
+  }
 }
 
 export function mountTracker(root: HTMLElement, options: MountOptions): () => void {
@@ -253,6 +343,12 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     balanceItemGrids();
     applyMapScale();
   };
+  /*
+   * Folding is for the dock and the page, never the overlay: a browser source
+   * takes no clicks, so a caret there would be furniture that cannot be used.
+   */
+  if (interactive) wireCollapsing(root);
+
   applyLayout();
   const widthObserver = new ResizeObserver(applyLayout);
   widthObserver.observe(root);
