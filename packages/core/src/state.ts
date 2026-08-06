@@ -8,7 +8,7 @@
  */
 
 import { ITEMS, ITEMS_BY_ID, maxValue } from './items.js';
-import { DUNGEONS } from './dungeons.js';
+import { DUNGEONS, holdsTriforcePiece } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
 import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
@@ -340,6 +340,10 @@ export function createStore(initial: TrackerState = createInitialState()): Store
 
 /** Triforce pieces currently held. */
 export function triforceCount(state: TrackerState): number {
-  return Object.values(state.dungeons).filter((d) => d.triforce).length;
+  // Keyed by level, and that includes Level 9 — which holds Ganon, not a piece.
+  // Counting the whole map let a save with 9 flagged reach eight on seven.
+  return Object.entries(state.dungeons).filter(
+    ([level, dungeon]) => dungeon.triforce && holdsTriforcePiece(Number(level)),
+  ).length;
 }
 

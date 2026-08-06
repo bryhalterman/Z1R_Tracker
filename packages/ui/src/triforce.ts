@@ -20,16 +20,19 @@
  */
 
 import {
+  canBeatGanon,
   canEnterLevel9,
   questForLevel,
   questIsAmbiguous,
   triforceCount,
   TRIFORCE_REQUIRED_FOR_L9,
   type ConcreteQuest,
+  type SpriteResolver,
   type Store,
   type TrackerState,
 } from '@z1r/core';
 import { memoise, runPatches, type Patch } from './patch.js';
+import { createSprite } from './sprite.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -149,7 +152,12 @@ function softenFilter(): SVGDefsElement {
   return defs;
 }
 
-export function buildTriforce(store: Store, patches: Patch[], interactive: boolean): HTMLElement {
+export function buildTriforce(
+  store: Store,
+  resolver: SpriteResolver,
+  patches: Patch[],
+  interactive: boolean,
+): HTMLElement {
   const root = document.createElement('section');
   root.className = 'z1r-panel z1r-triforce-panel';
 
@@ -170,7 +178,31 @@ export function buildTriforce(store: Store, patches: Patch[], interactive: boole
     'aria-label': 'Triforce pieces by level',
   });
   figure.append(hatchPattern());
-  root.append(figure);
+
+  /*
+   * Ganon and Zelda flanking the Triforce, once the run is actually winnable.
+   *
+   * Held back rather than always shown: appearing is the whole signal. It says
+   * "you have everything you need to end this" at a glance, which no counter
+   * does. Both are decorative — `canBeatGanon` is spelled out in the status
+   * line below, so neither is the only way to learn it.
+   *
+   * 64px boxes for both. Ganon is natively 64x64 so he lands on 1x; Zelda is
+   * 28x32 and lands on 2x, giving 56x64 — the same height, which is what makes
+   * them read as a pair rather than two unrelated stickers. Both are whole
+   * multiples, so neither resamples to mush.
+   *
+   * They sit *beside* the triangle rather than over it. Overlaid, either the
+   * wedges swallowed them or they obscured the thing being tracked.
+   */
+  const stage = document.createElement('div');
+  stage.className = 'z1r-triforce-stage';
+  stage.append(
+    createSprite(resolver, 'boss.ganon', { size: 64, className: 'z1r-endgame-figure' }),
+    figure,
+    createSprite(resolver, 'npc.zelda', { size: 64, className: 'z1r-endgame-figure' }),
+  );
+  root.append(stage);
 
   const toggle = (level: number) =>
     store.dispatch({
@@ -289,6 +321,9 @@ export function buildTriforce(store: Store, patches: Patch[], interactive: boole
     // Under Mixed or Random the split isn't known until the player records it,
     // so the numbering on screen may not be the seed's. Say so rather than
     // quietly showing 1st Quest numbering as if it were fact.
+    // All eight pieces, plus the Bow and the Silver Arrow that Ganon needs.
+    root.dataset.winnable = String(canBeatGanon(state));
+
     const unsure = questIsAmbiguous(state.seed.dungeonQuest);
     figure.dataset.unsure = String(unsure);
     figure.setAttribute(

@@ -85,3 +85,14 @@ export const DUNGEONS_BY_LEVEL: ReadonlyMap<number, DungeonDef> = new Map(
 
 /** Triforce pieces needed before Level 9's entrance opens. */
 export const TRIFORCE_REQUIRED_FOR_L9 = 8;
+
+/**
+ * Levels that actually hold a piece — 1 to 8. Level 9 holds Ganon.
+ *
+ * Counting has to be restricted to these. `state.dungeons` is keyed by level
+ * and carries an entry for 9 as well, so summing the whole map lets a save with
+ * Level 9 flagged reach eight with only seven real pieces.
+ */
+export function holdsTriforcePiece(level: number): boolean {
+  return Number.isInteger(level) && level >= 1 && level <= TRIFORCE_REQUIRED_FOR_L9;
+}

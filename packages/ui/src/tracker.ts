@@ -109,7 +109,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   const builders: Record<TrackerSection, () => HTMLElement> = {
     seed: () => buildSeedPanel(store, patches, interactive),
     items: () => buildItems(store, resolver, patches, { interactive, itemSize }),
-    dungeons: () => buildTriforce(store, patches, interactive),
+    dungeons: () => buildTriforce(store, resolver, patches, interactive),
     locations: () => buildLocations(store, resolver, patches, interactive, compact),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),

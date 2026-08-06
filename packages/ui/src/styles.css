@@ -275,6 +275,55 @@
   text-decoration: underline dotted;
 }
 
+/* ------------------------------------------------------ endgame companions */
+
+/*
+ * Ganon and Zelda flanking the Triforce once the run is winnable — all eight
+ * pieces, plus the Bow and the Silver Arrow.
+ *
+ * Hidden rather than faded while the run is incomplete, so they never read as
+ * dimmed controls you could somehow enable. The row stays centred either way:
+ * with them gone the triangle is the only item in it.
+ */
+.z1r-triforce-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--z1r-space-sm);
+}
+
+.z1r-endgame-figure {
+  display: none;
+  /* Never let them squeeze the triangle — it is the tracker, they are trim. */
+  flex: 0 0 auto;
+  /* Decoration sitting next to a control: they must not swallow a click meant
+     for the wedge behind them in the dock. */
+  pointer-events: none;
+}
+
+.z1r-triforce-panel[data-winnable="true"] .z1r-endgame-figure {
+  display: block;
+  animation: z1r-endgame-arrive 520ms ease-out;
+}
+
+/* Arriving is the signal, so they arrive rather than just being there. */
+@keyframes z1r-endgame-arrive {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .z1r-triforce-panel[data-winnable="true"] .z1r-endgame-figure {
+    animation: none;
+  }
+}
+
 /* ---------------------------------------------- completed Triforce flourish */
 
 /*

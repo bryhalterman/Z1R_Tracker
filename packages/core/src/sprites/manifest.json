@@ -237,6 +237,14 @@
       "url": "https://static.wikia.nocookie.net/z1r/images/5/5c/1QOWM.png",
       "name": "Overworld map (mirrored)",
       "glyph": ""
+    },
+    "boss.ganon": {
+      "name": "Ganon",
+      "url": "https://www.videogamesprites.net/Zelda1/Bosses/7%20-%20Ganon%20-%20Red1.gif"
+    },
+    "npc.zelda": {
+      "name": "Princess Zelda",
+      "url": "https://www.videogamesprites.net/Zelda1/NPCs/Princess%20Zelda.gif"
     }
   }
 }
