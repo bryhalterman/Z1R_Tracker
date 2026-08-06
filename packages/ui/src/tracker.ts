@@ -391,97 +391,17 @@ function buildMap(
   heading?.append(regionToggle);
 
   /*
-   * Each cell draws its own screen from the real overworld map.
+   * Each cell shows its own screen from the real overworld map.
    *
    * The map is 1280x468 with a legend strip below y=440, so the map proper is
-   * exactly 16x8 screens of 80x55 — the NES screen aspect, and the grid's own
-   * 16/11 cell ratio.
-   *
-   * Drawn into a canvas per cell rather than positioning one shared `<img>`.
-   * A cell is usually smaller than 80px, so the art is being *reduced*, and
-   * `image-rendering: pixelated` is only honoured on reduction by newer
-   * Chromium — older builds quietly fall back to smoothing. The map therefore
-   * came out sharp in a current browser and blurry in the Chromium OBS embeds,
-   * from identical CSS. `imageSmoothingEnabled = false` is honoured everywhere.
-   *
-   * One canvas per screen rather than one big canvas read back as a data URL:
-   * the map is fetched from a third-party host that sends no CORS headers, so
-   * reading pixels back out would taint the canvas and throw. Drawing *into*
-   * one and displaying it is unrestricted.
+   * exactly 16x8 screens of 80x55 — which is the NES screen aspect (1.4545)
+   * and the grid's existing 16/11 cell ratio. One image is positioned inside
+   * every cell rather than sliced into 128 files.
    */
-  const SCREEN_SOURCE_WIDTH = 80;
-  const SCREEN_SOURCE_HEIGHT = 55;
-  const screenCanvases: { canvas: HTMLCanvasElement; col: number; row: number }[] = [];
-  let mapSource: HTMLImageElement | null = null;
-  let mapSourceKey = '';
-  let paintedSignature = '';
-
-  const paintScreens = (force = false) => {
-    const source = mapSource;
-    const first = screenCanvases[0];
-    if (!source || !source.complete || source.naturalWidth === 0 || !first) return;
-
-    // Device pixels, so the canvas is not itself resampled on a HiDPI display
-    // or under Windows display scaling.
-    const ratio = Math.max(1, Math.min(globalThis.devicePixelRatio || 1, 4));
-    const cssWidth = first.canvas.clientWidth;
-    const cssHeight = first.canvas.clientHeight;
-    if (cssWidth <= 0 || cssHeight <= 0) return;
-
-    const width = Math.round(cssWidth * ratio);
-    const height = Math.round(cssHeight * ratio);
-    const signature = `${mapSourceKey}|${width}x${height}`;
-    if (!force && signature === paintedSignature) return;
-    paintedSignature = signature;
-
-    for (const { canvas, col, row } of screenCanvases) {
-      if (canvas.width !== width) canvas.width = width;
-      if (canvas.height !== height) canvas.height = height;
-      const context = canvas.getContext('2d');
-      if (!context) continue;
-      context.imageSmoothingEnabled = false;
-      context.clearRect(0, 0, width, height);
-      context.drawImage(
-        source,
-        (col - 1) * SCREEN_SOURCE_WIDTH,
-        (row - 1) * SCREEN_SOURCE_HEIGHT,
-        SCREEN_SOURCE_WIDTH,
-        SCREEN_SOURCE_HEIGHT,
-        0,
-        0,
-        width,
-        height,
-      );
-    }
-  };
-
-  /** Loads the reference map once per key, then repaints every cell from it. */
-  const ensureMapSource = (key: string) => {
-    if (key === mapSourceKey) return;
-    mapSourceKey = key;
-    const resolved = resolver.resolve(key);
-    if (resolved.kind !== 'image') {
-      // No map art reachable. The cells stay blank; the region codes and marks
-      // carry the tracker's own information regardless.
-      mapSource = null;
-      return;
-    }
-    const image = new Image();
-    image.decoding = 'async';
-    image.addEventListener('load', () => {
-      if (mapSourceKey !== key) return;
-      mapSource = image;
-      paintScreens(true);
-    });
-    image.addEventListener('error', () => {
-      if (mapSourceKey === key) mapSource = null;
-    });
-    image.src = resolved.url;
-  };
-
-  // Cell size is decided by the layout pass on the tracker root, so the repaint
-  // is driven from the grid's own size rather than plumbed through.
-  new ResizeObserver(() => paintScreens()).observe(body);
+  const MAP_COLUMNS_PERCENT = 16 * 100;
+  const MAP_ROWS_PERCENT = (468 / 440) * 8 * 100;
+  const mapKey = () =>
+    store.getState().seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld';
 
   /*
    * Mark palette.
@@ -692,11 +612,6 @@ function buildMap(
     palette.querySelector<HTMLElement>('.z1r-mark-option')?.focus();
   }
 
-  // Mirroring swaps the reference art, so this follows the seed setting.
-  patches.push((state) =>
-    ensureMapSource(state.seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld'),
-  );
-
   const focusNote = el('span', 'z1r-map-focus');
   heading?.append(focusNote);
   patches.push((state) => {
@@ -735,12 +650,15 @@ function buildMap(
       }
 
       const terrain = el('span', 'z1r-screen-terrain');
-      const terrainCanvas = document.createElement('canvas');
-      terrainCanvas.className = 'z1r-screen-canvas';
-      // Decorative: the cell's own title carries the screen id, region and mark.
-      terrainCanvas.setAttribute('aria-hidden', 'true');
-      terrain.append(terrainCanvas);
-      screenCanvases.push({ canvas: terrainCanvas, col, row });
+      const terrainImage = el('img');
+      terrainImage.alt = '';
+      terrainImage.loading = 'lazy';
+      terrainImage.decoding = 'async';
+      terrainImage.style.width = `${MAP_COLUMNS_PERCENT}%`;
+      terrainImage.style.height = `${MAP_ROWS_PERCENT}%`;
+      terrainImage.style.insetInlineStart = `${-(col - 1) * 100}%`;
+      terrainImage.style.insetBlockStart = `${-(row - 1) * 100}%`;
+      terrain.append(terrainImage);
 
       // The region code is the non-colour channel: two letters, always legible,
       // where a tint alone would be unreadable to a colour-blind viewer.
@@ -751,6 +669,17 @@ function buildMap(
       // dock and read without depending on colour.
       const detail = el('span', 'z1r-screen-detail');
       cell.append(terrain, code, slot, detail);
+
+      let renderedMap: string | null = null;
+      patches.push(() => {
+        const key = mapKey();
+        renderedMap = memoise(renderedMap, key, () => {
+          const resolved = resolver.resolve(key);
+          // A missing or unreachable map just leaves the cell blank; the codes
+          // and marks carry the tracker's own information regardless.
+          terrainImage.src = resolved.kind === 'image' ? resolved.url : '';
+        });
+      });
 
       let renderedMark: string | null = null;
       let renderedRegion: string | null = null;

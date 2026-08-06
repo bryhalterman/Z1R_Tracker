@@ -29,14 +29,13 @@ async function main(): Promise<void> {
   const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
 
   /*
-   * Stamp the build into the toolbar note.
+   * Stamp the build into the footnote.
    *
    * A Custom Browser Dock has no "Refresh cache of current page" — that button
    * exists only on Browser Sources — so a dock can go on serving a cached copy
    * across OBS restarts with nothing on screen to say so. Chasing a rendering
    * bug that had already been fixed is exactly what that costs, so the dock now
-   * says which build it is running. It sits with the toolbar at the top of the
-   * dock, where it is visible without scrolling.
+   * says which build it is running.
    */
   mountControls(controls, {
     store,
