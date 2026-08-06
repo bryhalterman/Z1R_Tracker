@@ -528,7 +528,10 @@ function buildMap(
    * one selection and a few clicks rather than a popover each.
    */
   const toolbar = el('div', 'z1r-map-tools');
-  body.append(toolbar);
+  // Into the panel, ahead of the grid — *not* into `body`, which is the grid
+  // itself. Appending it there made it a grid item one column wide, so every
+  // button stacked vertically and the first row of screens filled in beside it.
+  root.insertBefore(toolbar, body);
 
   let brush: MarkKind = 'dungeon';
   let brushLevel = 0;
@@ -544,7 +547,10 @@ function buildMap(
   const detailRows: { row: HTMLElement; forKind: MarkKind }[] = [];
   const detailRow = (forKind: MarkKind, label: string) => {
     const row = el('div', 'z1r-tool-row z1r-tool-detail');
-    row.append(el('span', 'z1r-tool-label', label));
+    // Labelled for screen readers rather than on screen. Only one detail row is
+    // ever visible, and which one is already answered by the selected brush.
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', label);
     toolbar.append(row);
     detailRows.push({ row, forKind });
     return row;
@@ -577,11 +583,15 @@ function buildMap(
     } else {
       button.append(el('span', 'z1r-tool-mark-clear', '—'));
     }
-    // Named, not just drawn. The icons alone would put the whole legend on
-    // colour and shape recognition.
-    button.append(el('span', 'z1r-tool-mark-name', mark.name));
+    /*
+     * Icon only. The name rides on `title` and `aria-label` instead — the row
+     * is five buttons that never change, so it is learned in one glance and
+     * then only costs space. Selection is still shown by fill *and* by an
+     * outline, so it is not carried by colour.
+     */
     button.title =
       mark.kind === 'none' ? 'Clear a screen (or right-click it)' : `Place: ${mark.name}`;
+    button.setAttribute('aria-label', button.title);
     button.addEventListener('click', () => {
       brush = mark.kind;
       syncToolbar();
@@ -614,8 +624,8 @@ function buildMap(
     button.type = 'button';
     button.dataset.stock = stock.id;
     button.title = stock.name;
-    button.append(createSprite(resolver, stock.sprite, { size: 16, label: stock.name }));
-    button.append(el('span', 'z1r-mark-stock-name', stock.name));
+    button.setAttribute('aria-label', stock.name);
+    button.append(createSprite(resolver, stock.sprite, { size: 18, label: stock.name }));
     button.addEventListener('click', () => {
       if (brushStock.has(stock.id)) brushStock.delete(stock.id);
       else brushStock.add(stock.id);
