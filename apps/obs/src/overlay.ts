@@ -59,9 +59,29 @@ async function main(): Promise<void> {
    * loops or reads a stale value — and the content ended up overflowing the
    * source instead of fitting it.
    */
+  /*
+   * Centre the composition in the source.
+   *
+   * The fit keeps aspect ratio, so one axis always has space left over — and
+   * with `transform-origin: top left` all of it collected on the right and
+   * below, which reads as the overlay being pinned to a corner rather than
+   * placed. Offsetting by half the remainder puts it in the middle of the
+   * source, so the source rectangle itself is the thing you position in OBS.
+   */
+  const centre = (scale: number, height: number, gutter: number) => {
+    const view = document.documentElement;
+    const spare = (extent: number, content: number) =>
+      `${Math.max(0, (extent - content * scale) / 2)}px`;
+    document.body.style.setProperty('--overlay-x', spare(view.clientWidth, baseWidth + gutter));
+    document.body.style.setProperty('--overlay-y', spare(view.clientHeight, height + gutter));
+  };
+
   const applyFit = () => {
     if (Number.isFinite(fixedScale) && fixedScale > 0) {
       document.body.style.setProperty('--overlay-scale', String(fixedScale));
+      // A pinned scale still needs centring, and still needs the gutter that
+      // `applyFit` reads from the custom property below.
+      centre(fixedScale, root.offsetHeight || 1, 2 * 8);
       return;
     }
     const height = root.offsetHeight || 1;
@@ -87,12 +107,14 @@ async function main(): Promise<void> {
       view.clientWidth / (baseWidth + gutter),
       view.clientHeight / (height + gutter),
     );
-    const next = String(Math.max(factor, 0.1));
+    const scale = Math.max(factor, 0.1);
+    const next = String(scale);
     // Compare before writing: a ResizeObserver that always writes re-triggers
     // itself, and Chromium drops the surplus notifications with a console error.
     if (document.body.style.getPropertyValue('--overlay-scale') !== next) {
       document.body.style.setProperty('--overlay-scale', next);
     }
+    centre(scale, height, gutter);
   };
 
   /*

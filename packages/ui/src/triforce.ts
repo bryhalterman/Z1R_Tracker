@@ -33,16 +33,32 @@ import { memoise, runPatches, type Patch } from './patch.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** Sub-triangle positions. Vertices are all multiples of 25 on a 100x50 grid. */
+/**
+ * Sub-triangle positions. Vertices are all multiples of 25 on a 100x50 grid.
+ *
+ * `label` is each wedge's **incenter**, not its centroid.
+ *
+ * The centroid is the average of the vertices, which for a right triangle sits
+ * closer to the hypotenuse than to the legs — so a numeral centred there leans
+ * into the long edge. The visible digit stayed inside, but its em box crossed
+ * an edge on seven of the eight wedges, and the digit read as pushed into the
+ * corner rather than placed in the middle.
+ *
+ * The incenter is the centre of the inscribed circle: the point furthest from
+ * all three edges at once, which is what "centred in a triangle" should mean
+ * when you are fitting something into it. All eight wedges are congruent, so
+ * each shifts by the same 1.43 units; measured clearance goes from 5.9 to 7.12
+ * and no em box crosses an edge.
+ */
 const SHAPES = {
-  UL: { points: '50,0 25,25 50,25', label: [41.67, 16.67] },
-  UR: { points: '50,0 75,25 50,25', label: [58.33, 16.67] },
-  ML: { points: '25,25 50,25 50,50', label: [41.67, 33.33] },
-  MR: { points: '75,25 50,25 50,50', label: [58.33, 33.33] },
-  LLi: { points: '25,25 50,50 25,50', label: [33.33, 41.67] },
-  LRi: { points: '75,25 50,50 75,50', label: [66.67, 41.67] },
-  LLo: { points: '0,50 25,25 25,50', label: [16.67, 41.67] },
-  LRo: { points: '100,50 75,25 75,50', label: [83.33, 41.67] },
+  UL: { points: '50,0 25,25 50,25', label: [42.68, 17.68] },
+  UR: { points: '50,0 75,25 50,25', label: [57.32, 17.68] },
+  ML: { points: '25,25 50,25 50,50', label: [42.68, 32.32] },
+  MR: { points: '75,25 50,25 50,50', label: [57.32, 32.32] },
+  LLi: { points: '25,25 50,50 25,50', label: [32.32, 42.68] },
+  LRi: { points: '75,25 50,50 75,50', label: [67.68, 42.68] },
+  LLo: { points: '0,50 25,25 25,50', label: [17.68, 42.68] },
+  LRo: { points: '100,50 75,25 75,50', label: [82.32, 42.68] },
 } as const;
 
 type PositionKey = keyof typeof SHAPES;

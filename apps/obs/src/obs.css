@@ -18,8 +18,15 @@ body {
 body.overlay {
   background: transparent;
   padding: var(--overlay-pad, 8px);
-  /* `?scale=` on the browser source URL sizes the whole overlay at once. */
-  transform: scale(var(--overlay-scale, 1));
+  /*
+   * `?scale=` on the browser source URL sizes the whole overlay at once; the
+   * translate centres whatever is left over in the source. It has to come
+   * first — transforms apply right to left, so a translate written after the
+   * scale would itself be scaled, and the overlay would drift further off
+   * centre the larger it got.
+   */
+  transform: translate(var(--overlay-x, 0px), var(--overlay-y, 0px))
+    scale(var(--overlay-scale, 1));
   transform-origin: top left;
 }
 
