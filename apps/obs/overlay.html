@@ -2,6 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!--
+      Send no Referer with asset requests.
+
+      The wiki that hosts the overworld map hotlink-protects it: a request
+      carrying a Referer gets a 200x73 thumbnail instead of the 1280x468
+      original, with a 200 status and no other sign anything is wrong. That
+      is what made the map blurry in OBS and sharp everywhere else — the
+      browser here happened not to send one, and OBS did.
+
+      Set on the document because sprites are painted as CSS backgrounds,
+      which cannot carry a per-element referrer policy.
+    -->
+    <meta name="referrer" content="no-referrer" />
     <title>Z1R Tracker — OBS Overlay</title>
     <meta name="color-scheme" content="dark" />
   </head>

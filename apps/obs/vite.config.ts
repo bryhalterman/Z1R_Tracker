@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
+import { localMaps, spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
 
 // Relative base: the built folder gets pointed at by a local file path or by
 // whatever host the streamer parks it on, and neither is known at build time.
@@ -15,7 +15,7 @@ export default defineConfig({
   define: {
     __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(5, 16).replace('T', ' ')),
   },
-  plugins: [spriteManifest()],
+  plugins: [spriteManifest(), localMaps()],
   resolve: { alias: workspaceAliases },
   build: {
     outDir: 'dist',

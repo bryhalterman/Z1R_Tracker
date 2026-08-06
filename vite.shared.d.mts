@@ -3,3 +3,4 @@ import type { Plugin } from 'vite';
 
 export declare const workspaceAliases: { find: string; replacement: string }[];
 export declare function spriteManifest(): Plugin;
+export declare function localMaps(): Plugin;

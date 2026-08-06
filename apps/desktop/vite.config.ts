@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
-import { spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
+import { localMaps, spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
 
 /**
  * Vite tags the entry script `type="module" crossorigin` because that is right
@@ -27,7 +27,7 @@ function classicScriptTag(): Plugin {
  */
 export default defineConfig({
   base: './',
-  plugins: [spriteManifest(), classicScriptTag()],
+  plugins: [spriteManifest(), localMaps(), classicScriptTag()],
   resolve: { alias: workspaceAliases },
   build: {
     outDir: 'dist',

@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 const source = (path) => fileURLToPath(new URL(path, import.meta.url));
 
 const MANIFEST = source('./packages/core/src/sprites/manifest.json');
+const MAPS = source('./assets/maps');
 
 /**
  * Publishes the sprite manifest next to each build's `index.html`.
@@ -30,6 +32,53 @@ export function spriteManifest() {
         fileName: 'sprites.json',
         source: readFileSync(MANIFEST, 'utf8'),
       });
+    },
+  };
+}
+
+/**
+ * Serves the overworld maps from the build rather than from the wiki.
+ *
+ * Every other sprite is fetched from its host, deliberately. The maps are the
+ * exception because the wiki that has them hotlink-protects: a request carrying
+ * a Referer is answered with a 200x73 thumbnail instead of the 1280x468
+ * original — status 200, right content type, nothing to notice except that the
+ * map is a blurry mess. OBS sends a Referer, browsers here did not, and the
+ * same URL therefore looked fine in testing and wrong on the streaming machine.
+ *
+ * `no-referrer` does fix it, and is set as well, but a backdrop the whole
+ * tracker is read against should not depend on a third party's hotlink policy
+ * staying the way it is today.
+ *
+ * Emitted from one shared folder rather than copied into each app's `public`,
+ * for the same reason the manifest is.
+ */
+export function localMaps() {
+  const emit = (plugin) => {
+    for (const name of readdirSync(MAPS)) {
+      plugin.emitFile({
+        type: 'asset',
+        fileName: `maps/${name}`,
+        source: readFileSync(join(MAPS, name)),
+      });
+    }
+  };
+  return {
+    name: 'z1r-local-maps',
+    configureServer(server) {
+      server.middlewares.use('/maps', (req, res, next) => {
+        const name = (req.url ?? '').replace(/^\//, '').split('?')[0];
+        if (!name || name.includes('..')) return next();
+        try {
+          res.setHeader('content-type', 'image/webp');
+          res.end(readFileSync(join(MAPS, name)));
+        } catch {
+          next();
+        }
+      });
+    },
+    generateBundle() {
+      emit(this);
     },
   };
 }

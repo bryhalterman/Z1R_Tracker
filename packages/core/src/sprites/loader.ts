@@ -119,6 +119,20 @@ export class SpriteResolver {
       }
       const image = new Image();
       image.decoding = 'async';
+      /*
+       * No Referer.
+       *
+       * Art hosts hotlink-protect. The wiki serving the overworld map answers a
+       * refererred request with a 200x73 thumbnail instead of the 1280x468
+       * original — status 200, correct content type, nothing to catch except
+       * the size. This probe also records `naturalWidth`, so a downgraded
+       * response would poison the dimensions every later sprite is scaled by.
+       *
+       * The documents set `<meta name="referrer" content="no-referrer">` too,
+       * since sprites are painted as CSS backgrounds and those cannot carry a
+       * per-element policy. This covers the probe wherever that meta is missed.
+       */
+      image.referrerPolicy = 'no-referrer';
       // Deliberately NOT crossOrigin='anonymous'. This probe only asks "does
       // this URL load?" — nothing here reads pixels, so CORS buys no safety
       // and costs real hosts: spriters-resource.com serves sprite sheets with

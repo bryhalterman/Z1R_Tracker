@@ -652,8 +652,20 @@ function buildMap(
       const terrain = el('span', 'z1r-screen-terrain');
       const terrainImage = el('img');
       terrainImage.alt = '';
-      terrainImage.loading = 'lazy';
+      /*
+       * Eager, not lazy.
+       *
+       * All 128 share one URL, so this is a single request however it is
+       * scheduled — lazy loading saves nothing and adds a way to fail. It was
+       * observed leaving images pending indefinitely even with the cell in
+       * view, which presents as a half-drawn map with no error anywhere.
+       */
+      terrainImage.loading = 'eager';
       terrainImage.decoding = 'async';
+      // The wiki hosting this map serves a 200x73 thumbnail rather than the
+      // 1280x468 original when a request carries a Referer, which is what made
+      // the map blurry in OBS and sharp in a browser that sent none.
+      terrainImage.referrerPolicy = 'no-referrer';
       terrainImage.style.width = `${MAP_COLUMNS_PERCENT}%`;
       terrainImage.style.height = `${MAP_ROWS_PERCENT}%`;
       terrainImage.style.insetInlineStart = `${-(col - 1) * 100}%`;
