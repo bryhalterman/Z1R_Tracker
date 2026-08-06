@@ -556,18 +556,15 @@
 }
 
 /*
- * Nearest neighbour at every size.
- *
- * This was on `auto` with a note that reducing an 80x55 screen into a small
- * cell wants averaging, since nearest neighbour drops whole rows at that ratio.
- * That is true, and it still reads as blur — which is the wrong trade for pixel
- * art. Sharp with some rows missing looks like the game; smooth looks like a
- * photograph of the game. The cells are whole pixels now, so this is as clean
- * as the ratio allows.
+ * The screen is drawn into this canvas at exactly its own size, so there is
+ * nothing left for the renderer to resample — see `paintScreens`. It still
+ * carries `pixelated` for the moment between layout and the first paint.
  */
-.z1r-screen-terrain img {
+.z1r-screen-canvas {
   position: absolute;
-  max-inline-size: none;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
   image-rendering: pixelated;
 }
 
