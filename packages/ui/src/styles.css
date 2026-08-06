@@ -1264,15 +1264,21 @@
 }
 
 /*
- * Numerals sit directly on gameplay, so they carry their own outline — but the
- * width is in viewBox units against a 9-unit font, so 2.5 swallowed the glyph
- * entirely. Roughly a tenth of the font size is enough to separate it.
+ * No level numerals on stream.
+ *
+ * At overlay scale they were the least legible thing in the composition and the
+ * least load-bearing: the wedge's *position* is what identifies the level — that
+ * is the whole point of the wiki's condensed map — so the numeral only ever
+ * restated it. Dropping them also removes the outline they needed to survive
+ * being drawn over gameplay, which was heavy against a 9-unit font.
+ *
+ * Held state does not depend on them. It is carried by fill *and* by the hatch
+ * pattern on unheld wedges, so it survives without colour vision, and the
+ * per-wedge `aria-label` still names the level and its state for screen
+ * readers. The dock and the web app keep their numerals.
  */
-.z1r-tracker[data-mode="overlay"] .z1r-tri-piece[data-on="false"] text {
-  paint-order: stroke fill;
-  stroke: #000;
-  stroke-width: 0.9;
-  stroke-linejoin: round;
+.z1r-tracker[data-mode="overlay"] .z1r-tri-piece text {
+  display: none;
 }
 
 /* Unheld wedges are near-invisible against dark gameplay without this. */
