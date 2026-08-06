@@ -101,6 +101,61 @@ function hatchPattern(): SVGDefsElement {
   return defs;
 }
 
+/**
+ * The finished Triforce's outer edge.
+ *
+ * Only the outline of the whole triangle — apex, right corner, left corner —
+ * not the seams between wedges, so the celebration reads as one shape rather
+ * than eight.
+ */
+const EDGE_PATH = 'M50 0 L100 50 L0 50 Z';
+
+/**
+ * Gold-to-white-to-gold, tiled and sliding, so the whole border stays lit and
+ * the brightness travels around it.
+ *
+ * `spreadMethod="repeat"` tiles the ramp over the shape, and the translation
+ * below moves it by exactly one tile — the gradient vector is (0,0)->(0.5,0.5)
+ * and it shifts by (0.5,0.5) — so the loop loses its seam. Any other distance
+ * would visibly jump on repeat.
+ *
+ * The slide is SMIL rather than CSS because `gradientTransform` is an SVG
+ * attribute; CSS cannot animate it, and animating a `transform` on the gradient
+ * element instead is not honoured consistently.
+ */
+function sparkGradient(animate: boolean): SVGDefsElement {
+  const defs = svg('defs');
+  const gradient = svg('linearGradient', {
+    id: 'z1r-triforce-spark',
+    x1: '0',
+    y1: '0',
+    x2: '0.5',
+    y2: '0.5',
+    spreadMethod: 'repeat',
+  });
+  for (const [offset, className] of [
+    ['0%', 'z1r-spark-edge'],
+    ['50%', 'z1r-spark-core'],
+    ['100%', 'z1r-spark-edge'],
+  ] as const) {
+    gradient.append(svg('stop', { offset, class: className }));
+  }
+  if (animate) {
+    gradient.append(
+      svg('animateTransform', {
+        attributeName: 'gradientTransform',
+        type: 'translate',
+        from: '0 0',
+        to: '0.5 0.5',
+        dur: '2.8s',
+        repeatCount: 'indefinite',
+      }),
+    );
+  }
+  defs.append(gradient);
+  return defs;
+}
+
 export function buildTriforce(store: Store, patches: Patch[], interactive: boolean): HTMLElement {
   const root = document.createElement('section');
   root.className = 'z1r-panel z1r-triforce-panel';
@@ -181,6 +236,32 @@ export function buildTriforce(store: Store, patches: Patch[], interactive: boole
     });
   }
 
+  /*
+   * Completion effect, drawn last so it sits over the wedges.
+   *
+   * Decoration only: `aria-hidden` because the status line already says the
+   * Triforce is complete, and `pointer-events: none` so the outline never eats
+   * a click meant for the wedge beneath it.
+   */
+  /*
+   * SMIL has no equivalent of the `prefers-reduced-motion` media query, so the
+   * slide is decided here instead. Without it the gradient still fills the
+   * border, just still — see the reduced-motion block in the stylesheet, which
+   * handles the halo's pulse the same way.
+   */
+  figure.append(
+    sparkGradient(!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
+  );
+  for (const layer of ['halo', 'spark'] as const) {
+    figure.append(
+      svg('path', {
+        d: EDGE_PATH,
+        class: `z1r-triforce-edge z1r-triforce-${layer}`,
+        'aria-hidden': 'true',
+      }),
+    );
+  }
+
   // Levels 1-8 hold the pieces; Level 9 holds Ganon. Its state is a sentence
   // rather than a ninth wedge, which would break the tiling.
   const status = document.createElement('p');
@@ -190,6 +271,9 @@ export function buildTriforce(store: Store, patches: Patch[], interactive: boole
   patches.push((state) => {
     const pieces = triforceCount(state);
     count.textContent = `${pieces}/${TRIFORCE_REQUIRED_FOR_L9}`;
+    // All eight wedges, not `canEnterLevel9` — some settings open Level 9
+    // early, and the celebration is for the finished triangle specifically.
+    figure.dataset.complete = String(pieces === LEVELS.length);
     const open = canEnterLevel9(state);
     status.textContent = open
       ? 'Level 9 is open'

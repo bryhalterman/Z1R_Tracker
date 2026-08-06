@@ -275,6 +275,80 @@
   text-decoration: underline dotted;
 }
 
+/* ---------------------------------------------- completed Triforce flourish */
+
+/*
+ * Hidden until all eight wedges are held. Both layers trace the outer edge
+ * only, so the finished piece reads as one triangle rather than eight.
+ */
+.z1r-triforce-edge {
+  display: none;
+  fill: none;
+  pointer-events: none;
+  stroke-linejoin: round;
+}
+
+.z1r-triforce[data-complete="true"] .z1r-triforce-edge {
+  display: block;
+}
+
+/* The pulse: the whole outline breathing. */
+.z1r-triforce-halo {
+  stroke: var(--z1r-triforce);
+  stroke-width: 1.2;
+  opacity: 0.35;
+  animation: z1r-triforce-breathe 2.4s ease-in-out infinite;
+}
+
+/*
+ * The flow: the entire border lit, with the brightness travelling around it.
+ *
+ * No dash — the stroke is continuous, and the movement comes from the gradient
+ * itself sliding underneath (see `sparkGradient` in triforce.ts). That keeps
+ * every edge lit at all times instead of one segment chasing round an
+ * otherwise dark outline.
+ */
+.z1r-triforce-spark {
+  stroke: url(#z1r-triforce-spark);
+  stroke-width: 2.2;
+}
+
+.z1r-spark-edge {
+  stop-color: var(--z1r-triforce);
+  stop-opacity: 0.15;
+}
+
+.z1r-spark-core {
+  stop-color: #fff;
+  stop-opacity: 0.95;
+}
+
+@keyframes z1r-triforce-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+    stroke-width: 1;
+  }
+  50% {
+    opacity: 0.8;
+    stroke-width: 2;
+  }
+}
+
+/*
+ * Motion is decoration here, never the signal — completion is already carried
+ * by the fill, by the hatching disappearing, and by the status line. So it can
+ * be dropped entirely. The outline stays, lit steadily, which also spares the
+ * CPU on a machine that is busy encoding video.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .z1r-triforce-halo {
+    animation: none;
+    opacity: 0.7;
+    stroke-width: 1.6;
+  }
+}
+
 .z1r-triforce-status {
   margin: var(--z1r-space-md) 0 0;
   font-size: var(--z1r-text-md);
