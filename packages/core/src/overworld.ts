@@ -34,17 +34,7 @@ export function allScreenIds(): string[] {
  * order on left-click and backwards on right-click, which is how every
  * randomizer tracker people already use behaves.
  */
-export type MarkKind =
-  | 'none'
-  | 'dungeon'
-  | 'shop'
-  | 'heart'
-  | 'item'
-  | 'bombable'
-  | 'burnable'
-  | 'pushable'
-  | 'warp'
-  | 'empty';
+export type MarkKind = 'none' | 'dungeon' | 'shop';
 
 export interface MarkDef {
   readonly kind: MarkKind;
@@ -55,18 +45,63 @@ export interface MarkDef {
   readonly color: string;
 }
 
+/*
+ * Three marks, not ten.
+ *
+ * The rest — bombable, burnable, pushable, warp, heart, checked — described the
+ * *terrain*, which the map image behind each cell already shows, and which does
+ * not change between seeds. What the randomizer moves is where the dungeons and
+ * shops are, so those are what a tracker has to record. Each of the two now
+ * carries detail of its own, which is worth far more than another icon: which
+ * dungeon, and what the shop sells.
+ */
 export const MARKS: readonly MarkDef[] = [
   { kind: 'none', name: 'Unmarked', sprite: null, color: 'transparent' },
   { kind: 'dungeon', name: 'Dungeon', sprite: 'mark.dungeon', color: '#c34a4a' },
   { kind: 'shop', name: 'Shop', sprite: 'mark.shop', color: '#3f8fd0' },
-  { kind: 'heart', name: 'Heart Container', sprite: 'mark.heart', color: '#e05c7a' },
-  { kind: 'item', name: 'Item', sprite: 'mark.item', color: '#d9a441' },
-  { kind: 'bombable', name: 'Bombable', sprite: 'mark.bombable', color: '#8e8e8e' },
-  { kind: 'burnable', name: 'Burnable', sprite: 'mark.burnable', color: '#e2762f' },
-  { kind: 'pushable', name: 'Pushable', sprite: 'mark.pushable', color: '#7a6a52' },
-  { kind: 'warp', name: 'Warp', sprite: 'mark.warp', color: '#8f5cc4' },
-  { kind: 'empty', name: 'Checked / Nothing', sprite: 'mark.empty', color: '#3a3a3a' },
 ];
+
+/**
+ * Shop stock worth remembering.
+ *
+ * Not a full price list — the point is "did I see arrows anywhere?", asked
+ * hours later when the bow finally turns up. Anything you would not backtrack
+ * across the map for does not belong here.
+ */
+export interface ShopStockDef {
+  readonly id: string;
+  readonly name: string;
+  readonly sprite: string;
+  /** Two-letter tag, so the stock reads without relying on the icons. */
+  readonly code: string;
+}
+
+export const SHOP_STOCK: readonly ShopStockDef[] = [
+  { id: 'bomb', name: 'Bombs', sprite: 'item.bomb', code: 'BM' },
+  { id: 'key', name: 'Keys', sprite: 'item.key.magical', code: 'KY' },
+  { id: 'arrow', name: 'Arrows', sprite: 'item.arrow.wood', code: 'AR' },
+  { id: 'potion', name: 'Potion', sprite: 'item.potion.blue', code: 'PO' },
+];
+
+export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = new Map(
+  SHOP_STOCK.map((entry) => [entry.id, entry]),
+);
+
+/**
+ * The screen holding the coast item, before mirroring.
+ *
+ * There is exactly one of these and it never moves: an item sat on a ledge on
+ * the east coast that nothing but the Ladder reaches. It is called out here
+ * rather than left as one more thing to mark because it is the classic "come
+ * back later" — you see it long before you can take it, and by the time the
+ * Ladder shows up you have forgotten it exists.
+ *
+ * Mirror this with `mirrorScreen` when the seed flips the overworld.
+ */
+export const COAST_ITEM_SCREEN = 'F16';
+
+/** The item the coast ledge is only reachable with. */
+export const COAST_ITEM_REQUIRES = 'ladder';
 
 export const MARKS_BY_KIND: ReadonlyMap<MarkKind, MarkDef> = new Map(
   MARKS.map((m) => [m.kind, m]),

@@ -14,11 +14,13 @@ import {
   STATE_VERSION,
   type DungeonState,
   type HintEntry,
+  type ScreenNote,
   type Store,
   type TrackerState,
 } from './state.js';
 
-import type { SeedSettings } from './seed.js';
+import { MARKS_BY_KIND, SHOP_STOCK_BY_ID, type MarkKind } from './overworld.js';
+import { POOL_BY_ID, type SeedSettings } from './seed.js';
 
 export const STORAGE_KEY = 'z1r-tracker:state';
 export const CHANNEL_NAME = 'z1r-tracker';
@@ -70,6 +72,57 @@ function hintSeqFrom(saved: unknown, hints: HintEntry[]): number {
 }
 
 /** Drops anything that isn't a well-formed hint object. */
+/**
+ * Drop marks whose kind no longer exists.
+ *
+ * The palette used to carry ten kinds; it carries three. A save written before
+ * that still holds `bombable`, `warp` and the rest, and merging it in unchanged
+ * left screens tagged with a kind no renderer has a definition for — they came
+ * back as blank cells that still refused to look unmarked, and exporting wrote
+ * them straight back out again.
+ */
+function conformMarks(saved: unknown): Record<string, MarkKind> {
+  if (!saved || typeof saved !== 'object') return {};
+  const out: Record<string, MarkKind> = {};
+  for (const [screen, kind] of Object.entries(saved as Record<string, unknown>)) {
+    if (typeof kind !== 'string' || kind === 'none') continue;
+    if (!MARKS_BY_KIND.has(kind as MarkKind)) continue;
+    out[screen] = kind as MarkKind;
+  }
+  return out;
+}
+
+/**
+ * Structural check on per-screen detail, which is entirely new in v6.
+ *
+ * Everything here is drawn straight onto the map, so a bad shape is a render
+ * error rather than a wrong number: `shop` is indexed and mapped over, and a
+ * string where an array belongs would iterate character by character.
+ */
+function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
+  if (!saved || typeof saved !== 'object') return {};
+  const out: Record<string, ScreenNote> = {};
+  for (const [screen, value] of Object.entries(saved as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object') continue;
+    const note = value as Partial<ScreenNote>;
+
+    const level = Number(note.dungeon);
+    const dungeon = Number.isInteger(level) ? Math.min(Math.max(level, 0), 9) : 0;
+    // Ids are looked up in a table to render, so an unknown one draws nothing
+    // and would sit in the save forever as an invisible entry.
+    const shop = Array.isArray(note.shop)
+      ? [...new Set(note.shop.filter((id): id is string => typeof id === 'string'))]
+          .filter((id) => SHOP_STOCK_BY_ID.has(id))
+          .sort()
+      : [];
+    const item = typeof note.item === 'string' && POOL_BY_ID.has(note.item) ? note.item : '';
+
+    if (dungeon === 0 && shop.length === 0 && item === '') continue;
+    out[screen] = { dungeon, shop, item };
+  }
+  return out;
+}
+
 function conformHints(saved: unknown): HintEntry[] {
   if (!Array.isArray(saved)) return [];
   const blank: HintEntry = { id: '', subject: '', region: '', screen: '', note: '' };
@@ -134,7 +187,8 @@ export function migrate(raw: unknown): TrackerState | null {
     // survive every future load and get written back into exported saves.
     items: pruneItems(base.items, candidate.items),
     dungeons: pruneDungeons(base.dungeons, candidate.dungeons),
-    marks: { ...(candidate.marks ?? {}) },
+    marks: conformMarks(candidate.marks),
+    screenNotes: conformScreenNotes(candidate.screenNotes),
     // v1 saves predate seed tracking; merging over the defaults fills in any
     // setting added since without discarding what the save does carry.
     seed: conformSeed(base.seed, candidate.seed),

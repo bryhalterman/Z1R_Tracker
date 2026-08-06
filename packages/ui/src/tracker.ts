@@ -8,13 +8,21 @@
  */
 
 import {
+  canEnterLevel9,
+  COAST_ITEM_REQUIRES,
+  COAST_ITEM_SCREEN,
   DUNGEONS,
   MARKS,
   MARKS_BY_KIND,
+  mirrorScreen,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
+  POOL_BY_ID,
   REGIONS_BY_ID,
   regionForScreen,
+  SHOP_STOCK,
+  SHOP_STOCK_BY_ID,
+  SHUFFLE_POOL,
   ITEMS,
   labelFor,
   maxValue,
@@ -366,6 +374,17 @@ function buildMap(
    * the map's legend — every mark is shown with its icon and its name, which
    * is the non-colour channel the icons alone don't provide.
    */
+  /*
+   * The coast screen moves when the seed mirrors the overworld.
+   *
+   * `COAST_ITEM_SCREEN` is the unmirrored position; a mirrored seed flips the
+   * whole map left to right, so the ledge ends up on the opposite edge. Reading
+   * it from state rather than caching it means toggling the setting mid-run
+   * moves the indicator with it.
+   */
+  const coastScreen = (state: TrackerState) =>
+    state.seed.mirroredOverworld ? mirrorScreen(COAST_ITEM_SCREEN) : COAST_ITEM_SCREEN;
+
   const palette = el('div', 'z1r-mark-palette');
   palette.hidden = true;
   palette.setAttribute('role', 'menu');
@@ -389,6 +408,7 @@ function buildMap(
     cell?.focus();
   }
 
+  const kindRow = el('div', 'z1r-mark-kinds');
   for (const mark of MARKS) {
     const option = el('button', 'z1r-mark-option');
     option.type = 'button';
@@ -402,14 +422,122 @@ function buildMap(
     }
     option.append(el('span', 'z1r-mark-option-name', mark.name));
     option.addEventListener('click', () => {
-      const screen = paletteScreen;
-      const cell = body.querySelector<HTMLElement>(`[data-screen="${screen}"]`);
-      store.dispatch({ type: 'setMark', screen, mark: mark.kind });
-      closePalette();
-      cell?.focus();
+      // Deliberately does not close. Picking Dungeon or Shop is the first half
+      // of the job — the detail controls appear underneath and you carry on in
+      // the same popover.
+      store.dispatch({ type: 'setMark', screen: paletteScreen, mark: mark.kind });
+      if (mark.kind === 'none') {
+        const cell = body.querySelector<HTMLElement>(`[data-screen="${paletteScreen}"]`);
+        closePalette();
+        cell?.focus();
+      }
     });
-    palette.append(option);
+    kindRow.append(option);
   }
+  palette.append(kindRow);
+
+  /*
+   * Which dungeon sits here.
+   *
+   * The whole point of marking a dungeon in a randomizer is knowing *which* one
+   * it is — a map covered in identical markers tells you where nine caves are
+   * and nothing else. `?` is a real state, not a placeholder: you routinely
+   * spot an entrance before you go in.
+   */
+  const dungeonRow = el('div', 'z1r-mark-detail z1r-mark-dungeons');
+  dungeonRow.append(el('span', 'z1r-mark-detail-label', 'Which dungeon'));
+  const dungeonButtons: HTMLButtonElement[] = [];
+  const dungeonGrid = el('div', 'z1r-mark-detail-options');
+  for (const level of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    const button = el('button', 'z1r-mark-level', level === 0 ? '?' : String(level));
+    button.type = 'button';
+    button.dataset.level = String(level);
+    button.title = level === 0 ? 'Found, not yet identified' : `Level ${level}`;
+    button.addEventListener('click', () =>
+      store.dispatch({ type: 'setScreenNote', screen: paletteScreen, patch: { dungeon: level } }),
+    );
+    dungeonButtons.push(button);
+    dungeonGrid.append(button);
+  }
+  dungeonRow.append(dungeonGrid);
+  palette.append(dungeonRow);
+
+  /* What the shop sells, so "where did I see arrows?" has an answer. */
+  const shopRow = el('div', 'z1r-mark-detail z1r-mark-stock');
+  shopRow.append(el('span', 'z1r-mark-detail-label', 'Sells'));
+  const stockButtons: HTMLButtonElement[] = [];
+  const stockGrid = el('div', 'z1r-mark-detail-options');
+  for (const stock of SHOP_STOCK) {
+    const button = el('button', 'z1r-mark-stock-option');
+    button.type = 'button';
+    button.dataset.stock = stock.id;
+    button.title = stock.name;
+    button.append(createSprite(resolver, stock.sprite, { size: 16, label: stock.name }));
+    button.append(el('span', 'z1r-mark-stock-name', stock.name));
+    button.addEventListener('click', () =>
+      store.dispatch({ type: 'toggleShopStock', screen: paletteScreen, stock: stock.id }),
+    );
+    stockButtons.push(button);
+    stockGrid.append(button);
+  }
+  shopRow.append(stockGrid);
+  palette.append(shopRow);
+
+  /*
+   * The coast item, offered only on the screen that has one.
+   *
+   * Shown regardless of the mark, because the coast ledge is neither a dungeon
+   * nor a shop — it is the one screen where recording an item matters, and
+   * making it a fourth mark kind to serve a single square is worse than this.
+   */
+  const coastRow = el('div', 'z1r-mark-detail z1r-mark-coast');
+  coastRow.append(el('span', 'z1r-mark-detail-label', 'Coast item'));
+  const coastSelect = document.createElement('select');
+  coastSelect.className = 'z1r-input z1r-mark-coast-select';
+  const noneOption = document.createElement('option');
+  noneOption.value = '';
+  noneOption.textContent = 'Unknown';
+  coastSelect.append(noneOption);
+  for (const entry of SHUFFLE_POOL) {
+    const option = document.createElement('option');
+    option.value = entry.id;
+    option.textContent = entry.name;
+    coastSelect.append(option);
+  }
+  coastSelect.addEventListener('change', () =>
+    store.dispatch({
+      type: 'setScreenNote',
+      screen: paletteScreen,
+      patch: { item: coastSelect.value },
+    }),
+  );
+  coastRow.append(coastSelect);
+  palette.append(coastRow);
+
+  /** Redraws the contextual half for whichever screen is open. */
+  const syncPalette = (state: TrackerState) => {
+    if (!paletteScreen) return;
+    const mark = state.marks[paletteScreen] ?? 'none';
+    const note = state.screenNotes[paletteScreen];
+
+    for (const option of kindRow.querySelectorAll<HTMLElement>('.z1r-mark-option')) {
+      option.dataset.active = String(option.dataset.mark === mark);
+    }
+
+    dungeonRow.hidden = mark !== 'dungeon';
+    for (const button of dungeonButtons) {
+      button.dataset.active = String(Number(button.dataset.level) === (note?.dungeon ?? 0));
+    }
+
+    shopRow.hidden = mark !== 'shop';
+    for (const button of stockButtons) {
+      button.dataset.active = String(!!note?.shop.includes(button.dataset.stock ?? ''));
+    }
+
+    coastRow.hidden = paletteScreen !== coastScreen(state);
+    if (document.activeElement !== coastSelect) coastSelect.value = note?.item ?? '';
+  };
+  patches.push(syncPalette);
   root.append(palette);
 
   function openPalette(screen: string, cell: HTMLElement) {
@@ -421,6 +549,16 @@ function buildMap(
     paletteScreen = screen;
     palette.hidden = false;
     palette.dataset.screen = screen;
+    /*
+     * Sync before measuring, not just on the next dispatch.
+     *
+     * The contextual rows are driven by a patch, and opening a palette is not a
+     * state change — so without this the popover showed whatever the last
+     * screen left behind: every detail row visible on the first open, and the
+     * coast chooser appearing one screen late. It also has to run before the
+     * positioning below, which measures the palette's height.
+     */
+    syncPalette(store.getState());
 
     const cellBox = cell.getBoundingClientRect();
     const panelBox = root.getBoundingClientRect();
@@ -490,7 +628,11 @@ function buildMap(
       // where a tint alone would be unreadable to a colour-blind viewer.
       const code = el('span', 'z1r-screen-region');
       const slot = el('span', 'z1r-screen-mark');
-      cell.append(terrain, code, slot);
+      // Detail drawn over the mark: the dungeon's number, or the shop's stock
+      // as two-letter tags. Both are text, so they survive being shrunk into a
+      // dock and read without depending on colour.
+      const detail = el('span', 'z1r-screen-detail');
+      cell.append(terrain, code, slot, detail);
 
       let renderedMap: string | null = null;
       patches.push(() => {
@@ -505,6 +647,7 @@ function buildMap(
 
       let renderedMark: string | null = null;
       let renderedRegion: string | null = null;
+      let renderedDetail: string | null = null;
 
       patches.push((state) => {
         const mark = state.marks[id] ?? 'none';
@@ -514,6 +657,43 @@ function buildMap(
           cell.style.setProperty('--mark-color', def?.color ?? 'transparent');
           if (!def?.sprite) slot.replaceChildren();
           else slot.replaceChildren(createSprite(resolver, def.sprite, { size: 18, label: def.name }));
+        });
+
+        const note = state.screenNotes[id];
+        const isCoast = id === coastScreen(state);
+        // The coast ledge is reachable the moment the Ladder is in hand — and
+        // that is exactly when you have forgotten it is there.
+        const coastReady = isCoast && (state.items[COAST_ITEM_REQUIRES] ?? 0) >= 1;
+        // Level 9 is the one dungeon you cannot enter on sight, so its marker
+        // is worth calling out the moment the last piece lands.
+        const level9Ready = note?.dungeon === 9 && canEnterLevel9(state);
+
+        const detailKey = [
+          mark,
+          note?.dungeon ?? 0,
+          note?.shop.join('') ?? '',
+          note?.item ?? '',
+          isCoast,
+          coastReady,
+          level9Ready,
+        ].join('|');
+        renderedDetail = memoise(renderedDetail, detailKey, () => {
+          cell.dataset.coast = String(isCoast);
+          cell.dataset.coastReady = String(coastReady);
+          cell.dataset.ready = String(level9Ready);
+
+          if (mark === 'dungeon') {
+            detail.textContent = note?.dungeon ? String(note.dungeon) : '?';
+          } else if (mark === 'shop' && note?.shop.length) {
+            detail.textContent = note.shop
+              .map((stock) => SHOP_STOCK_BY_ID.get(stock)?.code ?? '')
+              .join(' ');
+          } else if (isCoast && note?.item) {
+            detail.textContent = POOL_BY_ID.get(note.item)?.name.slice(0, 2).toUpperCase() ?? '';
+          } else {
+            detail.textContent = '';
+          }
+          detail.hidden = detail.textContent === '';
         });
 
         const region = regionForScreen(id, state.seed.mirroredOverworld);
@@ -527,7 +707,20 @@ function buildMap(
 
         const parts = [id];
         if (region) parts.push(region.name);
-        if (def && mark !== 'none') parts.push(def.name);
+        if (mark === 'dungeon') {
+          parts.push(note?.dungeon ? `Level ${note.dungeon}` : 'Dungeon (unidentified)');
+          if (level9Ready) parts.push('every Triforce piece held — Level 9 is open');
+        } else if (mark === 'shop') {
+          const stock = note?.shop.map((s) => SHOP_STOCK_BY_ID.get(s)?.name ?? s) ?? [];
+          parts.push(stock.length ? `Shop: ${stock.join(', ')}` : 'Shop');
+        } else if (def && mark !== 'none') {
+          parts.push(def.name);
+        }
+        if (isCoast) {
+          const item = note?.item ? POOL_BY_ID.get(note.item)?.name : '';
+          parts.push(item ? `Coast item: ${item}` : 'Coast item');
+          parts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');
+        }
         cell.title = parts.join(' — ');
       });
 

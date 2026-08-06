@@ -12,7 +12,7 @@ import { DUNGEONS, holdsTriforcePiece } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
 import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
-export const STATE_VERSION = 5;
+export const STATE_VERSION = 6;
 
 /** Upper bound on manual extra floor slots. Shared with `migrate` on purpose. */
 export const MAX_EXTRA_FLOOR_SLOTS = 8;
@@ -50,6 +50,26 @@ export interface DungeonState {
   triforce: boolean;
 }
 
+/**
+ * Detail hanging off a marked screen.
+ *
+ * Kept beside `marks` rather than folded into it because the mark is the shape
+ * on the map and this is what is written on it — a screen can be marked before
+ * any of it is known, and clearing the mark clears this with it.
+ *
+ * Every field is meaningful only for one mark kind, and all three are cheap, so
+ * they share one record rather than a union that persistence would have to
+ * discriminate on load.
+ */
+export interface ScreenNote {
+  /** Level 1-9 once known, 0 while the dungeon is found but unidentified. */
+  dungeon: number;
+  /** `ShopStockDef` ids seen for sale here. */
+  shop: string[];
+  /** Shuffle-pool entry id sitting on this screen. Used for the coast item. */
+  item: string;
+}
+
 export interface TrackerState {
   readonly version: number;
   /**
@@ -67,6 +87,8 @@ export interface TrackerState {
   dungeons: Record<string, DungeonState>;
   /** overworld screen id -> mark. */
   marks: Record<string, MarkKind>;
+  /** overworld screen id -> detail for that mark. Sparse: absent means bare. */
+  screenNotes: Record<string, ScreenNote>;
   /** Seed number, flag string, and the settings that reshape the tracker. */
   seed: SeedSettings;
   /**
@@ -96,6 +118,10 @@ export type Action =
   | { type: 'setDungeon'; level: number; patch: Partial<DungeonState> }
   | { type: 'cycleMark'; screen: string; direction: 1 | -1 }
   | { type: 'setMark'; screen: string; mark: MarkKind }
+  /** Write detail onto a marked screen: which dungeon, what stock, which item. */
+  | { type: 'setScreenNote'; screen: string; patch: Partial<ScreenNote> }
+  /** Add or remove one stock entry without resending the whole list. */
+  | { type: 'toggleShopStock'; screen: string; stock: string }
   | { type: 'setSeed'; patch: Partial<SeedSettings> }
   /** Record which pool entry sits at a location. Does not touch inventory. */
   | { type: 'setLocation'; id: string; item: string }
@@ -119,6 +145,53 @@ function emptyDungeon(): DungeonState {
   };
 }
 
+function emptyNote(): ScreenNote {
+  return { dungeon: 0, shop: [], item: '' };
+}
+
+/** True once a note carries nothing worth keeping. */
+function noteIsBare(note: ScreenNote): boolean {
+  return note.dungeon === 0 && note.shop.length === 0 && note.item === '';
+}
+
+/**
+ * Store a note, or drop the key when it has emptied out.
+ *
+ * Same rule as `marks`: absence is the empty state, so a save never accumulates
+ * `{dungeon: 0, shop: [], item: ''}` for every screen the player ever touched
+ * and then changed their mind about.
+ */
+function pruneNote(
+  notes: Record<string, ScreenNote>,
+  screen: string,
+  note: ScreenNote,
+): Record<string, ScreenNote> {
+  const next = { ...notes };
+  if (noteIsBare(note)) delete next[screen];
+  else next[screen] = note;
+  return next;
+}
+
+/**
+ * Set a screen's mark, discarding its detail when the mark is cleared.
+ *
+ * Unmarking a screen has to take the note with it. Leaving it behind means
+ * re-marking a screen later silently restores a dungeon number or a shop stock
+ * list from a previous guess, which reads as the tracker inventing data.
+ */
+function writeMark(state: TrackerState, screen: string, mark: MarkKind): Partial<TrackerState> {
+  const marks = { ...state.marks };
+  // Don't persist 'none' — an unmarked screen is the absence of a key.
+  if (mark === 'none') delete marks[screen];
+  else marks[screen] = mark;
+
+  if (mark !== 'none') return { marks };
+  if (!(screen in state.screenNotes)) return { marks };
+  const screenNotes = { ...state.screenNotes };
+  delete screenNotes[screen];
+  return { marks, screenNotes };
+}
+
 export function createInitialState(now = Date.now()): TrackerState {
   const items: Record<string, number> = {};
   for (const def of ITEMS) {
@@ -134,6 +207,7 @@ export function createInitialState(now = Date.now()): TrackerState {
     items,
     dungeons,
     marks: {},
+    screenNotes: {},
     seed: createSeedSettings(),
     locations: {},
     extraFloorSlots: {},
@@ -188,18 +262,33 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
     case 'cycleMark': {
       const current = state.marks[action.screen] ?? 'none';
       const next = cycleMark(current, action.direction);
-      const marks = { ...state.marks };
-      // Don't persist 'none' — an unmarked screen is the absence of a key.
-      if (next === 'none') delete marks[action.screen];
-      else marks[action.screen] = next;
-      return bump({ marks });
+      return bump(writeMark(state, action.screen, next));
     }
 
-    case 'setMark': {
-      const marks = { ...state.marks };
-      if (action.mark === 'none') delete marks[action.screen];
-      else marks[action.screen] = action.mark;
-      return bump({ marks });
+    case 'setMark':
+      return bump(writeMark(state, action.screen, action.mark));
+
+    case 'setScreenNote': {
+      const next = { ...emptyNote(), ...state.screenNotes[action.screen], ...action.patch };
+      if (typeof next.dungeon === 'number') {
+        // 0 means "found but not yet identified", which is a real state.
+        next.dungeon = Number.isInteger(next.dungeon) ? Math.min(Math.max(next.dungeon, 0), 9) : 0;
+      }
+      return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
+    }
+
+    case 'toggleShopStock': {
+      const current = state.screenNotes[action.screen] ?? emptyNote();
+      const held = current.shop.includes(action.stock);
+      const next: ScreenNote = {
+        ...current,
+        shop: held
+          ? current.shop.filter((id) => id !== action.stock)
+          : // Sorted so two screens with the same stock serialise identically,
+            // and the icons never reorder as you tick them.
+            [...current.shop, action.stock].sort(),
+      };
+      return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
     }
 
     case 'setSeed': {

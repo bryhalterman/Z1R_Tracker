@@ -601,6 +601,89 @@
   display: flex;
 }
 
+/*
+ * Detail written over the mark: the dungeon's number, or a shop's stock as
+ * two-letter tags.
+ *
+ * Text rather than more icons. At a dock's cell size a second icon is an
+ * indistinct smudge, whereas a numeral stays a numeral — and "which dungeon"
+ * is the entire reason for marking one in a randomizer.
+ */
+.z1r-screen-detail {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 3;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-align: center;
+  letter-spacing: 0.02em;
+  color: var(--z1r-text);
+  /* Outlined rather than backed by a plate: over 128 wildly different terrain
+     tiles an outline is the only thing that reads everywhere. */
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+  pointer-events: none;
+}
+
+.z1r-screen-detail[hidden] {
+  display: none;
+}
+
+/*
+ * The coast ledge, which needs the Ladder.
+ *
+ * Marked at all times with a corner notch so you can find it before you can
+ * reach it, and called out properly once the Ladder is in hand. The dashed
+ * outline says "known, not yet reachable"; solid says "go now".
+ */
+.z1r-screen[data-coast="true"] {
+  outline: 2px dashed var(--z1r-muted);
+  outline-offset: -2px;
+}
+
+.z1r-screen[data-coast-ready="true"] {
+  outline: 2px solid var(--z1r-accent);
+  animation: z1r-screen-beckon 2.6s ease-in-out infinite;
+}
+
+/*
+ * Level 9, once every Triforce piece is held.
+ *
+ * A slow pulse rather than a fast blink: this sits on a stream for as long as
+ * the run lasts, and something flashing in the corner of frame is a distraction
+ * rather than information. The ring is on top of the outline, so the marker is
+ * still identifiable when the animation is off.
+ */
+.z1r-screen[data-ready="true"] {
+  outline: 2px solid var(--z1r-accent);
+  outline-offset: -2px;
+  animation: z1r-screen-beckon 2.6s ease-in-out infinite;
+}
+
+@keyframes z1r-screen-beckon {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--z1r-accent) 70%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 6px 2px color-mix(in srgb, var(--z1r-accent) 70%, transparent);
+  }
+}
+
+/*
+ * Motion is never the only signal — the solid outline and the numeral both
+ * remain — so it can be dropped wholesale.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .z1r-screen[data-ready="true"],
+  .z1r-screen[data-coast-ready="true"] {
+    animation: none;
+    box-shadow: 0 0 6px 2px color-mix(in srgb, var(--z1r-accent) 70%, transparent);
+  }
+}
+
 /* A focused region is called out by a ring, a bolder code, and by every other
    screen dimming — three channels, none of which is colour on its own. */
 .z1r-map:has(.z1r-screen[data-focused="true"]) .z1r-screen:not([data-focused="true"])
@@ -1212,9 +1295,9 @@
 .z1r-mark-palette {
   position: absolute;
   z-index: 20;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--z1r-space-sm);
   inline-size: max-content;
   max-inline-size: 320px;
   padding: var(--z1r-space-sm);
@@ -1263,6 +1346,100 @@
 .z1r-mark-option-name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Three kinds now, so they fit on one row and the detail sits under them. */
+.z1r-mark-kinds {
+  display: flex;
+  gap: 2px;
+}
+
+/* Selected state carries a filled background *and* a solid outline, so which
+   kind is active is not signalled by colour alone. */
+.z1r-mark-option[data-active="true"] {
+  background: var(--z1r-inset);
+  border-color: var(--z1r-accent);
+}
+
+/* ------------------------------------------------------ per-screen detail */
+
+.z1r-mark-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-block-start: var(--z1r-space-sm);
+  border-block-start: var(--z1r-border-width) solid var(--z1r-border);
+}
+
+.z1r-mark-detail[hidden] {
+  display: none;
+}
+
+.z1r-mark-detail-label {
+  font-size: var(--z1r-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--z1r-muted);
+}
+
+.z1r-mark-detail-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.z1r-mark-level {
+  inline-size: var(--spectrum-component-height-75);
+  min-block-size: var(--spectrum-component-height-75);
+  font: inherit;
+  font-size: var(--z1r-text-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-text);
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+}
+
+.z1r-mark-stock-option {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-block-size: var(--spectrum-component-height-75);
+  padding: 2px var(--z1r-space-sm);
+  font: inherit;
+  font-size: var(--z1r-text-md);
+  color: var(--z1r-text);
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+}
+
+/*
+ * Chosen reads as filled + solid-bordered + full-strength icon; unchosen as
+ * dimmed with a dashed border. Three channels, none of them hue.
+ */
+.z1r-mark-level[data-active="true"],
+.z1r-mark-stock-option[data-active="true"] {
+  color: var(--z1r-bg);
+  background: var(--z1r-accent);
+  border-color: var(--z1r-accent);
+  font-weight: 700;
+}
+
+.z1r-mark-stock-option[data-active="false"] {
+  border-style: dashed;
+  opacity: 0.65;
+}
+
+.z1r-mark-level:hover,
+.z1r-mark-stock-option:hover {
+  border-color: var(--z1r-accent);
+}
+
+.z1r-mark-coast-select {
+  inline-size: 100%;
 }
 
 /* ------------------------------------------------- compact locations (OBS) */
