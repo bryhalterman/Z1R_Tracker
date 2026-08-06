@@ -214,34 +214,44 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   };
 
   /*
-   * Pick the map's resampling from how big a screen is actually drawn.
+   * Give the map whole-pixel cells.
    *
-   * The reference map is 16x8 screens of 80x55, so 80 CSS pixels is 1:1. Below
-   * that the art is being reduced and wants averaging; above it the art is
-   * being enlarged, where averaging is just blur — which is what the OBS dock
-   * showed at full width, since its cells run near 90px.
+   * `1fr` columns share out the remainder, so sixteen of them in a panel that
+   * is not a multiple of sixteen produce fractional widths — 54.4px, say. The
+   * terrain image is then positioned as a percentage of that and lands on
+   * half-pixel boundaries, which the renderer resolves by blending. That is
+   * soft however the image is sampled, and it is why the map still looked
+   * blurry after switching to nearest-neighbour.
    *
-   * Multiplied by the device pixel ratio because that is what decides how many
-   * real pixels the image lands on: a 45px cell on a 2x display is already
-   * upscaling, even though the CSS number says otherwise.
+   * Rounding the cell down to a whole number and centring the grid costs at
+   * most fifteen pixels of width and puts every screen on an exact boundary.
    */
-  const SOURCE_SCREEN_WIDTH = 80;
-  const applyMapSampling = () => {
+  const applyMapScale = () => {
     const map = root.querySelector<HTMLElement>('.z1r-map');
-    const cell = map?.querySelector<HTMLElement>('.z1r-screen');
-    if (!map || !cell) return;
-    // `offsetWidth`, not the bounding rect: the overlay scales its whole
-    // composition with a transform, and the rect would report the painted size.
-    const drawn = cell.offsetWidth * (globalThis.devicePixelRatio || 1);
-    if (drawn <= 0) return;
-    const next = drawn >= SOURCE_SCREEN_WIDTH ? 'pixelated' : 'smooth';
-    if (map.dataset.sampling !== next) map.dataset.sampling = next;
+    if (!map) return;
+    const gap = Number.parseFloat(getComputedStyle(map).columnGap) || 0;
+    // `clientWidth` excludes the border and includes padding, which is the box
+    // the columns are actually laid out in.
+    const inner = map.clientWidth;
+    if (inner <= 0) return;
+
+    const cell = Math.floor((inner - gap * (OVERWORLD_COLUMNS - 1)) / OVERWORLD_COLUMNS);
+    if (cell < 8) return;
+    // Height rounded independently rather than left to `aspect-ratio`, which
+    // would reintroduce a fraction on the other axis.
+    const height = Math.max(6, Math.round((cell * 11) / 16));
+
+    // Compare before writing, or this re-enters the observer that calls it.
+    if (map.style.getPropertyValue('--map-cell') !== `${cell}px`) {
+      map.style.setProperty('--map-cell', `${cell}px`);
+      map.style.setProperty('--map-cell-height', `${height}px`);
+    }
   };
 
   const applyLayout = () => {
     applyWidthBand();
     balanceItemGrids();
-    applyMapSampling();
+    applyMapScale();
   };
   applyLayout();
   const widthObserver = new ResizeObserver(applyLayout);
