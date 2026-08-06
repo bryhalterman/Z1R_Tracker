@@ -6,6 +6,15 @@ import { spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
 // whatever host the streamer parks it on, and neither is known at build time.
 export default defineConfig({
   base: './',
+  /*
+   * A short, changing build id, shown in the dock's footer.
+   *
+   * Docks cannot be told to drop their cache from OBS's UI, so the only way to
+   * know whether one is running current code is for it to say so.
+   */
+  define: {
+    __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(5, 16).replace('T', ' ')),
+  },
   plugins: [spriteManifest()],
   resolve: { alias: workspaceAliases },
   build: {
