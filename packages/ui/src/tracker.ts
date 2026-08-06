@@ -213,9 +213,35 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     }
   };
 
+  /*
+   * Pick the map's resampling from how big a screen is actually drawn.
+   *
+   * The reference map is 16x8 screens of 80x55, so 80 CSS pixels is 1:1. Below
+   * that the art is being reduced and wants averaging; above it the art is
+   * being enlarged, where averaging is just blur — which is what the OBS dock
+   * showed at full width, since its cells run near 90px.
+   *
+   * Multiplied by the device pixel ratio because that is what decides how many
+   * real pixels the image lands on: a 45px cell on a 2x display is already
+   * upscaling, even though the CSS number says otherwise.
+   */
+  const SOURCE_SCREEN_WIDTH = 80;
+  const applyMapSampling = () => {
+    const map = root.querySelector<HTMLElement>('.z1r-map');
+    const cell = map?.querySelector<HTMLElement>('.z1r-screen');
+    if (!map || !cell) return;
+    // `offsetWidth`, not the bounding rect: the overlay scales its whole
+    // composition with a transform, and the rect would report the painted size.
+    const drawn = cell.offsetWidth * (globalThis.devicePixelRatio || 1);
+    if (drawn <= 0) return;
+    const next = drawn >= SOURCE_SCREEN_WIDTH ? 'pixelated' : 'smooth';
+    if (map.dataset.sampling !== next) map.dataset.sampling = next;
+  };
+
   const applyLayout = () => {
     applyWidthBand();
     balanceItemGrids();
+    applyMapSampling();
   };
   applyLayout();
   const widthObserver = new ResizeObserver(applyLayout);

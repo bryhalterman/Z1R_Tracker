@@ -543,13 +543,23 @@
   pointer-events: none;
 }
 
+/*
+ * Which way the art is being scaled decides how to sample it, so this is set
+ * from the measured cell size rather than fixed here. See `applyMapSampling`.
+ *
+ * Reducing an 80x55 screen into a small cell wants averaging — nearest
+ * neighbour discards whole rows and columns and the terrain stops being
+ * readable. Enlarging it wants nearest neighbour, because averaging an upscale
+ * of pixel art is just blur, which is what a dock at full width was getting.
+ */
 .z1r-screen-terrain img {
   position: absolute;
   max-inline-size: none;
-  /* Smoothed, not pixelated: an 80x55 screen renders into a ~44px cell, so the
-     art is always being reduced. Nearest-neighbour discards whole rows and
-     columns at that ratio; averaging keeps the terrain readable. */
   image-rendering: auto;
+}
+
+.z1r-map[data-sampling="pixelated"] .z1r-screen-terrain img {
+  image-rendering: pixelated;
 }
 
 .z1r-screen-region {
