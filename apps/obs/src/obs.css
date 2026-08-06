@@ -86,3 +86,23 @@ body.dock .z1r-item-grid {
   box-shadow: 0 4px 14px #000a;
   z-index: 999;
 }
+
+/*
+ * `?debug=1` readout. Dock only, never on a stream.
+ *
+ * Loud on purpose: it is meant to be read off a screenshot, so it has to
+ * survive being scaled down and must not be mistaken for part of the tracker.
+ */
+.z1r-diagnostics {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  font-family: var(--z1r-font-mono, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  color: #ffe9a8;
+  background: #000;
+  border: 2px solid var(--z1r-accent);
+  border-radius: 4px;
+  cursor: pointer;
+}
