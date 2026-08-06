@@ -121,6 +121,34 @@ const EDGE_PATH = 'M50 0 L100 50 L0 50 Z';
  */
 const EDGE_LENGTH = 2 * Math.hypot(50, 50) + 100;
 
+const SOFTEN_ID = 'z1r-triforce-soften';
+
+/**
+ * Gaussian blur that turns the travelling dashes into light rather than paint.
+ *
+ * The deviation is in viewBox units, so it is proportional to the shape and
+ * holds up at any rendered size. The region is widened because the default
+ * filter box clips at 10% past the bounding box, which would square off the
+ * blur exactly where it is meant to fade out.
+ *
+ * `sRGB` interpolation because the default, linearRGB, washes a bright stroke
+ * out to a muddy grey as it fades.
+ */
+function softenFilter(): SVGDefsElement {
+  const defs = svg('defs');
+  const filter = svg('filter', {
+    id: SOFTEN_ID,
+    x: '-25%',
+    y: '-25%',
+    width: '150%',
+    height: '150%',
+    'color-interpolation-filters': 'sRGB',
+  });
+  filter.append(svg('feGaussianBlur', { stdDeviation: '1.6' }));
+  defs.append(filter);
+  return defs;
+}
+
 export function buildTriforce(store: Store, patches: Patch[], interactive: boolean): HTMLElement {
   const root = document.createElement('section');
   root.className = 'z1r-panel z1r-triforce-panel';
@@ -213,15 +241,32 @@ export function buildTriforce(store: Store, patches: Patch[], interactive: boole
   // a length — which browsers drop silently, leaving the animation running
   // against a single keyframe and the band sitting perfectly still.
   figure.style.setProperty('--z1r-edge-length', `${EDGE_LENGTH.toFixed(3)}px`);
-  for (const layer of ['halo', 'glow', 'spark'] as const) {
-    figure.append(
-      svg('path', {
-        d: EDGE_PATH,
-        class: `z1r-triforce-edge z1r-triforce-${layer}`,
-        'aria-hidden': 'true',
-      }),
-    );
-  }
+  const edge = (layer: string) =>
+    svg('path', {
+      d: EDGE_PATH,
+      class: `z1r-triforce-edge z1r-triforce-${layer}`,
+      'aria-hidden': 'true',
+    });
+
+  // The steady outline stays crisp — it is the border, not the effect.
+  figure.append(softenFilter(), edge('halo'));
+
+  /*
+   * The travelling bands go through a blur together.
+   *
+   * A dash has hard ends, and no amount of thinning or opacity changes that —
+   * it reads as a solid segment with a cut edge rather than light moving along
+   * the border. Blurring the moving layers lets each band fall off gradually at
+   * both ends, and softens the gaps between them so the chain looks continuous.
+   * One filter over both layers rather than one each, so they blend with each
+   * other instead of stacking two separately-blurred shapes.
+   */
+  const flowing = svg('g', {
+    filter: `url(#${SOFTEN_ID})`,
+    'aria-hidden': 'true',
+  });
+  flowing.append(edge('glow'), edge('spark'));
+  figure.append(flowing);
 
   // Levels 1-8 hold the pieces; Level 9 holds Ganon. Its state is a sentence
   // rather than a ninth wedge, which would break the tiling.

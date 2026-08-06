@@ -311,9 +311,9 @@
  */
 .z1r-triforce-halo {
   stroke: var(--z1r-triforce);
-  stroke-width: 1.6;
-  opacity: 0.45;
-  animation: z1r-triforce-breathe 2.4s ease-in-out infinite;
+  stroke-width: 1.2;
+  opacity: 0.5;
+  animation: z1r-triforce-breathe 3.6s ease-in-out infinite;
 }
 
 /*
@@ -336,28 +336,33 @@
  */
 .z1r-triforce-glow,
 .z1r-triforce-spark {
-  stroke: #fff;
+  /* Warm rather than white: this is meant to read as the gold edge catching
+     light, not as a white line painted over it. */
+  stroke: #fff3cd;
   stroke-linecap: round;
-  animation: z1r-triforce-run 2.8s linear infinite;
+  animation: z1r-triforce-run 3.6s linear infinite;
 }
 
+/* The body of each band. Wide and dim; the blur spreads it into its neighbours
+   so the gaps close and the chain reads as continuous. */
 .z1r-triforce-glow {
-  stroke-width: 3.2;
-  opacity: 0.22;
-  stroke-dasharray: calc(var(--z1r-edge-cycle) * 0.88) calc(var(--z1r-edge-cycle) * 0.12);
+  stroke-width: 2.6;
+  opacity: 0.5;
+  stroke-dasharray: calc(var(--z1r-edge-cycle) * 0.7) calc(var(--z1r-edge-cycle) * 0.3);
 }
 
+/* The crest, riding centred inside the body — this is what makes the band look
+   like it has a bright middle that falls away, rather than a flat segment. */
 .z1r-triforce-spark {
-  stroke-width: 2;
-  opacity: 0.95;
-  stroke-dasharray: calc(var(--z1r-edge-cycle) * 0.55) calc(var(--z1r-edge-cycle) * 0.45);
+  stroke-width: 1.3;
+  opacity: 0.85;
+  stroke-dasharray: calc(var(--z1r-edge-cycle) * 0.3) calc(var(--z1r-edge-cycle) * 0.7);
   /*
-   * Centres each bright band inside its dim one. It needs to start (0.88 - 0.55)
-   * / 2 of a cycle further along, and a negative delay is how you phase-shift an
-   * animation already running at the same rate — one cycle per 2.8s, so
-   * 0.165 * 2.8.
+   * Centres the crest in the body: it starts (0.7 - 0.3) / 2 = 0.2 of a cycle
+   * further along, and a negative delay is how you phase-shift an animation
+   * already running at the same rate — one cycle per 3.6s, so 0.2 * 3.6.
    */
-  animation-delay: -0.462s;
+  animation-delay: -0.72s;
 }
 
 /*
