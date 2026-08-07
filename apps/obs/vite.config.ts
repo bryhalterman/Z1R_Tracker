@@ -29,6 +29,7 @@ export default defineConfig({
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
         overlay: fileURLToPath(new URL('./overlay.html', import.meta.url)),
         dock: fileURLToPath(new URL('./dock.html', import.meta.url)),
+        map: fileURLToPath(new URL('./map.html', import.meta.url)),
       },
     },
   },

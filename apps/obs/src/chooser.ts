@@ -7,6 +7,7 @@
 const targets: [id: string, page: string][] = [
   ['overlay-url', 'overlay.html'],
   ['dock-url', 'dock.html'],
+  ['map-url', 'map.html'],
 ];
 
 for (const [id, page] of targets) {

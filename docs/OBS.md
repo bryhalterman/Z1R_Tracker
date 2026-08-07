@@ -1,24 +1,28 @@
 # OBS setup
 
-The OBS build is two pages that talk to each other:
+The OBS build is three pages that share one run:
 
-- **`index.html`** — the overlay. Transparent, read-only, goes on stream.
-- **`dock.html`** — the tracker you actually click. Stays inside OBS, never on stream.
+- **`overlay.html`** — transparent, read-only, goes on stream.
+- **`dock.html`** — the tracker you click. Stays inside OBS, never on stream.
+- **`map.html`** — the overworld on its own, so it can be sized and left alone.
 
-They're split because OBS browser sources ignore clicks unless you opt in, and even with clicks
-enabled a stray one during a run would edit the tracker live on camera.
+The overlay is separate because OBS browser sources ignore clicks unless you opt in, and even with
+clicks enabled a stray one during a run would edit the tracker live on camera. The map is separate
+because it wants room, and sharing a column with everything else meant scrolling past the tracker
+to reach it mid-run.
 
 Requires OBS 28 or newer.
 
 ## 0. Which page is which
 
-Three pages ship, and the names matter:
+Four pages ship, and the names matter:
 
 | Page | What it is |
 | --- | --- |
-| `index.html` | A setup page. Lists the other two with their full URLs — open it first. |
+| `index.html` | A setup page. Lists the others with their full URLs — open it first. |
 | `overlay.html` | The read-only overlay. Goes on stream as a Browser Source. |
 | `dock.html` | The interactive tracker. Goes in OBS as a Custom Browser Dock. |
+| `map.html` | The overworld map. A second Custom Browser Dock. |
 
 The overlay used to live at `index.html`, which meant a dock pointed at the root URL loaded a page
 with every control disabled and nothing explaining why. If you hit that, the overlay now says so
@@ -80,15 +84,13 @@ A vertical item strip beside a 4:3 game capture is usually `?sections=items&size
 
 Anything not in that list is dropped, not rendered. Misspell a name, or ask for a panel the OBS
 build doesn't carry, and you lose that panel rather than getting an empty box on stream. The list
-lives in `apps/obs/src/options.ts` as `OBS_SECTIONS`, and the dock shows the same six in the same
-order.
+lives in `apps/obs/src/options.ts` as `DOCK_SECTIONS`.
 
 ### No overworld map on stream
 
-The overworld grid isn't available to either OBS page. It's 128 cells with a two-letter region code
-on each — legible in a browser window, unreadable squeezed into a dock beside a game capture, and
-pointless as a static overlay. Overworld tracking lives in the web and desktop apps, which have the
-room for it. If you want it during a run, keep one of those open on a second monitor.
+The overworld grid isn't offered to the overlay. It's 128 cells carrying marks, dungeon numbers and
+stock codes — worth reading in a window you can size, pointless as a static graphic over a game
+capture. It has its own dock instead; see below.
 
 The overlay has no background by design. If you want a backing plate, add a Color Source behind it
 in OBS rather than styling one in — that way it stays independent of the tracker's own layout.
@@ -132,10 +134,31 @@ second one compounds rather than replaces it. Change `?width=` instead.
 
 Apply, then drag the dock wherever you like. Click in it and the overlay updates immediately.
 
+This carries the seed, items, Triforce, locations and hints — everything except the map.
+
+## 4. Add the map dock
+
+**Docks → Custom Browser Docks…** again:
+
+| Field | Value |
+| --- | --- |
+| Dock Name | `Z1R Map` |
+| URL | `http://127.0.0.1:4178/map.html` |
+
+The overworld on its own. It's a separate window because it wants to be large and to stay put —
+sharing a column with the seed form and the inventory meant it was either squeezed narrow or
+reached by scrolling past everything else, mid-run, which is when neither is acceptable.
+
+Dock it along the bottom or on a second monitor and give it room. Marking a screen here shows up in
+the main dock and on the overlay at once; they are one run, not two.
+
+It has no Export/Import/Reset bar. Those live in the main dock, and a second Reset button on a
+single-panel window is a way to lose a run by misclick.
+
 ## Same-origin
 
-The two pages sync through `localStorage` and a `BroadcastChannel`, both of which are scoped to an
-**origin**. If the dock and the overlay don't share one, they will silently track two separate runs.
+The pages sync through `localStorage` and a `BroadcastChannel`, both of which are scoped to an
+**origin**. If they don't share one, they will silently track separate runs.
 
 That means:
 
@@ -150,7 +173,7 @@ show up on stream immediately — has nothing to deliver to. You can end up with
 only after a reload, or not at all. Serve the folder over HTTP (`npm run serve:obs`) and the
 problem doesn't arise.
 
-Pick one address and use it for both.
+Pick one address and use it for all three.
 
 ## Troubleshooting
 

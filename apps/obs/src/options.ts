@@ -19,12 +19,17 @@ export type { TrackerSection as TrackerSectionName } from '@z1r/ui';
 import type { TrackerSection } from '@z1r/ui';
 
 /**
- * The dock carries everything.
+ * Everything the dock carries.
  *
  * It lives inside OBS and is never on camera, so it needs full tracking
  * capability — anything missing here would force you out to another window
  * mid-run. It renders in the compact layout because a dock is narrow, not
  * because anything is left out.
+ *
+ * The overworld map is *not* here. It wants to be large and to stay put, and
+ * sharing this column meant it was either squeezed narrow or reached by
+ * scrolling past everything else. It has `map.html` to itself, docked wherever
+ * there is room, sharing this store through localStorage and a BroadcastChannel.
  */
 export const DOCK_SECTIONS: readonly TrackerSection[] = [
   'seed',
@@ -32,8 +37,10 @@ export const DOCK_SECTIONS: readonly TrackerSection[] = [
   'dungeons',
   'locations',
   'hintlog',
-  'map',
 ];
+
+/** The standalone map dock: one panel, given the whole window. */
+export const MAP_SECTIONS: readonly TrackerSection[] = ['map'];
 
 /**
  * What the overlay shows unless asked otherwise.
@@ -53,6 +60,9 @@ export const OVERLAY_DEFAULT_SECTIONS = 'items,dungeons';
  * to the tracker being broken.
  */
 export function allowedSections(requested: readonly string[]): readonly TrackerSection[] {
+  // Deliberately checked against the dock's list, which no longer includes the
+  // map: 128 screens with a two-letter code on each is unreadable as a static
+  // overlay, and it has its own window now for when you want to read it.
   const allowed = requested.filter((name): name is TrackerSection =>
     DOCK_SECTIONS.includes(name as TrackerSection),
   );
