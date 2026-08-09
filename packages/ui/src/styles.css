@@ -1728,14 +1728,22 @@
 }
 
 /*
- * Clearing the map is destructive, so it does not sit flush against the
- * Regions toggle where a misclick could reach it.
+ * Clearing the map is destructive, so it says so.
+ *
+ * `--z1r-bad` is the palette's red and is already contrast-checked against the
+ * panel as "destructive actions", so this reads as a warning without inventing
+ * a colour. It is not carried by hue alone: the button also sits apart from the
+ * Regions toggle, so a misclick cannot reach it, and asks before it fires.
  */
 .z1r-map-clear {
   margin-inline-start: auto;
+  color: var(--z1r-bad);
+  border-color: var(--z1r-bad);
 }
 
-.z1r-map-clear:hover {
-  border-color: var(--z1r-heart);
-  color: var(--z1r-text);
+.z1r-map-clear:hover,
+.z1r-map-clear:focus-visible {
+  color: var(--z1r-bg);
+  background: var(--z1r-bad);
+  border-color: var(--z1r-bad);
 }

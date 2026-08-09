@@ -287,6 +287,16 @@ export const SHUFFLE_POOL: readonly PoolEntry[] = [
     sprite: 'item.boomerang.magical',
   },
   { id: 'magicalKey', name: 'Magical Key', itemId: 'magicalKey', value: 1, sprite: 'item.key.magical' },
+  // Stage 3 of the progressive sword, above the White Sword at stage 2. It was
+  // missing from the pool entirely, so the one item most worth recording the
+  // location of could not be recorded at all.
+  {
+    id: 'magicalSword',
+    name: 'Magical Sword',
+    itemId: 'sword',
+    value: 3,
+    sprite: 'item.sword.magical',
+  },
   { id: 'bracelet', name: 'Power Bracelet', itemId: 'bracelet', value: 1, sprite: 'item.bracelet' },
   { id: 'raft', name: 'Raft', itemId: 'raft', value: 1, sprite: 'item.raft' },
   { id: 'recorder', name: 'Recorder', itemId: 'recorder', value: 1, sprite: 'item.recorder' },
