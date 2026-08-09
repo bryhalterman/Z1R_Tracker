@@ -1747,3 +1747,40 @@
   background: var(--z1r-bad);
   border-color: var(--z1r-bad);
 }
+
+/* ------------------------------------------------- selected screen editing */
+
+/*
+ * The screen the toolbar is editing.
+ *
+ * A ring plus an offset, so it reads on top of terrain of any colour and does
+ * not get lost among the mark outlines the cell may also be carrying.
+ */
+.z1r-screen[data-selected="true"] {
+  outline: 3px solid var(--z1r-text);
+  outline-offset: -3px;
+  z-index: 2;
+}
+
+/* Which screen is being edited, or an instruction when none is. */
+.z1r-tool-target {
+  min-inline-size: 6.5em;
+  font-size: var(--z1r-text-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-text);
+}
+
+/*
+ * Idle, the toolbar is still the map's legend — so it dims rather than
+ * disappearing, and the prompt says what to do about it.
+ */
+.z1r-map-tools[data-active="false"] .z1r-tool-target {
+  font-weight: 400;
+  color: var(--z1r-muted);
+}
+
+.z1r-tool-mark:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

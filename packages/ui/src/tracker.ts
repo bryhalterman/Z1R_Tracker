@@ -33,6 +33,7 @@ import {
   spriteFor,
   type ItemDef,
   type MarkKind,
+  type ScreenNote,
   type SpriteResolver,
   type Store,
   type TrackerState,
@@ -562,23 +563,50 @@ function buildMap(
   // button stacked vertically and the first row of screens filled in beside it.
   root.insertBefore(toolbar, body);
 
-  let brush: MarkKind = 'dungeon';
-  let brushLevel = 0;
-  let brushSpot = '';
-  let brushItem = '';
-  const brushStock = new Set<string>();
-  const brushBlocks = new Set<string>();
+  /*
+   * Select a screen, then edit it.
+   *
+   * This was a brush — you set what you were placing, then clicked screens to
+   * place it. That reads well for painting a run of dead ends and badly for
+   * everything else, because it asks you to choose a dungeon's number before
+   * you have said which screen the dungeon is on. Editing a screen you had
+   * already marked meant re-setting every property and stamping over it.
+   *
+   * So: click a screen to select it, then work left to right along the toolbar
+   * — Dungeon, then which level, then what blocked you. Each control writes to
+   * the selected screen the moment you touch it, and the toolbar shows what
+   * that screen already holds rather than what you are about to stamp.
+   *
+   * The toolbar stays fixed above the map, which is the half of the old popover
+   * that was worth keeping: it never covers the map and never scrolls the page.
+   */
+  let selected = '';
+
+  const selectScreen = (screen: string) => {
+    // Clicking the selected screen again lets go of it, so there is a way out
+    // that is not "find somewhere harmless to click".
+    selected = selected === screen ? '' : screen;
+    for (const cell of body.querySelectorAll<HTMLElement>('.z1r-screen')) {
+      cell.dataset.selected = String(cell.dataset.screen === selected);
+    }
+    syncToolbar(store.getState());
+  };
+
+  const patchSelected = (patch: Partial<ScreenNote>) => {
+    if (!selected) return;
+    store.dispatch({ type: 'setScreenNote', screen: selected, patch });
+  };
 
   const kindRow = el('div', 'z1r-tool-row z1r-tool-kinds');
   toolbar.append(kindRow);
   const kindButtons: HTMLButtonElement[] = [];
 
-  /** Detail rows appear only for the brush that uses them. */
+  /** Detail rows appear only for the mark the selected screen carries. */
   const detailRows: { row: HTMLElement; forKind: MarkKind }[] = [];
   const detailRow = (forKind: MarkKind, label: string) => {
     const row = el('div', 'z1r-tool-row z1r-tool-detail');
     // Labelled for screen readers rather than on screen. Only one detail row is
-    // ever visible, and which one is already answered by the selected brush.
+    // ever visible, and which one is already answered by the mark.
     row.setAttribute('role', 'group');
     row.setAttribute('aria-label', label);
     toolbar.append(row);
@@ -586,24 +614,38 @@ function buildMap(
     return row;
   };
 
-  const syncToolbar = () => {
+  /** Names the screen being edited, so the toolbar is never ambiguous. */
+  const target = el('span', 'z1r-tool-target');
+  kindRow.append(target);
+
+  const syncToolbar = (state: TrackerState) => {
+    const mark = selected ? (state.marks[selected] ?? 'none') : 'none';
+    const note = selected ? state.screenNotes[selected] : undefined;
+
+    toolbar.dataset.active = String(!!selected);
+    target.textContent = selected || 'Pick a screen';
+
     for (const button of kindButtons) {
-      const active = button.dataset.mark === brush;
+      const active = !!selected && button.dataset.mark === mark;
       button.dataset.active = String(active);
       button.setAttribute('aria-pressed', String(active));
+      // Disabled rather than hidden with nothing selected: the row is the map's
+      // legend as well as its editor, and it should not vanish when idle.
+      button.disabled = !selected;
     }
-    for (const { row, forKind } of detailRows) row.hidden = forKind !== brush;
+    for (const { row, forKind } of detailRows) row.hidden = !selected || forKind !== mark;
+
     for (const button of levelButtons) {
-      button.dataset.active = String(Number(button.dataset.level) === brushLevel);
+      button.dataset.active = String(Number(button.dataset.level) === (note?.dungeon ?? 0));
     }
     for (const button of stockButtons) {
-      button.dataset.active = String(brushStock.has(button.dataset.stock ?? ''));
+      button.dataset.active = String(!!note?.shop.includes(button.dataset.stock ?? ''));
     }
     for (const button of blockButtons) {
-      button.dataset.active = String(brushBlocks.has(button.dataset.block ?? ''));
+      button.dataset.active = String(!!note?.blocks.includes(button.dataset.block ?? ''));
     }
-    if (document.activeElement !== spotSelect) spotSelect.value = brushSpot;
-    if (document.activeElement !== itemSelect) itemSelect.value = brushItem;
+    if (document.activeElement !== spotSelect) spotSelect.value = note?.spot ?? '';
+    if (document.activeElement !== itemSelect) itemSelect.value = note?.item ?? '';
   };
 
   for (const mark of MARKS) {
@@ -618,22 +660,21 @@ function buildMap(
     }
     /*
      * Icon only. The name rides on `title` and `aria-label` instead — the row
-     * is five buttons that never change, so it is learned in one glance and
+     * is seven buttons that never change, so it is learned in one glance and
      * then only costs space. Selection is still shown by fill *and* by an
      * outline, so it is not carried by colour.
      */
-    button.title =
-      mark.kind === 'none' ? 'Clear a screen (or right-click it)' : `Place: ${mark.name}`;
+    button.title = mark.kind === 'none' ? 'Clear this screen' : `Mark as: ${mark.name}`;
     button.setAttribute('aria-label', button.title);
     button.addEventListener('click', () => {
-      brush = mark.kind;
-      syncToolbar();
+      if (!selected) return;
+      store.dispatch({ type: 'setMark', screen: selected, mark: mark.kind });
     });
     kindButtons.push(button);
     kindRow.append(button);
   }
 
-  /* Which dungeon the next click places. `?` is found-but-unidentified. */
+  /* Which dungeon this is. `?` is found-but-unidentified, a real state. */
   const levelRow = detailRow('dungeon', 'Level');
   const levelButtons: HTMLButtonElement[] = [];
   for (const level of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
@@ -641,10 +682,7 @@ function buildMap(
     button.type = 'button';
     button.dataset.level = String(level);
     button.title = level === 0 ? 'Found, not yet identified' : `Level ${level}`;
-    button.addEventListener('click', () => {
-      brushLevel = level;
-      syncToolbar();
-    });
+    button.addEventListener('click', () => patchSelected({ dungeon: level }));
     levelButtons.push(button);
     levelRow.append(button);
   }
@@ -667,9 +705,7 @@ function buildMap(
     button.setAttribute('aria-label', block.name);
     button.append(createSprite(resolver, block.sprite, { size: 18, label: block.name }));
     button.addEventListener('click', () => {
-      if (brushBlocks.has(block.id)) brushBlocks.delete(block.id);
-      else brushBlocks.add(block.id);
-      syncToolbar();
+      if (selected) store.dispatch({ type: 'toggleDungeonBlock', screen: selected, block: block.id });
     });
     blockButtons.push(button);
     blockRow.append(button);
@@ -686,9 +722,7 @@ function buildMap(
     button.setAttribute('aria-label', stock.name);
     button.append(createSprite(resolver, stock.sprite, { size: 18, label: stock.name }));
     button.addEventListener('click', () => {
-      if (brushStock.has(stock.id)) brushStock.delete(stock.id);
-      else brushStock.add(stock.id);
-      syncToolbar();
+      if (selected) store.dispatch({ type: 'toggleShopStock', screen: selected, stock: stock.id });
     });
     stockButtons.push(button);
     stockRow.append(button);
@@ -715,9 +749,7 @@ function buildMap(
     option.textContent = location.label;
     spotSelect.append(option);
   }
-  spotSelect.addEventListener('change', () => {
-    brushSpot = spotSelect.value;
-  });
+  spotSelect.addEventListener('change', () => patchSelected({ spot: spotSelect.value }));
 
   const itemSelect = document.createElement('select');
   itemSelect.className = 'z1r-input z1r-tool-select';
@@ -732,34 +764,18 @@ function buildMap(
     option.textContent = entry.name;
     itemSelect.append(option);
   }
-  itemSelect.addEventListener('change', () => {
-    brushItem = itemSelect.value;
-  });
+  itemSelect.addEventListener('change', () => patchSelected({ item: itemSelect.value }));
   itemRow.append(spotSelect, itemSelect);
 
-  /** Applies the current brush, detail and all, to one screen. */
-  const paint = (screen: string) => {
-    store.dispatch({ type: 'setMark', screen, mark: brush });
-    if (brush === 'dungeon') {
-      store.dispatch({
-        type: 'setScreenNote',
-        screen,
-        patch: { dungeon: brushLevel, blocks: [...brushBlocks].sort() },
-      });
-    } else if (brush === 'shop') {
-      // Sent whole rather than toggled, so a screen ends up with exactly what
-      // the toolbar shows rather than the difference from what was there.
-      store.dispatch({ type: 'setScreenNote', screen, patch: { shop: [...brushStock].sort() } });
-    } else if (brush === 'item') {
-      store.dispatch({
-        type: 'setScreenNote',
-        screen,
-        patch: { spot: brushSpot, item: brushItem },
-      });
-    }
-  };
+  // Escape lets go of the screen without having to find somewhere safe to click.
+  body.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !selected) return;
+    const cell = body.querySelector<HTMLElement>(`[data-screen="${selected}"]`);
+    selectScreen(selected);
+    cell?.focus();
+  });
 
-  syncToolbar();
+  patches.push(syncToolbar);
 
   const focusNote = el('span', 'z1r-map-focus');
   heading?.append(focusNote);
@@ -778,7 +794,7 @@ function buildMap(
       cell.title = id;
       if (!interactive) cell.disabled = true;
       else {
-        cell.addEventListener('click', () => paint(id));
+        cell.addEventListener('click', () => selectScreen(id));
         // Right-click clears outright — the common correction, and faster than
         // opening the palette to pick "Unmarked".
         cell.addEventListener('contextmenu', (event) => {
@@ -883,6 +899,10 @@ function buildMap(
           mark,
           note?.dungeon ?? 0,
           note?.shop.join('') ?? '',
+          // Every field the label is built from has to be in this key. Leaving
+          // `blocks` out meant a dungeon's tags showed up in the tooltip and
+          // never on the cell, because the memo saw no reason to redraw.
+          note?.blocks.join('') ?? '',
           note?.spot ?? '',
           note?.item ?? '',
           isCoast,
