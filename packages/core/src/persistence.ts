@@ -19,7 +19,12 @@ import {
   type TrackerState,
 } from './state.js';
 
-import { MARKS_BY_KIND, SHOP_STOCK_BY_ID, type MarkKind } from './overworld.js';
+import {
+  DUNGEON_BLOCKS_BY_ID,
+  MARKS_BY_KIND,
+  SHOP_STOCK_BY_ID,
+  type MarkKind,
+} from './overworld.js';
 import { OVERWORLD_LOCATIONS, POOL_BY_ID, type SeedSettings } from './seed.js';
 
 export const STORAGE_KEY = 'z1r-tracker:state';
@@ -115,6 +120,11 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
           .filter((id) => SHOP_STOCK_BY_ID.has(id))
           .sort()
       : [];
+    const blocks = Array.isArray(note.blocks)
+      ? [...new Set(note.blocks.filter((id): id is string => typeof id === 'string'))]
+          .filter((id) => DUNGEON_BLOCKS_BY_ID.has(id))
+          .sort()
+      : [];
     const item = typeof note.item === 'string' && POOL_BY_ID.has(note.item) ? note.item : '';
     // Checked against the real list: an unknown spot id renders as nothing and
     // would sit in the save forever as an invisible entry.
@@ -123,8 +133,10 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
         ? note.spot
         : '';
 
-    if (dungeon === 0 && shop.length === 0 && spot === '' && item === '') continue;
-    out[screen] = { dungeon, shop, spot, item };
+    if (dungeon === 0 && shop.length === 0 && blocks.length === 0 && spot === '' && item === '') {
+      continue;
+    }
+    out[screen] = { dungeon, shop, blocks, spot, item };
   }
   return out;
 }

@@ -213,6 +213,25 @@ const KIND_INITIAL: Record<string, string> = {
 };
 
 /**
+ * The three overworld spots are not interchangeable, so they do not share a
+ * letter.
+ *
+ * They rendered as three identical `O` chips, which told you there were three
+ * of them and nothing else — you had to hover each one to find out which was
+ * the Coast. Dungeon slots genuinely are interchangeable within a level, so
+ * those keep their kind initial.
+ */
+const SPOT_CODE: Record<string, string> = {
+  'ow.whiteSword': 'WS',
+  'ow.armos': 'AR',
+  'ow.coast': 'CO',
+};
+
+function slotCode(location: LocationDef): string {
+  return SPOT_CODE[location.id] ?? KIND_INITIAL[location.kind] ?? '?';
+}
+
+/**
  * Dense variant for the OBS dock and overlay.
  *
  * On stream the game capture is the premium space, so this is built to take as
@@ -359,7 +378,7 @@ function buildCompactLocations(
             `${current.collected ? ' (collected)' : ''}`;
           renderedItem = memoise(renderedItem, current.item, () => {
             if (entry) face.replaceChildren(createSprite(resolver, entry.sprite, { size: 16 }));
-            else face.textContent = KIND_INITIAL[location.kind] ?? '?';
+            else face.textContent = slotCode(location);
           });
         });
       }

@@ -96,6 +96,37 @@ export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = new Map(
 );
 
 /**
+ * What is stopping you getting further into a dungeon you have already found.
+ *
+ * The question this answers is "can I finish that one yet?", asked from the
+ * overworld with a new item in hand. Without it you go back in to find out, and
+ * the answer is usually no.
+ *
+ * These are the five things that actually turn you around in Z1R. Enemies you
+ * fight; a locked door with no key, water with no ladder, a wall with no bombs,
+ * an eye with no bow or a Digdogger with no recorder simply end the trip.
+ */
+export interface DungeonBlockDef {
+  readonly id: string;
+  readonly name: string;
+  readonly sprite: string;
+  /** Two letters, so the tag reads without depending on the icons. */
+  readonly code: string;
+}
+
+export const DUNGEON_BLOCKS: readonly DungeonBlockDef[] = [
+  { id: 'key', name: 'Locked door', sprite: 'item.key.magical', code: 'KY' },
+  { id: 'bomb', name: 'Bomb wall', sprite: 'item.bomb', code: 'BM' },
+  { id: 'ladder', name: 'Ladder gap', sprite: 'item.ladder', code: 'LD' },
+  { id: 'bow', name: 'Needs the Bow', sprite: 'item.bow', code: 'BW' },
+  { id: 'recorder', name: 'Needs the Recorder', sprite: 'item.recorder', code: 'RC' },
+];
+
+export const DUNGEON_BLOCKS_BY_ID: ReadonlyMap<string, DungeonBlockDef> = new Map(
+  DUNGEON_BLOCKS.map((entry) => [entry.id, entry]),
+);
+
+/**
  * The named overworld spot whose item needs the Ladder.
  *
  * This used to be a hardcoded screen id, which was a guess about where the

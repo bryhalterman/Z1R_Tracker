@@ -150,3 +150,62 @@ test('migrate rejects malformed screen notes', () => {
   assert.equal(state.screenNotes['A4']?.spot, '', 'unknown spot cleared');
   assert.equal('A5' in state.screenNotes, false);
 });
+
+test('a dungeon records what turned you back', () => {
+  let state = marked('F2', 'dungeon');
+  for (const block of ['ladder', 'key']) {
+    state = reduce(state, { type: 'toggleDungeonBlock', screen: 'F2', block });
+  }
+  // Sorted, so two dungeons blocked the same way serialise identically.
+  assert.deepEqual(state.screenNotes['F2']?.blocks, ['key', 'ladder']);
+
+  state = reduce(state, { type: 'toggleDungeonBlock', screen: 'F2', block: 'key' });
+  assert.deepEqual(state.screenNotes['F2']?.blocks, ['ladder']);
+});
+
+test('blockers alone are enough to keep a note', () => {
+  // A dungeon you found but have not identified still needs its blockers kept.
+  const state = reduce(marked('F2', 'dungeon'), {
+    type: 'toggleDungeonBlock',
+    screen: 'F2',
+    block: 'bomb',
+  });
+  assert.equal(state.screenNotes['F2']?.dungeon, 0);
+  assert.deepEqual(state.screenNotes['F2']?.blocks, ['bomb']);
+});
+
+test('clearMap wipes the map and nothing else', () => {
+  /*
+   * The distinction that matters: a run ends with most of 128 screens marked
+   * and none of it carries to the next seed, but items and Triforce pieces have
+   * their own controls. Taking those too would make this a second Reset.
+   */
+  let state = marked('A1', 'dungeon');
+  state = reduce(state, { type: 'setScreenNote', screen: 'A1', patch: { dungeon: 4 } });
+  state = reduce(state, { type: 'setMark', screen: 'B2', mark: 'visited' });
+  state = reduce(state, { type: 'setItem', id: 'bow', value: 1 });
+  state = reduce(state, { type: 'setDungeon', level: 1, patch: { triforce: true } });
+
+  const cleared = reduce(state, { type: 'clearMap' });
+  assert.deepEqual(cleared.marks, {});
+  assert.deepEqual(cleared.screenNotes, {});
+  assert.equal(cleared.items['bow'], 1, 'items untouched');
+  assert.equal(cleared.dungeons['1']?.triforce, true, 'Triforce untouched');
+  assert.equal(cleared.seed.seed, state.seed.seed, 'seed untouched');
+});
+
+test('clearMap on an empty map is a no-op', () => {
+  // No `rev` bump, or every peer window takes a pointless sync round.
+  const state = createInitialState();
+  assert.equal(reduce(state, { type: 'clearMap' }), state);
+});
+
+test('migrate drops blockers it does not recognise', () => {
+  const save = saveWith({
+    marks: { A1: 'dungeon' },
+    screenNotes: { A1: { dungeon: 1, shop: [], blocks: ['ladder', 'nonsense'], spot: '', item: '' } },
+  });
+  const state = migrate(save);
+  assert.ok(state);
+  assert.deepEqual(state.screenNotes['A1']?.blocks, ['ladder']);
+});

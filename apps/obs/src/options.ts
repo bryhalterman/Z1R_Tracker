@@ -26,21 +26,27 @@ import type { TrackerSection } from '@z1r/ui';
  * mid-run. It renders in the compact layout because a dock is narrow, not
  * because anything is left out.
  *
- * The overworld map is *not* here. It wants to be large and to stay put, and
- * sharing this column meant it was either squeezed narrow or reached by
- * scrolling past everything else. It has `map.html` to itself, docked wherever
- * there is room, sharing this store through localStorage and a BroadcastChannel.
+ * The overworld map is *not* here, and neither is the hint log. The map wants to
+ * be large and to stay put, and a hint's whole payoff is the screens it lights
+ * up on that map — reading one here meant looking away from the answer. Both
+ * live in `map.html`, sharing this store through localStorage and a
+ * BroadcastChannel.
  */
 export const DOCK_SECTIONS: readonly TrackerSection[] = [
   'seed',
   'items',
   'dungeons',
   'locations',
-  'hintlog',
 ];
 
-/** The standalone map dock: one panel, given the whole window. */
-export const MAP_SECTIONS: readonly TrackerSection[] = ['map'];
+/**
+ * The map dock: the overworld, and the hints that point at it.
+ *
+ * A hint names a region and its whole payoff is the screens lighting up, so
+ * reading one on a different window from the map it highlights meant looking
+ * away from the answer to type the question. They travel together.
+ */
+export const MAP_SECTIONS: readonly TrackerSection[] = ['hintlog', 'map'];
 
 /**
  * What the overlay shows unless asked otherwise.

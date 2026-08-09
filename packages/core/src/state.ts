@@ -12,7 +12,7 @@ import { DUNGEONS, holdsTriforcePiece } from './dungeons.js';
 import { cycleMark, type MarkKind } from './overworld.js';
 import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 
-export const STATE_VERSION = 7;
+export const STATE_VERSION = 8;
 
 /** Upper bound on manual extra floor slots. Shared with `migrate` on purpose. */
 export const MAX_EXTRA_FLOOR_SLOTS = 8;
@@ -66,6 +66,8 @@ export interface ScreenNote {
   dungeon: number;
   /** `ShopStockDef` ids seen for sale here. */
   shop: string[];
+  /** `DungeonBlockDef` ids: what turned you back last time you went in. */
+  blocks: string[];
   /**
    * Which named overworld spot this is — `ow.whiteSword`, `ow.armos`,
    * `ow.coast`. Empty when the screen holds an item that is not one of them.
@@ -127,6 +129,10 @@ export type Action =
   | { type: 'setScreenNote'; screen: string; patch: Partial<ScreenNote> }
   /** Add or remove one stock entry without resending the whole list. */
   | { type: 'toggleShopStock'; screen: string; stock: string }
+  /** Same, for what is blocking progress inside a dungeon. */
+  | { type: 'toggleDungeonBlock'; screen: string; block: string }
+  /** Wipe every overworld mark, leaving items and Triforce alone. */
+  | { type: 'clearMap' }
   | { type: 'setSeed'; patch: Partial<SeedSettings> }
   /** Record which pool entry sits at a location. Does not touch inventory. */
   | { type: 'setLocation'; id: string; item: string }
@@ -151,12 +157,18 @@ function emptyDungeon(): DungeonState {
 }
 
 function emptyNote(): ScreenNote {
-  return { dungeon: 0, shop: [], spot: '', item: '' };
+  return { dungeon: 0, shop: [], blocks: [], spot: '', item: '' };
 }
 
 /** True once a note carries nothing worth keeping. */
 function noteIsBare(note: ScreenNote): boolean {
-  return note.dungeon === 0 && note.shop.length === 0 && note.spot === '' && note.item === '';
+  return (
+    note.dungeon === 0 &&
+    note.shop.length === 0 &&
+    note.blocks.length === 0 &&
+    note.spot === '' &&
+    note.item === ''
+  );
 }
 
 /**
@@ -281,6 +293,30 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       }
       return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
     }
+
+    case 'toggleDungeonBlock': {
+      const current = state.screenNotes[action.screen] ?? emptyNote();
+      const held = current.blocks.includes(action.block);
+      const next: ScreenNote = {
+        ...current,
+        blocks: held
+          ? current.blocks.filter((id) => id !== action.block)
+          : [...current.blocks, action.block].sort(),
+      };
+      return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
+    }
+
+    case 'clearMap':
+      /*
+       * Deliberately only the map. A run ends with most of 128 screens marked
+       * and none of it is worth carrying into the next seed, but the items and
+       * Triforce have their own controls — wiping those here would make this a
+       * second Reset wearing a friendlier label.
+       */
+      if (Object.keys(state.marks).length === 0 && Object.keys(state.screenNotes).length === 0) {
+        return state;
+      }
+      return bump({ marks: {}, screenNotes: {} });
 
     case 'toggleShopStock': {
       const current = state.screenNotes[action.screen] ?? emptyNote();

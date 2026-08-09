@@ -1726,3 +1726,16 @@
 .z1r-panel[data-collapsed="true"] > .z1r-panel-title {
   margin-block-end: 0;
 }
+
+/*
+ * Clearing the map is destructive, so it does not sit flush against the
+ * Regions toggle where a misclick could reach it.
+ */
+.z1r-map-clear {
+  margin-inline-start: auto;
+}
+
+.z1r-map-clear:hover {
+  border-color: var(--z1r-heart);
+  color: var(--z1r-text);
+}

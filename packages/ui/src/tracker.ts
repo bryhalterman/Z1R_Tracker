@@ -12,6 +12,8 @@ import {
   safeStorage,
   COAST_ITEM_REQUIRES,
   COAST_SPOT_ID,
+  DUNGEON_BLOCKS,
+  DUNGEON_BLOCKS_BY_ID,
   DUNGEONS,
   OVERWORLD_LOCATIONS,
   MARKS,
@@ -503,6 +505,33 @@ function buildMap(
   heading?.append(regionToggle);
 
   /*
+   * Clear every mark in one go.
+   *
+   * A finished run leaves most of 128 screens marked and none of it carries
+   * into the next seed. Unmarking them by hand is a chore nobody does, so the
+   * map ends up starting a seed with the last one still on it.
+   *
+   * Confirmed, because it is a lot of work to lose to a misclick, and scoped to
+   * the map alone — items and the Triforce have their own controls, and wiping
+   * those here would make this a second Reset wearing a friendlier label.
+   */
+  if (interactive) {
+    const clear = el('button', 'z1r-chip-button z1r-map-clear', 'Clear');
+    clear.type = 'button';
+    clear.title = 'Remove every mark from the map. Items and Triforce are untouched.';
+    clear.addEventListener('click', () => {
+      const state = store.getState();
+      const marked = Object.keys(state.marks).length;
+      if (marked === 0) return;
+      const ok = globalThis.confirm?.(
+        `Clear all ${marked} marked screens? Items and Triforce are not affected.`,
+      );
+      if (ok !== false) store.dispatch({ type: 'clearMap' });
+    });
+    heading?.append(clear);
+  }
+
+  /*
    * Each cell shows its own screen from the real overworld map.
    *
    * The map is 1280x468 with a legend strip below y=440, so the map proper is
@@ -538,6 +567,7 @@ function buildMap(
   let brushSpot = '';
   let brushItem = '';
   const brushStock = new Set<string>();
+  const brushBlocks = new Set<string>();
 
   const kindRow = el('div', 'z1r-tool-row z1r-tool-kinds');
   toolbar.append(kindRow);
@@ -568,6 +598,9 @@ function buildMap(
     }
     for (const button of stockButtons) {
       button.dataset.active = String(brushStock.has(button.dataset.stock ?? ''));
+    }
+    for (const button of blockButtons) {
+      button.dataset.active = String(brushBlocks.has(button.dataset.block ?? ''));
     }
     if (document.activeElement !== spotSelect) spotSelect.value = brushSpot;
     if (document.activeElement !== itemSelect) itemSelect.value = brushItem;
@@ -614,6 +647,32 @@ function buildMap(
     });
     levelButtons.push(button);
     levelRow.append(button);
+  }
+
+  /*
+   * What turned you back last time.
+   *
+   * The question this answers is "can I finish that one yet?", asked from the
+   * overworld with a new item in hand — and without it the only way to find out
+   * is to walk back in. Same row as the level, because you learn both on the
+   * same trip.
+   */
+  const blockRow = detailRow('dungeon', 'Blocked by');
+  const blockButtons: HTMLButtonElement[] = [];
+  for (const block of DUNGEON_BLOCKS) {
+    const button = el('button', 'z1r-mark-stock-option');
+    button.type = 'button';
+    button.dataset.block = block.id;
+    button.title = block.name;
+    button.setAttribute('aria-label', block.name);
+    button.append(createSprite(resolver, block.sprite, { size: 18, label: block.name }));
+    button.addEventListener('click', () => {
+      if (brushBlocks.has(block.id)) brushBlocks.delete(block.id);
+      else brushBlocks.add(block.id);
+      syncToolbar();
+    });
+    blockButtons.push(button);
+    blockRow.append(button);
   }
 
   /* What the shop sells. Multi-select, since most sell more than one thing. */
@@ -682,7 +741,11 @@ function buildMap(
   const paint = (screen: string) => {
     store.dispatch({ type: 'setMark', screen, mark: brush });
     if (brush === 'dungeon') {
-      store.dispatch({ type: 'setScreenNote', screen, patch: { dungeon: brushLevel } });
+      store.dispatch({
+        type: 'setScreenNote',
+        screen,
+        patch: { dungeon: brushLevel, blocks: [...brushBlocks].sort() },
+      });
     } else if (brush === 'shop') {
       // Sent whole rather than toggled, so a screen ends up with exactly what
       // the toolbar shows rather than the difference from what was there.
@@ -786,14 +849,28 @@ function buildMap(
       patches.push((state) => {
         const mark = state.marks[id] ?? 'none';
         const def = MARKS_BY_KIND.get(mark);
-        renderedMark = memoise(renderedMark, mark, () => {
+        const note = state.screenNotes[id];
+
+        /*
+         * An item screen draws the item, not a generic star.
+         *
+         * Once you know what is sitting there, the star is telling you nothing
+         * you did not already know from the screen being marked at all — and
+         * the map is read at a glance, where a sword reads faster than "SW".
+         */
+        const held = mark === 'item' && note?.item ? POOL_BY_ID.get(note.item) : undefined;
+        const markKey = `${mark}|${held?.sprite ?? ''}`;
+        renderedMark = memoise(renderedMark, markKey, () => {
           cell.dataset.mark = mark;
           cell.style.setProperty('--mark-color', def?.color ?? 'transparent');
-          if (!def?.sprite) slot.replaceChildren();
-          else slot.replaceChildren(createSprite(resolver, def.sprite, { size: 18, label: def.name }));
+          const sprite = held?.sprite ?? def?.sprite;
+          if (!sprite) slot.replaceChildren();
+          else {
+            slot.replaceChildren(
+              createSprite(resolver, sprite, { size: 18, label: held?.name ?? def?.name }),
+            );
+          }
         });
-
-        const note = state.screenNotes[id];
         const isCoast = note?.spot === COAST_SPOT_ID;
         // The coast ledge is reachable the moment the Ladder is in hand — and
         // that is exactly when you have forgotten it is there.
@@ -818,7 +895,14 @@ function buildMap(
           cell.dataset.ready = String(level9Ready);
 
           if (mark === 'dungeon') {
-            detail.textContent = note?.dungeon ? String(note.dungeon) : '?';
+            // Level first, then what is stopping you — the two facts you want
+            // before deciding whether this one is worth the walk.
+            const level = note?.dungeon ? String(note.dungeon) : '?';
+            const blocked = (note?.blocks ?? [])
+              .map((id) => DUNGEON_BLOCKS_BY_ID.get(id)?.code ?? '')
+              .filter(Boolean)
+              .join(' ');
+            detail.textContent = blocked ? `${level} ${blocked}` : level;
           } else if (mark === 'shop' && note?.shop.length) {
             detail.textContent = note.shop
               .map((stock) => SHOP_STOCK_BY_ID.get(stock)?.code ?? '')
@@ -830,11 +914,17 @@ function buildMap(
              * the map for; that it is the White Sword cave is in the tooltip
              * and rarely what you need at a glance.
              */
-            const held = note?.item ? POOL_BY_ID.get(note.item)?.name : '';
+            /*
+             * The sprite above already says *what* it is, so the label says
+             * *where*: "CO" under a boomerang is the coast item, which is the
+             * pair you are actually scanning for. Falls back to the item when
+             * the spot is unnamed, and to a bare `?` when neither is known yet.
+             */
             const spot = note?.spot
               ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label
               : '';
-            detail.textContent = shortCode(held) || shortCode(spot) || '?';
+            const itemName = note?.item ? POOL_BY_ID.get(note.item)?.name : '';
+            detail.textContent = shortCode(spot) || shortCode(itemName) || '?';
           } else {
             // `visited` says everything in its icon — a screen with nothing on
             // it needs no label, and the map is mostly these by the end.
@@ -856,6 +946,9 @@ function buildMap(
         if (region) parts.push(region.name);
         if (mark === 'dungeon') {
           parts.push(note?.dungeon ? `Level ${note.dungeon}` : 'Dungeon (unidentified)');
+          const blocked = (note?.blocks ?? [])
+            .map((blockId) => DUNGEON_BLOCKS_BY_ID.get(blockId)?.name ?? blockId);
+          if (blocked.length) parts.push(`blocked by ${blocked.join(', ')}`);
           if (level9Ready) parts.push('every Triforce piece held — Level 9 is open');
         } else if (mark === 'shop') {
           const stock = note?.shop.map((s) => SHOP_STOCK_BY_ID.get(s)?.name ?? s) ?? [];
