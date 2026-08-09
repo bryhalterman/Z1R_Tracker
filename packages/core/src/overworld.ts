@@ -34,7 +34,14 @@ export function allScreenIds(): string[] {
  * order on left-click and backwards on right-click, which is how every
  * randomizer tracker people already use behaves.
  */
-export type MarkKind = 'none' | 'dungeon' | 'shop' | 'item' | 'visited';
+export type MarkKind =
+  | 'none'
+  | 'dungeon'
+  | 'shop'
+  | 'item'
+  | 'gamble'
+  | 'hintroom'
+  | 'visited';
 
 export interface MarkDef {
   readonly kind: MarkKind;
@@ -60,6 +67,11 @@ export const MARKS: readonly MarkDef[] = [
   { kind: 'dungeon', name: 'Dungeon', sprite: 'mark.dungeon', color: '#c34a4a' },
   { kind: 'shop', name: 'Shop', sprite: 'mark.shop', color: '#3f8fd0' },
   { kind: 'item', name: 'Item', sprite: 'mark.item', color: '#d9a441' },
+  // The other two things a cave can be. Both are worth a second visit — a
+  // gambling room once the rupees are spare, a hint room the moment you have
+  // forgotten what it said — and neither is an item, a shop or a dead end.
+  { kind: 'gamble', name: 'Gambling', sprite: 'mark.gamble', color: '#4bb572' },
+  { kind: 'hintroom', name: 'Hint room', sprite: 'mark.hintroom', color: '#9b7fd4' },
   // "Been here, nothing to come back for" is as worth recording as a find —
   // without it every unmarked screen is ambiguous between unchecked and empty,
   // which is most of the map for most of a run.

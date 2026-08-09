@@ -3,18 +3,20 @@ import { test } from 'node:test';
 
 import { migrate } from './persistence.js';
 import { createInitialState, reduce, type TrackerState } from './state.js';
-import { MARKS_BY_KIND } from './overworld.js';
+import { MARKS, MARKS_BY_KIND, type MarkKind } from './overworld.js';
+import { VECTORS } from './sprites/vectors.js';
+import { bundledManifest } from './index.js';
 
 import { COAST_SPOT_ID } from './overworld.js';
 
-function marked(screen: string, mark: 'dungeon' | 'shop' | 'item' | 'visited'): TrackerState {
+function marked(screen: string, mark: MarkKind): TrackerState {
   return reduce(createInitialState(), { type: 'setMark', screen, mark });
 }
 
 test('the mark kinds are the ones the toolbar offers', () => {
   assert.deepEqual(
     [...MARKS_BY_KIND.keys()].sort(),
-    ['dungeon', 'item', 'none', 'shop', 'visited'],
+    ['dungeon', 'gamble', 'hintroom', 'item', 'none', 'shop', 'visited'],
   );
 });
 
@@ -208,4 +210,27 @@ test('migrate drops blockers it does not recognise', () => {
   const state = migrate(save);
   assert.ok(state);
   assert.deepEqual(state.screenNotes['A1']?.blocks, ['ladder']);
+});
+
+test('a gambling or hint room needs no detail to stick', () => {
+  // Like `visited`, the mark is the whole content — these must not be pruned
+  // away for having an empty note.
+  for (const kind of ['gamble', 'hintroom'] as const) {
+    const state = marked('G5', kind);
+    assert.equal(state.marks['G5'], kind, kind);
+  }
+});
+
+test('every mark kind has art and a name', () => {
+  /*
+   * The toolbar is icons only now, so a kind without a sprite renders as a
+   * lettered glyph among drawn shapes — which reads as a broken button rather
+   * than a marker.
+   */
+  for (const mark of MARKS) {
+    assert.ok(mark.name, `${mark.kind} has a name`);
+    if (mark.kind === 'none') continue;
+    assert.ok(mark.sprite, `${mark.kind} has a sprite key`);
+    assert.ok(VECTORS[mark.sprite!] || bundledManifest.sprites[mark.sprite!], `${mark.kind} resolves`);
+  }
 });

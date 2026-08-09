@@ -72,6 +72,31 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
         fill="#d9a441" stroke="#6d4d10" stroke-width="1" stroke-linejoin="round"/>`,
   ),
 
+  /*
+   * The money-making game. A rupee, because that is what the room is.
+   *
+   * Drawn as the NES rupee's flattened hexagon rather than a coin, so it does
+   * not read as the shop's awning at a glance — the two are next to each other
+   * in the toolbar and both are "a cave that wants your money".
+   */
+  'mark.gamble': V(
+    `<path d="M8 1.6 L12.6 5.2 L12.6 10.8 L8 14.4 L3.4 10.8 L3.4 5.2 Z"
+        fill="#4bb572" stroke="#1d5433" stroke-width="1" stroke-linejoin="round"/>
+     <path d="M8 4.4 L10.4 6.2 L10.4 9.8 L8 11.6 L5.6 9.8 L5.6 6.2 Z" fill="#a8e6c1"/>`,
+  ),
+
+  /*
+   * The old man with something to tell you. A speech bubble rather than a
+   * figure: at 18px a person is an indistinct blob, whereas a bubble with a
+   * tail reads immediately and says "there are words here".
+   */
+  'mark.hintroom': V(
+    `<path d="M2 3 L14 3 L14 11 L8.6 11 L5.4 14 L5.4 11 L2 11 Z"
+        fill="#9b7fd4" stroke="#3f2d63" stroke-width="1" stroke-linejoin="round"/>
+     <rect x="4.4" y="5.6" width="7.2" height="1.2" fill="#efe8ff"/>
+     <rect x="4.4" y="8" width="4.8" height="1.2" fill="#efe8ff"/>`,
+  ),
+
   'mark.bombable': V(
     `<circle cx="7.5" cy="10" r="4.6" fill="#8e8e8e" stroke="#3d3d3d" stroke-width="1"/>
      <path d="M10.4 6 L12.4 3.6" stroke="#6b5432" stroke-width="1.5" stroke-linecap="round" fill="none"/>
