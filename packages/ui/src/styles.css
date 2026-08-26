@@ -1816,3 +1816,65 @@
 .z1r-map[data-armed="true"] .z1r-screen {
   cursor: copy;
 }
+
+/* ------------------------------------------------ dungeon numeral + badge */
+
+/*
+ * A dungeon's level, drawn large on the left of the cell.
+ *
+ * This replaces the cave icon, which was identical on all nine and so spent the
+ * middle of the cell saying "a dungeon" — something the numeral says anyway.
+ * Left-aligned to leave the right for the item badge, so the pair reads as
+ * "Level 5, holds the Raft" without either crowding the other.
+ *
+ * Outlined rather than plated: the terrain behind ranges from near-white sand to
+ * near-black cave mouths, and an outline is the only treatment that holds across
+ * all of it.
+ */
+.z1r-screen-level {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 3px;
+  translate: 0 -50%;
+  z-index: 2;
+  font-size: calc(var(--map-cell-height, 40px) * 0.6);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--z1r-text);
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000,
+    1px 1px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
+}
+
+.z1r-screen-level:empty {
+  display: none;
+}
+
+/*
+ * What the level is known to hold, from the item locations.
+ *
+ * Top-right, clear of both the numeral and the blocker codes along the bottom.
+ * A dark disc behind it for the same reason the marks have one — the art
+ * underneath varies too much to rely on.
+ */
+.z1r-screen-badge {
+  position: absolute;
+  inset-block-start: 1px;
+  inset-inline-end: 1px;
+  z-index: 3;
+  display: flex;
+  padding: 1px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--z1r-bg) 80%, transparent);
+  pointer-events: none;
+}
+
+.z1r-screen-badge:empty {
+  display: none;
+}
+
+/* Armed, but waiting for a level before it can place anything. */
+.z1r-map-tools[data-waiting="true"] .z1r-tool-target {
+  color: var(--z1r-accent);
+}

@@ -9,6 +9,7 @@
 
 import {
   canEnterLevel9,
+  dungeonItems,
   safeStorage,
   COAST_ITEM_REQUIRES,
   COAST_SPOT_ID,
@@ -596,6 +597,8 @@ function buildMap(
    * flow rather than a switch: stamp, refine, stamp the next.
    */
   let armed: MarkKind | '' = '';
+  /** Which level the armed Dungeon marker will place. 0 means none chosen. */
+  let armedLevel = 0;
 
   const highlightSelection = () => {
     for (const cell of body.querySelectorAll<HTMLElement>('.z1r-screen')) {
@@ -617,7 +620,16 @@ function buildMap(
       selectScreen(screen);
       return;
     }
-    store.dispatch({ type: 'setMark', screen, mark: armed });
+    // A dungeon needs its number first. You learn which level it is by walking
+    // into it, so by the time you are marking one you know — and an unnumbered
+    // dungeon marker is a note to yourself that says nothing useful.
+    if (armed === 'dungeon' && !armedLevel) return;
+
+    if (armed === 'dungeon') {
+      store.dispatch({ type: 'placeDungeon', screen, level: armedLevel });
+    } else {
+      store.dispatch({ type: 'setMark', screen, mark: armed });
+    }
     // Selected, not toggled — clicking an already-selected tile while armed
     // should re-stamp it, not drop the selection out from under the detail rows.
     selected = screen;
@@ -627,6 +639,7 @@ function buildMap(
 
   const setArmed = (kind: MarkKind | '') => {
     armed = kind;
+    if (kind !== 'dungeon') armedLevel = 0;
     body.dataset.armed = String(!!armed);
     syncToolbar(store.getState());
   };
@@ -663,9 +676,15 @@ function buildMap(
 
     toolbar.dataset.active = String(!!selected || !!armed);
     const armedName = armed ? MARKS_BY_KIND.get(armed)?.name : '';
-    target.textContent = armed
-      ? `Placing ${armedName}`
-      : selected || 'Pick a screen';
+    const needsLevel = armed === 'dungeon' && !armedLevel;
+    // Says what the next click does, in the order the toolbar reads: pick the
+    // marker, pick the level, then place it.
+    target.textContent = needsLevel
+      ? 'Pick a level'
+      : armed
+        ? `Placing ${armed === 'dungeon' ? `Level ${armedLevel}` : armedName}`
+        : selected || 'Pick a screen';
+    toolbar.dataset.waiting = String(needsLevel);
 
     for (const button of kindButtons) {
       const kind = button.dataset.mark as MarkKind;
@@ -683,11 +702,17 @@ function buildMap(
       // is how a palette is supposed to work.
       button.disabled = false;
     }
-    for (const { row, forKind } of detailRows) row.hidden = !selected || forKind !== mark;
-    for (const control of [spotSelect, itemSelect]) control.disabled = !selected;
+    // Shown for whichever the toolbar is describing: the marker being armed, or
+    // the tile being edited.
+    const showing = armed || (selected ? mark : '');
+    for (const { row, forKind } of detailRows) row.hidden = forKind !== showing;
+    for (const control of [spotSelect, itemSelect]) control.disabled = !selected && !armed;
 
     for (const button of levelButtons) {
-      button.dataset.active = String(Number(button.dataset.level) === (note?.dungeon ?? 0));
+      // While arming, the buttons show what is about to be placed; otherwise
+      // they show what the selected tile already is.
+      const shown = armed === 'dungeon' ? armedLevel : (note?.dungeon ?? 0);
+      button.dataset.active = String(Number(button.dataset.level) === shown);
     }
     for (const button of stockButtons) {
       button.dataset.active = String(!!note?.shop.includes(button.dataset.stock ?? ''));
@@ -721,24 +746,42 @@ function buildMap(
         : `Place ${mark.name}. Click again to stop.`;
     button.setAttribute('aria-label', button.title);
     button.addEventListener('click', () => {
-      // Applies to the tile in hand *and* arms for the next ones, so the same
-      // click serves "fix this one" and "now do a dozen".
-      if (selected) store.dispatch({ type: 'setMark', screen: selected, mark: mark.kind });
+      /*
+       * Arming only. This used to also stamp the selected tile, which made the
+       * button do two different things depending on invisible state and was
+       * impossible to explain. One job: choose what you are about to place.
+       */
       setArmed(armed === mark.kind ? '' : mark.kind);
     });
     kindButtons.push(button);
     kindRow.append(button);
   }
 
-  /* Which dungeon this is. `?` is found-but-unidentified, a real state. */
+  /*
+   * Which level this is. 1-9 only.
+   *
+   * There used to be a `?` for "found but not identified". There is no such
+   * state in practice: the level number is painted on the wall of the entrance,
+   * so anyone marking a dungeon already knows which one it is.
+   */
   const levelRow = detailRow('dungeon', 'Level');
   const levelButtons: HTMLButtonElement[] = [];
-  for (const level of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
-    const button = el('button', 'z1r-mark-level', level === 0 ? '?' : String(level));
+  for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    const button = el('button', 'z1r-mark-level', String(level));
     button.type = 'button';
     button.dataset.level = String(level);
-    button.title = level === 0 ? 'Found, not yet identified' : `Level ${level}`;
-    button.addEventListener('click', () => patchSelected({ dungeon: level }));
+    button.title = `Level ${level}`;
+    button.addEventListener('click', () => {
+      if (armed === 'dungeon') {
+        // Arming half of the flow: marker, then number, then click the map.
+        armedLevel = armedLevel === level ? 0 : level;
+        syncToolbar(store.getState());
+        return;
+      }
+      // Editing a tile already on the map. Goes through `placeDungeon` too, so
+      // renumbering one still moves the level off wherever it used to be.
+      if (selected) store.dispatch({ type: 'placeDungeon', screen: selected, level });
+    });
     levelButtons.push(button);
     levelRow.append(button);
   }
@@ -908,7 +951,18 @@ function buildMap(
       // as two-letter tags. Both are text, so they survive being shrunk into a
       // dock and read without depending on colour.
       const detail = el('span', 'z1r-screen-detail');
-      cell.append(terrain, code, slot, detail);
+      /*
+       * A dungeon draws its level as a large numeral instead of an icon.
+       *
+       * The cave icon was the same on all nine and told you only "a dungeon",
+       * which the numeral says too — so it was spending the middle of the cell
+       * to repeat itself. The number sits left, leaving the right free for the
+       * item badge, and the pair reads as "Level 5, holds the Raft" at a glance.
+       */
+      const numeral = el('span', 'z1r-screen-level');
+      // What is known to be inside, from the location slots — see `dungeonItems`.
+      const badge = el('span', 'z1r-screen-badge');
+      cell.append(terrain, code, slot, numeral, badge, detail);
 
       let renderedMap: string | null = null;
       patches.push(() => {
@@ -938,17 +992,37 @@ function buildMap(
          * the map is read at a glance, where a sword reads faster than "SW".
          */
         const held = mark === 'item' && note?.item ? POOL_BY_ID.get(note.item) : undefined;
-        const markKey = `${mark}|${held?.sprite ?? ''}`;
+        /*
+         * Whatever the location slots say is in this level. Learned from a hint
+         * before the dungeon is found, or from walking in without one — either
+         * way it shows here, because the two are joined by level number rather
+         * than by which was recorded first.
+         */
+        const inside =
+          mark === 'dungeon' && note?.dungeon
+            ? dungeonItems(state, note.dungeon).map((id) => POOL_BY_ID.get(id)).filter(Boolean)
+            : [];
+
+        const markKey = `${mark}|${held?.sprite ?? ''}|${inside.map((e) => e!.sprite).join(',')}|${note?.dungeon ?? 0}`;
         renderedMark = memoise(renderedMark, markKey, () => {
           cell.dataset.mark = mark;
           cell.style.setProperty('--mark-color', def?.color ?? 'transparent');
-          const sprite = held?.sprite ?? def?.sprite;
+
+          // A dungeon is its number; every other mark is its icon.
+          numeral.textContent = mark === 'dungeon' && note?.dungeon ? String(note.dungeon) : '';
+          const sprite = mark === 'dungeon' ? undefined : (held?.sprite ?? def?.sprite);
           if (!sprite) slot.replaceChildren();
           else {
             slot.replaceChildren(
               createSprite(resolver, sprite, { size: 18, label: held?.name ?? def?.name }),
             );
           }
+
+          // Only the first: two icons in a 70px cell is a smudge, and the rest
+          // are in the tooltip and the Locations panel.
+          const first = inside[0];
+          if (!first) badge.replaceChildren();
+          else badge.replaceChildren(createSprite(resolver, first.sprite, { size: 16, label: first.name }));
         });
         const isCoast = note?.spot === COAST_SPOT_ID;
         // The coast ledge is reachable the moment the Ladder is in hand — and
@@ -961,6 +1035,7 @@ function buildMap(
         const detailKey = [
           mark,
           note?.dungeon ?? 0,
+          inside.map((entry) => entry!.id).join(','),
           note?.shop.join('') ?? '',
           // Every field the label is built from has to be in this key. Leaving
           // `blocks` out meant a dungeon's tags showed up in the tooltip and
@@ -978,14 +1053,12 @@ function buildMap(
           cell.dataset.ready = String(level9Ready);
 
           if (mark === 'dungeon') {
-            // Level first, then what is stopping you — the two facts you want
-            // before deciding whether this one is worth the walk.
-            const level = note?.dungeon ? String(note.dungeon) : '?';
-            const blocked = (note?.blocks ?? [])
+            // Just the blockers now — the numeral carries the level, so
+            // repeating it here would cost the width the codes need.
+            detail.textContent = (note?.blocks ?? [])
               .map((id) => DUNGEON_BLOCKS_BY_ID.get(id)?.code ?? '')
               .filter(Boolean)
               .join(' ');
-            detail.textContent = blocked ? `${level} ${blocked}` : level;
           } else if (mark === 'shop' && note?.shop.length) {
             detail.textContent = note.shop
               .map((stock) => SHOP_STOCK_BY_ID.get(stock)?.code ?? '')
@@ -1029,6 +1102,7 @@ function buildMap(
         if (region) parts.push(region.name);
         if (mark === 'dungeon') {
           parts.push(note?.dungeon ? `Level ${note.dungeon}` : 'Dungeon (unidentified)');
+          if (inside.length) parts.push(`holds ${inside.map((entry) => entry!.name).join(', ')}`);
           const blocked = (note?.blocks ?? [])
             .map((blockId) => DUNGEON_BLOCKS_BY_ID.get(blockId)?.name ?? blockId);
           if (blocked.length) parts.push(`blocked by ${blocked.join(', ')}`);

@@ -131,6 +131,11 @@ export type Action =
   | { type: 'toggleShopStock'; screen: string; stock: string }
   /** Same, for what is blocking progress inside a dungeon. */
   | { type: 'toggleDungeonBlock'; screen: string; block: string }
+  /**
+   * Put Level N on a screen. There is only one of each, so this moves it if it
+   * was already somewhere, rather than leaving two.
+   */
+  | { type: 'placeDungeon'; screen: string; level: number }
   /** Wipe every overworld mark, leaving items and Triforce alone. */
   | { type: 'clearMap' }
   | { type: 'setSeed'; patch: Partial<SeedSettings> }
@@ -292,6 +297,38 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         next.dungeon = Number.isInteger(next.dungeon) ? Math.min(Math.max(next.dungeon, 0), 9) : 0;
       }
       return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
+    }
+
+    case 'placeDungeon': {
+      const level = Math.min(Math.max(Math.trunc(action.level) || 0, 1), 9);
+      const marks = { ...state.marks };
+      const screenNotes = { ...state.screenNotes };
+
+      /*
+       * A level exists once. Marking it somewhere new means the old spot was
+       * wrong, so the marker moves rather than duplicating — two screens both
+       * claiming Level 3 is worse than no marker at all, because you cannot
+       * tell which one to walk to.
+       *
+       * The note travels with it. Blockers belong to the dungeon, not to the
+       * square of grass it was mistakenly pinned on.
+       */
+      let carried: ScreenNote | undefined;
+      for (const [screen, note] of Object.entries(screenNotes)) {
+        if (screen === action.screen || note.dungeon !== level) continue;
+        carried = note;
+        delete screenNotes[screen];
+        delete marks[screen];
+      }
+
+      marks[action.screen] = 'dungeon';
+      screenNotes[action.screen] = {
+        ...emptyNote(),
+        ...carried,
+        ...screenNotes[action.screen],
+        dungeon: level,
+      };
+      return bump({ marks, screenNotes });
     }
 
     case 'toggleDungeonBlock': {

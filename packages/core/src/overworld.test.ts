@@ -234,3 +234,44 @@ test('every mark kind has art and a name', () => {
     assert.ok(VECTORS[mark.sprite!] || bundledManifest.sprites[mark.sprite!], `${mark.kind} resolves`);
   }
 });
+
+test('a level exists in exactly one place', () => {
+  /*
+   * Two screens both claiming Level 3 is worse than none, because you cannot
+   * tell which to walk to. Marking it somewhere new means the old spot was
+   * wrong, so it moves.
+   */
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 3 });
+
+  assert.equal('A1' in state.marks, false, 'old screen cleared');
+  assert.equal(state.marks['H8'], 'dungeon');
+  assert.equal(state.screenNotes['H8']?.dungeon, 3);
+  assert.equal(
+    Object.values(state.screenNotes).filter((n) => n.dungeon === 3).length,
+    1,
+    'exactly one screen holds level 3',
+  );
+});
+
+test('a dungeon carries its blockers when it moves', () => {
+  // Blockers belong to the dungeon, not to the square of grass it was
+  // mistakenly pinned on.
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  state = reduce(state, { type: 'toggleDungeonBlock', screen: 'A1', block: 'ladder' });
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 3 });
+
+  assert.deepEqual(state.screenNotes['H8']?.blocks, ['ladder']);
+  assert.equal('A1' in state.screenNotes, false);
+});
+
+test('placeDungeon clamps to a real level', () => {
+  for (const [input, expected] of [[0, 1], [12, 9], [-4, 1]] as const) {
+    const state = reduce(createInitialState(), {
+      type: 'placeDungeon',
+      screen: 'A1',
+      level: input,
+    });
+    assert.equal(state.screenNotes['A1']?.dungeon, expected, `level ${input}`);
+  }
+});

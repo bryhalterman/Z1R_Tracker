@@ -13,6 +13,7 @@
 import type { TrackerState } from './state.js';
 import { triforceCount } from './state.js';
 import { TRIFORCE_REQUIRED_FOR_L9 } from './dungeons.js';
+import { deriveLocations } from './seed.js';
 
 /** Level 9's entrance stays shut until every Triforce piece is in hand. */
 export function canEnterLevel9(state: TrackerState): boolean {
@@ -37,4 +38,24 @@ export function canBeatGanon(state: TrackerState): boolean {
     (state.items['bow'] ?? 0) >= 1 &&
     (state.items['arrow'] ?? 0) >= SILVER_ARROW_STAGE
   );
+}
+
+/**
+ * Pool ids known to be inside a level.
+ *
+ * The map marks *where* a dungeon is; the location slots record *what is in
+ * it*. Those are learned in either order — a hint names the contents of a level
+ * you have not found, and you walk into levels whose contents you have not
+ * heard about — so neither can be the place both facts live. Joining them by
+ * level number lets the map show the item whichever way round it was learned.
+ *
+ * Heart Containers are excluded on purpose. Every level has one, so drawing it
+ * would put the same icon on nine screens and say nothing.
+ */
+export function dungeonItems(state: TrackerState, level: number): string[] {
+  if (!level) return [];
+  return deriveLocations(state.seed, state.extraFloorSlots)
+    .filter((location) => location.level === level && location.kind !== 'heart')
+    .map((location) => state.locations[location.id]?.item ?? '')
+    .filter((item): item is string => item !== '');
 }

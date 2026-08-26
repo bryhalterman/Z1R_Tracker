@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
-import { canBeatGanon, canEnterLevel9 } from './logic.js';
+import { canBeatGanon, canEnterLevel9, dungeonItems } from './logic.js';
 import { createInitialState, type TrackerState } from './state.js';
 
 /**
@@ -58,4 +58,25 @@ test('canBeatGanon tolerates a save with no items recorded', () => {
   const state = stateWith(8);
   state.items = {};
   assert.equal(canBeatGanon(state), false);
+});
+
+test('dungeonItems joins the map to the location slots by level', () => {
+  /*
+   * The map records where a dungeon is; the slots record what is in it. They
+   * are learned in either order — a hint names the contents of a level you have
+   * not found, and you walk into levels nobody hinted about — so the join is by
+   * level number rather than by which was written first.
+   */
+  const state = createInitialState();
+  state.locations['d5.stair.0'] = { item: 'raft', collected: false };
+  assert.deepEqual(dungeonItems(state, 5), ['raft']);
+  assert.deepEqual(dungeonItems(state, 4), [], 'other levels unaffected');
+  assert.deepEqual(dungeonItems(state, 0), [], 'an unnumbered dungeon has nothing to look up');
+});
+
+test('dungeonItems ignores Heart Containers', () => {
+  // Every level has one, so drawing it would put the same icon on nine screens.
+  const state = createInitialState();
+  state.locations['d5.heart'] = { item: 'heart', collected: false };
+  assert.deepEqual(dungeonItems(state, 5), []);
 });
