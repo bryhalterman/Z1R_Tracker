@@ -1784,3 +1784,35 @@
   cursor: default;
   opacity: 0.5;
 }
+
+/* -------------------------------------------------------- armed marker */
+
+/*
+ * A marker that is armed: the next tile you click becomes this.
+ *
+ * Deliberately distinct from `[data-active]`, which means "the selected tile
+ * already is this". One says a click will change something, the other says it
+ * would not — conflating them would leave the toolbar unable to tell you which.
+ *
+ * Armed reads as a dashed ring plus a lifted background; active stays the solid
+ * fill. Two different shapes, so the difference is not the colour.
+ */
+.z1r-tool-mark[data-armed="true"] {
+  outline: 2px dashed var(--z1r-accent);
+  outline-offset: 2px;
+  background: var(--z1r-inset);
+  border-color: var(--z1r-accent);
+}
+
+/* Both at once — armed, and the selected tile already carries it. */
+.z1r-tool-mark[data-armed="true"][data-active="true"] {
+  background: var(--z1r-accent);
+}
+
+/*
+ * The cursor says the map is in stamping mode, on every cell at once. Cheaper
+ * to notice than a toolbar you are not looking at.
+ */
+.z1r-map[data-armed="true"] .z1r-screen {
+  cursor: copy;
+}

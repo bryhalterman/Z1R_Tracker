@@ -582,13 +582,52 @@ function buildMap(
    */
   let selected = '';
 
+  /*
+   * A marker can also be *armed*, which turns the toolbar into a palette.
+   *
+   * Two ways of working, because a run needs both. Sweeping a region and
+   * writing off a dozen dead ends wants a palette: arm the marker once, then
+   * click tiles. Coming back to one screen to say which level it was and what
+   * turned you back wants the opposite — pick the screen, then edit it.
+   *
+   * Arming does not take the editor away. A stamped tile is also selected, so
+   * the detail rows are already pointing at the tile you just marked and the
+   * level and blockers are right there. That is what makes the two modes one
+   * flow rather than a switch: stamp, refine, stamp the next.
+   */
+  let armed: MarkKind | '' = '';
+
+  const highlightSelection = () => {
+    for (const cell of body.querySelectorAll<HTMLElement>('.z1r-screen')) {
+      cell.dataset.selected = String(cell.dataset.screen === selected);
+    }
+  };
+
   const selectScreen = (screen: string) => {
     // Clicking the selected screen again lets go of it, so there is a way out
     // that is not "find somewhere harmless to click".
     selected = selected === screen ? '' : screen;
-    for (const cell of body.querySelectorAll<HTMLElement>('.z1r-screen')) {
-      cell.dataset.selected = String(cell.dataset.screen === selected);
+    highlightSelection();
+    syncToolbar(store.getState());
+  };
+
+  /** A tile click: stamp the armed marker if there is one, and edit the tile. */
+  const touchScreen = (screen: string) => {
+    if (!armed) {
+      selectScreen(screen);
+      return;
     }
+    store.dispatch({ type: 'setMark', screen, mark: armed });
+    // Selected, not toggled — clicking an already-selected tile while armed
+    // should re-stamp it, not drop the selection out from under the detail rows.
+    selected = screen;
+    highlightSelection();
+    syncToolbar(store.getState());
+  };
+
+  const setArmed = (kind: MarkKind | '') => {
+    armed = kind;
+    body.dataset.armed = String(!!armed);
     syncToolbar(store.getState());
   };
 
@@ -622,18 +661,30 @@ function buildMap(
     const mark = selected ? (state.marks[selected] ?? 'none') : 'none';
     const note = selected ? state.screenNotes[selected] : undefined;
 
-    toolbar.dataset.active = String(!!selected);
-    target.textContent = selected || 'Pick a screen';
+    toolbar.dataset.active = String(!!selected || !!armed);
+    const armedName = armed ? MARKS_BY_KIND.get(armed)?.name : '';
+    target.textContent = armed
+      ? `Placing ${armedName}`
+      : selected || 'Pick a screen';
 
     for (const button of kindButtons) {
-      const active = !!selected && button.dataset.mark === mark;
+      const kind = button.dataset.mark as MarkKind;
+      /*
+       * Two states, kept apart on purpose. `active` is "the selected tile is
+       * already this", `armed` is "the next tile you click becomes this".
+       * Conflating them would make the toolbar unable to say whether a click
+       * is about to change anything.
+       */
+      const active = !!selected && kind === mark;
       button.dataset.active = String(active);
-      button.setAttribute('aria-pressed', String(active));
-      // Disabled rather than hidden with nothing selected: the row is the map's
-      // legend as well as its editor, and it should not vanish when idle.
-      button.disabled = !selected;
+      button.dataset.armed = String(armed === kind);
+      button.setAttribute('aria-pressed', String(armed === kind || active));
+      // Never disabled now: with nothing selected the buttons still arm, which
+      // is how a palette is supposed to work.
+      button.disabled = false;
     }
     for (const { row, forKind } of detailRows) row.hidden = !selected || forKind !== mark;
+    for (const control of [spotSelect, itemSelect]) control.disabled = !selected;
 
     for (const button of levelButtons) {
       button.dataset.active = String(Number(button.dataset.level) === (note?.dungeon ?? 0));
@@ -664,11 +715,16 @@ function buildMap(
      * then only costs space. Selection is still shown by fill *and* by an
      * outline, so it is not carried by colour.
      */
-    button.title = mark.kind === 'none' ? 'Clear this screen' : `Mark as: ${mark.name}`;
+    button.title =
+      mark.kind === 'none'
+        ? 'Clear screens. Click again to stop.'
+        : `Place ${mark.name}. Click again to stop.`;
     button.setAttribute('aria-label', button.title);
     button.addEventListener('click', () => {
-      if (!selected) return;
-      store.dispatch({ type: 'setMark', screen: selected, mark: mark.kind });
+      // Applies to the tile in hand *and* arms for the next ones, so the same
+      // click serves "fix this one" and "now do a dozen".
+      if (selected) store.dispatch({ type: 'setMark', screen: selected, mark: mark.kind });
+      setArmed(armed === mark.kind ? '' : mark.kind);
     });
     kindButtons.push(button);
     kindRow.append(button);
@@ -769,7 +825,14 @@ function buildMap(
 
   // Escape lets go of the screen without having to find somewhere safe to click.
   body.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || !selected) return;
+    if (event.key !== 'Escape') return;
+    // The armed marker first: it is the state that changes what a click does,
+    // so it is the one you most urgently want a way out of.
+    if (armed) {
+      setArmed('');
+      return;
+    }
+    if (!selected) return;
     const cell = body.querySelector<HTMLElement>(`[data-screen="${selected}"]`);
     selectScreen(selected);
     cell?.focus();
@@ -794,7 +857,7 @@ function buildMap(
       cell.title = id;
       if (!interactive) cell.disabled = true;
       else {
-        cell.addEventListener('click', () => selectScreen(id));
+        cell.addEventListener('click', () => touchScreen(id));
         // Right-click clears outright — the common correction, and faster than
         // opening the palette to pick "Unmarked".
         cell.addEventListener('contextmenu', (event) => {
