@@ -26,9 +26,27 @@ allows exactly one mark per screen, so a screen that is both a shop and a
 bombable wall can't say so. Pips would let secondary attributes ride along
 without competing with the centre icon.
 
-**Dungeon entrances draw the staircase sprite plus a large numeral.** Ours draws
-a generic cave icon plus a small `7` in the detail line. Theirs is much easier to
-pick out of a busy map — the numeral is large and high-contrast.
+**The numbered staircases are warp travel, not dungeon entrances.** Corrected by
+Bryan — I had misread these. Z1's overworld has stair caves that teleport you
+between fixed points, and the numeral pairs the two ends of a route. That is a
+whole category of information we cannot record at all: a stairway is not a
+dungeon, a shop, an item or a dead end, and its whole value is knowing *where
+the other end comes out*.
+
+This is the most interesting thing in the screenshot, and bigger than the
+cosmetic items below — it is a new mark kind plus a pairing between two screens,
+which nothing in our model currently does. Sketch:
+
+- A `stairway` mark, with a route number (1..n) as its detail.
+- Two screens sharing a number are the two ends of one route.
+- The cell could say where it goes — "→ D4" — which is the actual question
+  ("if I take this, where do I come out?").
+- Wants validation: a third screen taking a number already used twice is
+  probably a mistake worth surfacing rather than silently allowing.
+
+Separately, and still true: **their dungeon numerals are larger and higher
+contrast than ours**, which draws a small `7` in the detail line. Easier to pick
+out of a busy map.
 
 **Far more marker variety.** The "Overworld Palette" panel is a persistent grid
 of every marker: numbered dungeon entrances, bosses, NPCs, cave types. Greyed
@@ -61,3 +79,5 @@ once an item is known. Sprites read faster.
    gain a set of tags alongside its mark) and needs a non-colour channel per pip.
 5. Boss-per-dungeon tracking. Real information, no obvious home yet; possibly
    belongs with the dungeon's blockers rather than on the map.
+6. Stairway/warp routes — the largest of these, and the only one that adds a
+   relationship *between* two screens rather than more detail on one.
