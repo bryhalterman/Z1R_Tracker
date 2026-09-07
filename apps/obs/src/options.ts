@@ -32,12 +32,7 @@ import type { TrackerSection } from '@z1r/ui';
  * live in `map.html`, sharing this store through localStorage and a
  * BroadcastChannel.
  */
-export const DOCK_SECTIONS: readonly TrackerSection[] = [
-  'seed',
-  'items',
-  'dungeons',
-  'locations',
-];
+export const DOCK_SECTIONS: readonly TrackerSection[] = ['items', 'locations'];
 
 /**
  * The map dock: the overworld, and the hints that point at it.
@@ -46,7 +41,7 @@ export const DOCK_SECTIONS: readonly TrackerSection[] = [
  * reading one on a different window from the map it highlights meant looking
  * away from the answer to type the question. They travel together.
  */
-export const MAP_SECTIONS: readonly TrackerSection[] = ['hintlog', 'map'];
+export const MAP_SECTIONS: readonly TrackerSection[] = ['seed', 'hintlog', 'map'];
 
 /**
  * What the overlay shows unless asked otherwise.
@@ -59,6 +54,26 @@ export const MAP_SECTIONS: readonly TrackerSection[] = ['hintlog', 'map'];
 export const OVERLAY_DEFAULT_SECTIONS = 'items,dungeons';
 
 /**
+ * What `?sections=` may ask for.
+ *
+ * Its own list rather than the dock's. It was checked against `DOCK_SECTIONS`,
+ * which silently coupled the two: the moment the Triforce panel left the dock,
+ * the overlay stopped accepting `dungeons` and dropped the triangle from every
+ * stream that asked for it.
+ *
+ * Everything except the map. 128 screens carrying marks and codes is worth
+ * reading in a window you can size and pointless as a static graphic over a
+ * game capture; it has its own dock for that.
+ */
+export const OVERLAY_ALLOWED_SECTIONS: readonly TrackerSection[] = [
+  'seed',
+  'items',
+  'dungeons',
+  'locations',
+  'hintlog',
+];
+
+/**
  * Keeps `?sections=` honest — an unknown name is dropped.
  *
  * Falls back to the default rather than returning empty: a typo or an empty
@@ -66,11 +81,8 @@ export const OVERLAY_DEFAULT_SECTIONS = 'items,dungeons';
  * to the tracker being broken.
  */
 export function allowedSections(requested: readonly string[]): readonly TrackerSection[] {
-  // Deliberately checked against the dock's list, which no longer includes the
-  // map: 128 screens with a two-letter code on each is unreadable as a static
-  // overlay, and it has its own window now for when you want to read it.
   const allowed = requested.filter((name): name is TrackerSection =>
-    DOCK_SECTIONS.includes(name as TrackerSection),
+    OVERLAY_ALLOWED_SECTIONS.includes(name as TrackerSection),
   );
   return allowed.length
     ? allowed

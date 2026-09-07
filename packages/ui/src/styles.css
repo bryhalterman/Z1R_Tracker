@@ -1878,3 +1878,53 @@
 .z1r-map-tools[data-waiting="true"] .z1r-tool-target {
   color: var(--z1r-accent);
 }
+
+/* ------------------------------------------- triforce piece on a level row */
+
+/*
+ * The level's Triforce piece, sitting at the end of its own row in Locations.
+ *
+ * Absorbed from a panel that spent 181px on a drawn triangle to hold eight
+ * booleans. The triangle still earns its space on the stream overlay, where it
+ * is what viewers read; in a dock it repeated what a row of toggles says.
+ *
+ * Held is solid-bordered and full strength, unheld dashed and dimmed — the same
+ * two channels the item chips beside it use, neither of them color.
+ */
+.z1r-compact-piece {
+  display: flex;
+  align-items: center;
+  margin-inline-start: auto;
+  padding: 1px;
+  background: transparent;
+  border: var(--z1r-border-width) dashed var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.z1r-compact-piece[data-on="true"] {
+  opacity: 1;
+  filter: none;
+  border-style: solid;
+  border-color: var(--z1r-accent);
+}
+
+.z1r-compact-piece:disabled {
+  cursor: default;
+}
+
+/* Count, and whether Level 9 has opened. */
+.z1r-locations-triforce {
+  margin-inline-start: auto;
+  font-size: var(--z1r-text-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--z1r-muted);
+}
+
+.z1r-locations-triforce[data-ready="true"] {
+  color: var(--z1r-good);
+}

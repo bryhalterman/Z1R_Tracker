@@ -10,7 +10,10 @@
 import {
   POOL_BY_ID,
   SHUFFLE_POOL,
+  TRIFORCE_REQUIRED_FOR_L9,
+  canEnterLevel9,
   deriveLocations,
+  triforceCount,
   type LocationDef,
   type SpriteResolver,
   type Store,
@@ -258,6 +261,25 @@ function buildCompactLocations(
   const summary = document.createElement('span');
   summary.className = 'z1r-locations-summary';
   title.append(summary);
+
+  /*
+   * Triforce count and whether Level 9 is open.
+   *
+   * Both came from the panel this absorbed. The count is the part that was
+   * worth keeping — with the pieces spread one per row, nothing else says how
+   * many you have without counting them yourself.
+   */
+  const triforce = document.createElement('span');
+  triforce.className = 'z1r-locations-triforce';
+  title.append(triforce);
+  patches.push((state) => {
+    const held = triforceCount(state);
+    const open = canEnterLevel9(state);
+    triforce.textContent = open
+      ? `Triforce ${held}/${TRIFORCE_REQUIRED_FOR_L9} — L9 open`
+      : `Triforce ${held}/${TRIFORCE_REQUIRED_FOR_L9}`;
+    triforce.dataset.ready = String(open);
+  });
   root.append(title);
 
   const body = document.createElement('div');
@@ -341,6 +363,48 @@ function buildCompactLocations(
         className: 'z1r-compact-level',
         textContent: label,
       }));
+
+      /*
+       * The level's Triforce piece, on the level's own row.
+       *
+       * It used to be a separate panel holding a drawn triangle — 181px for
+       * eight booleans that are already one per row here. The triangle still
+       * earns that space on the stream overlay, where it is the thing viewers
+       * read; in a dock it was paying rent to say what a row of toggles says.
+       *
+       * Levels 1-8 only. Level 9 holds Ganon, and the overworld row has no
+       * level at all.
+       */
+      const level = /^L([1-9])$/.exec(label)?.[1];
+      if (level && Number(level) <= TRIFORCE_REQUIRED_FOR_L9) {
+        const piece = document.createElement('button');
+        piece.type = 'button';
+        piece.className = 'z1r-compact-piece';
+        piece.disabled = !interactive;
+        piece.append(createSprite(resolver, 'ui.triforce', { size: 14, label: 'Triforce piece' }));
+        if (interactive) {
+          piece.addEventListener('click', () =>
+            store.dispatch({
+              type: 'setDungeon',
+              level: Number(level),
+              patch: {
+                triforce: !(store.getState().dungeons[level]?.triforce ?? false),
+              },
+            }),
+          );
+        }
+        slotPatches.push((s2) => {
+          const held = s2.dungeons[level]?.triforce ?? false;
+          // Held reads as solid border and full strength, unheld as dashed and
+          // dimmed — the same two channels the item chips use, neither of them
+          // colour.
+          piece.dataset.on = String(held);
+          piece.title = `Level ${level} Triforce piece — ${held ? 'collected' : 'not collected'}`;
+          piece.setAttribute('aria-pressed', String(held));
+          piece.setAttribute('aria-label', piece.title);
+        });
+        row.append(piece);
+      }
 
       for (const location of list) {
         const slot = document.createElement('button');
