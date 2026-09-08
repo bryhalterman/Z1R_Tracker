@@ -238,9 +238,13 @@ function slotCode(location: LocationDef): string {
  * Dense variant for the OBS dock and overlay.
  *
  * On stream the game capture is the premium space, so this is built to take as
- * little of it as possible: one line per level, each slot an 18px chip. The
+ * little of it as possible: one column per level, each slot a 20px chip. The
  * full layout is a card per level with a dropdown per row — roughly six times
  * the area, which is reasonable on a desktop and indefensible over gameplay.
+ *
+ * Columns rather than rows because the panel is bounded by height, not width:
+ * ten stacked rows spend a line each on groups that hold two or three slots,
+ * while ten columns spend one line on the deepest group and none on the rest.
  *
  * The chips still carry both facts the full layout does. A known item shows its
  * sprite; collected is a solid border against a dashed one, so the distinction
@@ -266,7 +270,7 @@ function buildCompactLocations(
    * Triforce count and whether Level 9 is open.
    *
    * Both came from the panel this absorbed. The count is the part that was
-   * worth keeping — with the pieces spread one per row, nothing else says how
+   * worth keeping — with the pieces spread one per column, nothing else says how
    * many you have without counting them yourself.
    */
   const triforce = document.createElement('span');
@@ -344,6 +348,29 @@ function buildCompactLocations(
   let renderedSignature = '';
   const slotPatches: Patch[] = [];
 
+  /**
+   * Puts a level number on the Triforce triangle.
+   *
+   * The numeral is a positioned sibling of the art rather than part of it, so
+   * it takes a color of its own per state instead of inheriting whatever the
+   * sprite happens to be, and so the unheld state's gray-out lands on the
+   * triangle only. It is anchored near the base because that is the only part
+   * of the triangle wide enough to hold a digit — higher up it would cross the
+   * transparent corners, where a dark numeral has nothing to read against.
+   */
+  const appendNumberedTriangle = (host: HTMLElement, text: string): void => {
+    const art = document.createElement('span');
+    art.className = 'z1r-compact-head-art';
+    art.append(createSprite(resolver, 'ui.triforce', { size: 20, label: 'Triforce piece' }));
+    host.append(
+      art,
+      Object.assign(document.createElement('span'), {
+        className: 'z1r-compact-numeral',
+        textContent: text,
+      }),
+    );
+  };
+
   const rebuild = (state: TrackerState) => {
     body.replaceChildren();
     slotPatches.length = 0;
@@ -357,31 +384,28 @@ function buildCompactLocations(
     }
 
     for (const [label, list] of grouped) {
-      const row = document.createElement('div');
-      row.className = 'z1r-compact-row';
-      row.append(Object.assign(document.createElement('span'), {
-        className: 'z1r-compact-level',
-        textContent: label,
-      }));
+      const column = document.createElement('div');
+      column.className = 'z1r-compact-column';
 
       /*
-       * The level's Triforce piece, on the level's own row.
+       * The level's Triforce piece, as the column's own heading.
        *
        * It used to be a separate panel holding a drawn triangle — 181px for
-       * eight booleans that are already one per row here. The triangle still
+       * eight booleans that are already one per group here. The triangle still
        * earns that space on the stream overlay, where it is the thing viewers
        * read; in a dock it was paying rent to say what a row of toggles says.
        *
-       * Levels 1-8 only. Level 9 holds Ganon, and the overworld row has no
-       * level at all.
+       * Levels 1-8 only. Level 9 holds Ganon and has no piece, and the
+       * overworld column is not a level at all — both keep the heading box so
+       * the slot rows stay aligned, but neither is a control.
        */
       const level = /^L([1-9])$/.exec(label)?.[1];
       if (level && Number(level) <= TRIFORCE_REQUIRED_FOR_L9) {
         const piece = document.createElement('button');
         piece.type = 'button';
-        piece.className = 'z1r-compact-piece';
+        piece.className = 'z1r-compact-head';
         piece.disabled = !interactive;
-        piece.append(createSprite(resolver, 'ui.triforce', { size: 14, label: 'Triforce piece' }));
+        appendNumberedTriangle(piece, level);
         if (interactive) {
           piece.addEventListener('click', () =>
             store.dispatch({
@@ -395,15 +419,22 @@ function buildCompactLocations(
         }
         slotPatches.push((s2) => {
           const held = s2.dungeons[level]?.triforce ?? false;
-          // Held reads as solid border and full strength, unheld as dashed and
-          // dimmed — the same two channels the item chips use, neither of them
-          // colour.
+          // Held reads as solid border and a full-strength triangle, unheld as
+          // dashed, gray and dimmed — the same two channels the item chips use,
+          // neither of them color. The numeral stays legible either way; see
+          // the contrast note in styles.css.
           piece.dataset.on = String(held);
           piece.title = `Level ${level} Triforce piece — ${held ? 'collected' : 'not collected'}`;
           piece.setAttribute('aria-pressed', String(held));
           piece.setAttribute('aria-label', piece.title);
         });
-        row.append(piece);
+        column.append(piece);
+      } else {
+        const head = document.createElement('span');
+        head.className = 'z1r-compact-head z1r-compact-head-plain';
+        head.textContent = level ?? label;
+        head.title = level ? `Level ${level} — Ganon, no Triforce piece` : 'Overworld locations';
+        column.append(head);
       }
 
       for (const location of list) {
@@ -429,7 +460,7 @@ function buildCompactLocations(
         const face = document.createElement('span');
         face.className = 'z1r-compact-face';
         slot.append(face);
-        row.append(slot);
+        column.append(slot);
 
         let renderedItem: string | null = null;
         slotPatches.push((s2) => {
@@ -446,7 +477,7 @@ function buildCompactLocations(
           });
         });
       }
-      body.append(row);
+      body.append(column);
     }
   };
 

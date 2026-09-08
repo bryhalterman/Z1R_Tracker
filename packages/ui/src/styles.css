@@ -1467,33 +1467,38 @@
 /* ------------------------------------------------- compact locations (OBS) */
 
 /*
- * Built for a stream, where the game capture is the premium space. One line per
- * level, each slot an 18px chip: roughly a sixth of the area the full layout
- * needs. Both facts still read — the sprite says what is there, and a solid
- * versus dashed border says whether it has been collected.
+ * Built for a stream, where the game capture is the premium space. One column
+ * per level, each slot a 20px chip. Both facts still read — the sprite says
+ * what is there, and a solid versus dashed border says whether it has been
+ * collected.
+ *
+ * Columns rather than rows because height is the scarce axis: ten rows spend a
+ * line each on groups of two or three slots, ten columns spend one line on the
+ * deepest group and none on the rest.
  */
 .z1r-locations-compact-panel {
   position: relative;
 }
 
 .z1r-locations-compact {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.z1r-compact-row {
-  display: flex;
-  align-items: center;
+  display: grid;
+  /*
+   * One column per group, from the data. `grid-auto-flow: column` takes the
+   * count from however many children the rebuild appended, so a settings change
+   * that adds or drops a group needs no edit here — nothing hardcodes ten.
+   */
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  justify-content: start;
+  align-items: start;
   gap: 3px;
 }
 
-.z1r-compact-level {
-  inline-size: 20px;
-  font-size: var(--z1r-text-2xs);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--z1r-muted);
+.z1r-compact-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .z1r-compact-slot {
@@ -1879,39 +1884,106 @@
   color: var(--z1r-accent);
 }
 
-/* ------------------------------------------- triforce piece on a level row */
+/* --------------------------------------- triforce piece as a column heading */
 
 /*
- * The level's Triforce piece, sitting at the end of its own row in Locations.
+ * The level's Triforce piece, heading its own column in Locations.
  *
  * Absorbed from a panel that spent 181px on a drawn triangle to hold eight
  * booleans. The triangle still earns its space on the stream overlay, where it
  * is what viewers read; in a dock it repeated what a row of toggles says.
  *
- * Held is solid-bordered and full strength, unheld dashed and dimmed — the same
- * two channels the item chips beside it use, neither of them color.
+ * Held is solid-bordered with a full-strength triangle, unheld dashed, gray and
+ * dimmed — the same two channels the item chips below it use, neither of them
+ * color. The numeral adds a third: it is text, and it says which level the
+ * column is whatever the piece state.
+ *
+ * Level 9 and the overworld keep the same box without a triangle: 9 has no
+ * piece and the overworld is not a level, so neither is a control. The box
+ * stays so the slot chips below line up across all ten columns.
  */
-.z1r-compact-piece {
+.z1r-compact-head {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  inline-size: 24px;
+  block-size: 24px;
   padding: 1px;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-muted);
   background: transparent;
   border: var(--z1r-border-width) dashed var(--z1r-border);
   border-radius: var(--z1r-radius);
   cursor: pointer;
-  opacity: 0.4;
-  filter: grayscale(1);
 }
 
-.z1r-compact-piece[data-on="true"] {
-  opacity: 1;
-  filter: none;
+.z1r-compact-head[data-on="true"] {
   border-style: solid;
   border-color: var(--z1r-accent);
 }
 
-.z1r-compact-piece:disabled {
+.z1r-compact-head:disabled,
+.z1r-compact-head-plain {
   cursor: default;
+}
+
+/* Not a toggle, so no toggle chrome — just the label. */
+.z1r-compact-head-plain {
+  border-color: transparent;
+}
+
+/*
+ * A wrapper around the sprite, carrying the unheld gray-out.
+ *
+ * The dimming cannot go on the button, which would take the numeral with it,
+ * and it cannot go on `.z1r-sprite` either: the overlay's drop-shadow rule for
+ * image sprites is more specific and would drop the desaturation exactly where
+ * the piece is being read from across a room.
+ */
+.z1r-compact-head-art {
+  display: block;
+  inline-size: 20px;
+  block-size: 20px;
+}
+
+.z1r-compact-head[data-on="false"] .z1r-compact-head-art {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+/*
+ * The level number, over the triangle.
+ *
+ * It sits outside the dimmed wrapper so it keeps a color of its own in both
+ * states, and both were measured against what actually ends up behind them:
+ *
+ *   held    --z1r-bg on the piece art        8.79:1 (remote), 10.59:1 (vector)
+ *   unheld  --z1r-text on the same art after grayscale(1) at 0.4 over the panel
+ *                                            5.52:1 (remote),  4.86:1 (vector)
+ *
+ * Anchored near the base because the digit has to stay on painted pixels: the
+ * art is a triangle on transparency, and --z1r-bg over the panel is 1.15:1.
+ */
+.z1r-compact-numeral {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 4px;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--z1r-text);
+  pointer-events: none;
+}
+
+.z1r-compact-head[data-on="true"] .z1r-compact-numeral {
+  font-weight: 800;
+  color: var(--z1r-bg);
 }
 
 /* Count, and whether Level 9 has opened. */
