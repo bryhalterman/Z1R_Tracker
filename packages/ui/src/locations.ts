@@ -5,6 +5,12 @@
  * come from, and what's left unchecked". Slots are derived from the seed
  * settings rather than stored, so switching Dungeon Quest reshapes the list —
  * see `deriveLocations`.
+ *
+ * Items are not chosen here, for the same reason they are not chosen on the
+ * room sheet: one is armed in the Items panel and dropped by clicking a slot,
+ * through the channel `createPlacement` owns. Recording an item is recording
+ * *where it is* and never grants it — saying you hold the thing is
+ * `collectLocation`, which stays a separate gesture on the same box.
  */
 
 import {
@@ -21,13 +27,21 @@ import {
 } from '@z1r/core';
 import { createSprite } from './sprite.js';
 import { memoise, runPatches, type Patch } from './patch.js';
+import type { PlacementChannel } from './rooms.js';
 
-/** Slot kind is the thing the owner most wants at a glance, so it gets a chip. */
-const KIND_LABEL: Record<string, string> = {
-  floor: 'Floor',
-  stair: 'Stair',
-  heart: 'Heart',
-  overworld: 'OW',
+/**
+ * What a slot shows before its item is known.
+ *
+ * A glyph rather than a labelled chip: the shape says which kind of slot this
+ * is on its own, so the kind survives being read in grayscale and costs no
+ * width. `stair` is deliberately absent — it draws the tracker's own staircase
+ * art instead, the same shape the overworld warps and the room sheet use, so a
+ * staircase reads the same way wherever it appears.
+ */
+const KIND_GLYPH: Record<string, string> = {
+  floor: '▭',
+  heart: '♥',
+  overworld: '◆',
 };
 
 const KIND_TITLE: Record<string, string> = {
@@ -37,12 +51,19 @@ const KIND_TITLE: Record<string, string> = {
   overworld: 'Named overworld location',
 };
 
+/** Sprite edge length inside a 24px box, leaving its border and padding. */
+const SLOT_ART = 20;
+
+/** The staircase is drawn art, so it sits inside the box rather than filling it. */
+const SLOT_GLYPH_ART = 14;
+
 export function buildLocations(
   store: Store,
   resolver: SpriteResolver,
   patches: Patch[],
   interactive: boolean,
   compact = false,
+  placement?: PlacementChannel,
 ): HTMLElement {
   if (compact) return buildCompactLocations(store, resolver, patches, interactive);
   const root = document.createElement('section');
@@ -56,49 +77,76 @@ export function buildLocations(
   summary.className = 'z1r-locations-summary';
   title.append(summary);
 
-  const body = document.createElement('div');
-  body.className = 'z1r-location-groups';
-  root.append(body);
+  const rows = document.createElement('div');
+  rows.className = 'z1r-loc-rows';
+  rows.dataset.arming = 'false';
+  root.append(rows);
+
+  /**
+   * The armed item, when a slot here can actually take it.
+   *
+   * The Items panel arms a `ROOM_ITEMS` id, which is the shuffle pool plus the
+   * Map, the Compass and a Triforce piece — three things generated per level
+   * that no item location stands for. A slot holds a pool entry, so anything
+   * outside the pool counts as nothing armed in this panel: the rows drop
+   * their arming cue and a click goes back to toggling collected, rather than
+   * taking a click that would record an id this panel cannot draw.
+   */
+  const armedItem = (): string => {
+    const brush = placement?.get();
+    if (!brush?.placing) return '';
+    return POOL_BY_ID.has(brush.item) ? brush.item : '';
+  };
 
   // Rebuilding is driven by the *shape* of the derived list, not by every
-  // state change — the rows themselves patch in place.
+  // state change — the slots themselves patch in place.
   let renderedSignature = '';
-  const rowPatches: Patch[] = [];
+  const slotPatches: Patch[] = [];
 
   const rebuild = (state: TrackerState) => {
-    body.replaceChildren();
-    rowPatches.length = 0;
+    rows.replaceChildren();
+    slotPatches.length = 0;
 
-    const locations = deriveLocations(state.seed, state.extraFloorSlots);
     const groups = new Map<string, LocationDef[]>();
-    for (const location of locations) {
-      const key = location.level === undefined ? 'Overworld' : `Level ${location.level}`;
+    for (const location of deriveLocations(state.seed, state.extraFloorSlots)) {
+      const key = location.level === undefined ? 'OW' : `L${location.level}`;
       const list = groups.get(key);
       if (list) list.push(location);
       else groups.set(key, [location]);
     }
 
     for (const [name, list] of groups) {
-      const group = document.createElement('div');
-      group.className = 'z1r-location-group';
-
-      const head = document.createElement('div');
-      head.className = 'z1r-location-group-head';
-      head.append(Object.assign(document.createElement('span'), { textContent: name }));
+      const block = document.createElement('div');
+      block.className = 'z1r-loc-block';
 
       const level = list[0]?.level;
+      const label = document.createElement('span');
+      label.className = 'z1r-loc-level';
+      label.textContent = name;
+      // The long form stays reachable on hover: the line has room for two
+      // characters, and "OW" is not self-explanatory on a first read.
+      label.title = level === undefined ? 'Overworld locations' : `Level ${level}`;
+      block.append(label);
+
+      for (const location of list) {
+        block.append(buildSlot(store, resolver, location, slotPatches, interactive, armedItem));
+      }
+
       if (interactive && level !== undefined && state.seed.shuffleMinorDrops) {
         // Only reachable with Shuffle Minor Drops on, which is the flag that
-        // allows more than one item on a dungeon floor.
+        // allows more than one item on a dungeon floor. A bare sign rather than
+        // "+ floor": the line is 24px tall, and the level it belongs to is
+        // named at the head of that same line.
         const add = document.createElement('button');
         add.type = 'button';
         add.className = 'z1r-slot-add';
-        add.textContent = '+ floor';
+        add.textContent = '+';
         add.title = 'Add an extra floor slot for this level';
+        add.setAttribute('aria-label', add.title);
         add.addEventListener('click', () =>
           store.dispatch({ type: 'addFloorSlot', level, delta: 1 }),
         );
-        head.append(add);
+        block.append(add);
 
         if ((state.extraFloorSlots[String(level)] ?? 0) > 0) {
           const remove = document.createElement('button');
@@ -106,106 +154,159 @@ export function buildLocations(
           remove.className = 'z1r-slot-add';
           remove.textContent = '−';
           remove.title = 'Remove the last extra floor slot';
+          remove.setAttribute('aria-label', remove.title);
           remove.addEventListener('click', () =>
             store.dispatch({ type: 'addFloorSlot', level, delta: -1 }),
           );
-          head.append(remove);
+          block.append(remove);
         }
       }
 
-      group.append(head);
-      for (const location of list) {
-        group.append(buildRow(store, resolver, location, rowPatches, interactive));
-      }
-      body.append(group);
+      rows.append(block);
     }
   };
 
-  patches.push((state) => {
+  const draw: Patch = (state) => {
     const locations = deriveLocations(state.seed, state.extraFloorSlots);
     const signature = `${locations.map((l) => l.id).join('|')}::${state.seed.shuffleMinorDrops}`;
     renderedSignature = memoise(renderedSignature, signature, () => rebuild(state)) ?? '';
-    runPatches(rowPatches, state);
+    // One attribute for the whole set rather than one per box: the cue is
+    // "a click in here records now", which is a fact about the panel.
+    rows.dataset.arming = String(!!armedItem());
+    runPatches(slotPatches, state);
 
     const collected = locations.filter((l) => state.locations[l.id]?.collected).length;
     summary.textContent = `${collected}/${locations.length}`;
-  });
+  };
+
+  patches.push(draw);
+  // Arming changes nothing in the store, so the channel drives its own redraw —
+  // the same way the Items panel redraws its cells.
+  placement?.watch(() => draw(store.getState()));
 
   return root;
 }
 
-function buildRow(
+/**
+ * One 24px box: what is known to be here, and whether it has been picked up.
+ *
+ * Both facts live on one control because they are one gesture apart, and the
+ * gesture is the room sheet's — with an item armed a click records it, with
+ * nothing armed a click says you have it. The row this replaces spent a
+ * dropdown and a checkbox on the same two facts and ten times the width.
+ */
+function buildSlot(
   store: Store,
   resolver: SpriteResolver,
   location: LocationDef,
   patches: Patch[],
   interactive: boolean,
+  armedItem: () => string,
 ): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'z1r-location';
-  row.dataset.kind = location.kind;
+  const slot = document.createElement('button');
+  slot.type = 'button';
+  slot.className = 'z1r-loc-slot';
+  slot.dataset.slot = location.id;
+  slot.dataset.kind = location.kind;
+  slot.dataset.known = 'false';
+  slot.dataset.collected = 'false';
+  slot.disabled = !interactive;
 
-  const kind = document.createElement('span');
-  kind.className = 'z1r-location-kind';
-  kind.textContent = KIND_LABEL[location.kind] ?? location.kind;
-  kind.title = KIND_TITLE[location.kind] ?? '';
+  const face = document.createElement('span');
+  face.className = 'z1r-loc-face';
+  slot.append(face);
 
-  const label = document.createElement('span');
-  label.className = 'z1r-location-label';
-  label.textContent = location.label;
-  if (location.note) label.title = location.note;
+  if (interactive) {
+    slot.addEventListener('click', () => {
+      const armed = armedItem();
+      const current = store.getState().locations[location.id] ?? { item: '', collected: false };
+      if (armed) {
+        /*
+         * One gesture both ways.
+         *
+         * The same armed item on the same box takes it off again, so clearing
+         * needs no second control — and this branch dispatches `setLocation`,
+         * which records where a thing is and leaves the inventory alone.
+         * Collecting is the other branch, below, and it is the only one that
+         * can grant anything.
+         */
+        store.dispatch({
+          type: 'setLocation',
+          id: location.id,
+          item: current.item === armed ? '' : armed,
+        });
+        return;
+      }
+      store.dispatch({
+        type: 'collectLocation',
+        id: location.id,
+        collected: !current.collected,
+      });
+    });
 
-  const slot = document.createElement('span');
-  slot.className = 'z1r-location-sprite';
-
-  const picker = document.createElement('select');
-  picker.className = 'z1r-input z1r-location-picker';
-  picker.disabled = !interactive;
-  const unknown = document.createElement('option');
-  unknown.value = '';
-  unknown.textContent = '—';
-  picker.append(unknown);
-  for (const entry of SHUFFLE_POOL) {
-    const option = document.createElement('option');
-    option.value = entry.id;
-    option.textContent = entry.name;
-    picker.append(option);
+    /*
+     * Delete clears what is recorded here.
+     *
+     * Enter and Space are the click, which records with an item armed and
+     * collects without one — neither takes a wrong entry back out unless you
+     * first arm that same wrong item, which the dropdown this replaces could
+     * do from the keyboard in one step. Delete restores that, and the tooltip
+     * names it rather than leaving it to be discovered.
+     */
+    slot.addEventListener('keydown', (event) => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      event.preventDefault();
+      store.dispatch({ type: 'setLocation', id: location.id, item: '' });
+    });
   }
-  picker.addEventListener('change', () =>
-    store.dispatch({ type: 'setLocation', id: location.id, item: picker.value }),
-  );
 
-  const collected = document.createElement('input');
-  collected.type = 'checkbox';
-  collected.className = 'z1r-location-check';
-  collected.title = 'Picked up. Ticking this also marks the item found; unticking never removes it.';
-  collected.disabled = !interactive;
-  collected.addEventListener('change', () =>
-    store.dispatch({ type: 'collectLocation', id: location.id, collected: collected.checked }),
-  );
-
-  row.append(kind, label, slot, picker, collected);
-
-  let renderedSprite: string | null = null;
+  let renderedFace: string | null = null;
   patches.push((state) => {
     const current = state.locations[location.id] ?? { item: '', collected: false };
-    if (document.activeElement !== picker) picker.value = current.item;
-    collected.checked = current.collected;
-    row.dataset.collected = String(current.collected);
-    row.dataset.known = String(!!current.item);
+    const entry = current.item ? POOL_BY_ID.get(current.item) : undefined;
+    slot.dataset.known = String(!!entry);
+    slot.dataset.collected = String(current.collected);
 
-    const sprite = current.item ? (POOL_BY_ID.get(current.item)?.sprite ?? '') : '';
-    renderedSprite = memoise(renderedSprite, sprite, () => {
-      // 20 to match the row height — see `.z1r-location-sprite`. A larger
-      // sprite would be the thing setting the row's height.
-      if (sprite) slot.replaceChildren(createSprite(resolver, sprite, { size: 20 }));
-      else slot.replaceChildren();
+    const armed = armedItem();
+    const armedName = armed ? (POOL_BY_ID.get(armed)?.name ?? armed) : '';
+    const gesture = !interactive
+      ? ''
+      : armed
+        ? current.item === armed
+          ? ` — click to clear ${armedName}`
+          : ` — click to record ${armedName} here`
+        : current.collected
+          ? ' — click to mark not picked up'
+          : ' — click to mark picked up, Delete to clear';
+    // Every state in words as well as in the border and the tick: this is what
+    // a screen reader is given, and the text channel is the one that does not
+    // depend on seeing the difference between a dashed and a solid edge.
+    slot.title =
+      `${location.label} — ${entry ? entry.name : 'nothing recorded'}` +
+      ` — ${current.collected ? 'picked up' : 'not picked up'}` +
+      ` (${location.note ?? KIND_TITLE[location.kind] ?? location.kind})` +
+      gesture;
+    slot.setAttribute('aria-label', slot.title);
+
+    const faceKey = entry ? `item:${entry.sprite}` : `kind:${location.kind}`;
+    renderedFace = memoise(renderedFace, faceKey, () => {
+      if (entry) {
+        face.replaceChildren(createSprite(resolver, entry.sprite, { size: SLOT_ART, label: '' }));
+        return;
+      }
+      if (location.kind === 'stair') {
+        face.replaceChildren(
+          createSprite(resolver, 'mark.stairway', { size: SLOT_GLYPH_ART, label: '' }),
+        );
+        return;
+      }
+      face.replaceChildren();
+      face.textContent = KIND_GLYPH[location.kind] ?? '?';
     });
   });
 
-  return row;
+  return slot;
 }
-
 
 /* ------------------------------------------------------------------ compact */
 

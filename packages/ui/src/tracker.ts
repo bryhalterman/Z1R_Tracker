@@ -16,6 +16,7 @@ import {
   DUNGEON_BLOCKS,
   DUNGEON_BLOCKS_BY_ID,
   DUNGEONS,
+  deriveLocations,
   OVERWORLD_LOCATIONS,
   MARKS,
   MARKS_BY_KIND,
@@ -287,28 +288,42 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   /*
    * Where an armed item lives while it is in the air.
    *
-   * Shared by the Items panel, which arms it, and the room sheet, which drops
-   * it — the two panels built by this same call. It is deliberately not store
-   * state: see `createPlacement`.
+   * Shared by the Items panel, which arms it, and the panels that drop it — the
+   * room sheet and the item locations panel, all built by this same call. It is
+   * deliberately not store state: see `createPlacement`.
    */
   const placement = createPlacement();
 
   /*
-   * Place is offered only where there is a sheet to place onto.
+   * Which panels in this mount can receive a placement.
    *
    * Arming is view state that reaches the panels of this one mount and no
-   * others, by design — so in a window with the inventory and no room sheet the
-   * toggle could arm an item that nothing could ever receive. The OBS dock is
-   * exactly that window, and it must not change.
+   * others, by design — so in a window with the inventory and nothing to place
+   * onto, the toggle could arm an item that nothing could ever receive.
+   *
+   * The item locations panel takes a placement in its full form only. The
+   * compact form is the OBS dock's, where a slot opens a picker instead and
+   * which must not change; `compact` is what tells the two apart, so the dock
+   * grows no Place toggle it had no use for.
    */
-  const placeable = interactive && sections.includes('rooms');
+  const placeInto = {
+    rooms: sections.includes('rooms'),
+    locations: sections.includes('locations') && !compact,
+  };
+  const placeable = interactive && (placeInto.rooms || placeInto.locations);
 
   const builders: Record<TrackerSection, () => HTMLElement> = {
     seed: () => buildSeedPanel(store, patches, interactive),
     items: () =>
-      buildItems(store, resolver, patches, { interactive, itemSize, placement, placeable }),
+      buildItems(store, resolver, patches, {
+        interactive,
+        itemSize,
+        placement,
+        placeable,
+        placeInto,
+      }),
     dungeons: () => buildTriforce(store, resolver, patches, interactive),
-    locations: () => buildLocations(store, resolver, patches, interactive, compact),
+    locations: () => buildLocations(store, resolver, patches, interactive, compact, placement),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),
     rooms: () => buildRooms(store, resolver, patches, interactive, placement),
@@ -476,12 +491,27 @@ function buildItems(
     itemSize: number;
     placement: PlacementChannel;
     placeable: boolean;
+    /** Which panels of this mount a placement can land on. */
+    placeInto: { rooms: boolean; locations: boolean };
   },
 ): HTMLElement {
-  const { placeable, placement } = opts;
+  const { placeable, placement, placeInto } = opts;
   const { root, body } = section('Items', 'z1r-item-groups');
   const heading = root.querySelector('.z1r-panel-title');
   const cellPatches: Patch[] = [];
+
+  /*
+   * What a placement can be dropped onto, named for the panel's own prompts.
+   *
+   * The room sheet is no longer the only receiver, so the wording comes from
+   * the sections this mount actually built rather than naming a room outright.
+   */
+  const placeTarget =
+    placeInto.rooms && placeInto.locations
+      ? 'a room or an item location'
+      : placeInto.rooms
+        ? 'a room'
+        : 'an item location';
 
   /*
    * Where each room item has been recorded, rebuilt once per pass.
@@ -491,7 +521,7 @@ function buildItems(
    * index does once.
    */
   const placedAt = new Map<string, string[]>();
-  const cellOpts = { ...opts, placedAt };
+  const cellOpts = { ...opts, placedAt, placeTarget };
 
   // Two groups, in the game's own order: always-active items on top, then the
   // boxed B-slot items, mirroring the inventory screen.
@@ -518,9 +548,14 @@ function buildItems(
    * inventory cell to arm from — the first three never travel, and the heart
    * total is on the game's own HUD. They appear only while Place is on, so with
    * it off this panel is exactly the inventory it has always been.
+   *
+   * Room sheet only. A mount that can place onto item locations and nothing
+   * else has nowhere to put a Map or a Compass, which have no pool entry and so
+   * no location slot — offering them there would be four cells that look armed
+   * and land nowhere.
    */
   const dungeonGroup = el('div', 'z1r-item-group z1r-item-group-dungeon');
-  if (placeable) {
+  if (placeable && placeInto.rooms) {
     dungeonGroup.dataset.group = 'dungeon';
     dungeonGroup.hidden = true;
     dungeonGroup.append(el('span', 'z1r-item-group-label', 'Dungeon pickups'));
@@ -537,7 +572,7 @@ function buildItems(
    *
    * It is the only place the panel says which mode it is in, so it stays — but
    * at the smallest type, on one line, and only while Place is on. A window
-   * with no room sheet grows neither control, the overlay included.
+   * with nothing to place onto grows neither control, the overlay included.
    */
   const status = el('p', 'z1r-room-item-status');
   if (placeable) {
@@ -545,7 +580,7 @@ function buildItems(
     toggle.type = 'button';
     toggle.dataset.on = 'false';
     toggle.title =
-      'Arm an item here, then click a room on the dungeon sheet to record where it is. Placing never collects.';
+      `Arm an item here, then click ${placeTarget} to record where it is. Placing never collects.`;
     toggle.setAttribute('aria-pressed', 'false');
     toggle.addEventListener('click', () => placement.set({ placing: !placement.get().placing }));
     heading?.append(toggle);
@@ -562,7 +597,7 @@ function buildItems(
       status.hidden = !placing;
       const armed = item ? ROOM_ITEMS_BY_ID.get(item) : undefined;
       status.textContent = armed
-        ? `${armed.name} armed — click a room to record where it is.`
+        ? `${armed.name} armed — click ${placeTarget} to record where it is.`
         : 'Click an item to arm it. Placing records a location; it never collects.';
     });
   }
@@ -570,13 +605,28 @@ function buildItems(
   const own: Patch[] = [
     (state) => {
       placedAt.clear();
+      const record = (item: string, where: string) => {
+        const seen = placedAt.get(item);
+        if (seen) seen.push(where);
+        else placedAt.set(item, [where]);
+      };
       for (const [level, rooms] of Object.entries(state.rooms)) {
         for (const [room, note] of Object.entries(rooms)) {
           if (!note.item) continue;
-          const where = placedAt.get(note.item);
-          if (where) where.push(`L${level} ${room}`);
-          else placedAt.set(note.item, [`L${level} ${room}`]);
+          record(note.item, `L${level} ${room}`);
         }
+      }
+      /*
+       * Item location slots count as "spoken for" too.
+       *
+       * A pool entry id is a `ROOM_ITEMS` id, so both kinds of record land in
+       * one index and a cell's corner tick means the same thing wherever the
+       * item was written down. The slot's own label is what names the place —
+       * "L5 stair", "Coast" — so the tooltip reads as a place either way.
+       */
+      for (const location of deriveLocations(state.seed, state.extraFloorSlots)) {
+        const item = state.locations[location.id]?.item;
+        if (item) record(item, location.label);
       }
     },
     // Per cell, not per panel: these eighteen shared one registered patch, so a
@@ -591,7 +641,7 @@ function buildItems(
   return root;
 }
 
-/** Each room this item has been recorded in, phrased for a tooltip. */
+/** Each place this item has been recorded in, phrased for a tooltip. */
 function placedSuffix(ids: readonly string[], placedAt: Map<string, string[]>): string {
   const parts: string[] = [];
   for (const id of ids) {
@@ -613,9 +663,11 @@ function buildItemCell(
     itemSize: number;
     placement: PlacementChannel;
     placedAt: Map<string, string[]>;
+    /** What a placement lands on in this mount, for the cell's own prompt. */
+    placeTarget: string;
   },
 ): HTMLElement {
-  const { placement, placedAt } = opts;
+  const { placement, placedAt, placeTarget } = opts;
   const cell = el('button', 'z1r-item');
   cell.type = 'button';
   cell.dataset.itemId = def.id;
@@ -684,8 +736,8 @@ function buildItemCell(
     const armed = !!target && item === target;
     cell.dataset.armed = String(armed);
     cell.dataset.placed = String(covers.some((id) => (placedAt.get(id)?.length ?? 0) > 0));
-    // An item with no room-item counterpart must not look armable, so while
-    // placing it is plainly out of the gesture rather than inert-on-click.
+    // An item with no pool counterpart must not look armable, so while placing
+    // it is plainly out of the gesture rather than inert-on-click.
     cell.disabled = !opts.interactive || (placing && !target);
 
     const held = labelFor(def, value);
@@ -694,8 +746,8 @@ function buildItemCell(
     const placeHint = !placing
       ? ''
       : target
-        ? ` — click to ${armed ? 'disarm' : 'arm'} ${ROOM_ITEMS_BY_ID.get(target)?.name ?? target} for a room`
-        : ' — cannot be placed in a room';
+        ? ` — click to ${armed ? 'disarm' : 'arm'} ${ROOM_ITEMS_BY_ID.get(target)?.name ?? target} for ${placeTarget}`
+        : ` — cannot be placed in ${placeTarget}`;
     cell.title = `${base}${where}${placeHint}`;
     cell.setAttribute('aria-pressed', String(placing ? armed : value > 0));
     cell.setAttribute(

@@ -1109,42 +1109,79 @@
 }
 
 /*
- * Ten groups, packed as tight as the rows inside them stay readable.
+ * One short line per level, stacked.
  *
- * The minimum column was 212px, which on a 1080px panel packed four columns
- * and left the panel the tallest thing on the page after the map. 190px is
- * what a row needs end to end — see the widths on `.z1r-location-kind` and
- * `.z1r-location-label` below, which were trimmed to match — and it packs five
- * columns in the same space, so the group rows go from three to two.
+ * This panel was ten bordered cards, each with a heading and a labelled row
+ * per slot, and most of its footprint went on furniture: a row read "L1 floor"
+ * beside a chip that already said FLOOR, inside a card already headed
+ * "Level 1". A block names its level once and shows its slots as boxes, so ten
+ * cards become ten short lines — 1233px wide before, narrow enough afterwards
+ * to stand beside something else.
+ *
+ * The panel sizes to its own content instead of stretching across the column
+ * the tracker lays its sections out in. A full-width border around a 150px
+ * stack of boxes would be the old panel's footprint with none of its content.
+ *
+ * All three declarations are needed because the column is a flex column in the
+ * docks and a grid column on the web page: `align-self` is the cross axis in
+ * one and the block axis in the other, so `inline-size` is what actually holds
+ * in both, and the cap keeps it inside a column narrower than its content.
  */
-.z1r-location-groups {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 4px;
+.z1r-locations {
+  align-self: start;
+  justify-self: start;
+  inline-size: fit-content;
+  max-inline-size: 100%;
 }
 
-.z1r-location-group {
-  background: var(--z1r-inset);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
-  padding: 3px 4px;
+.z1r-loc-rows {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 3px;
 }
 
-.z1r-location-group-head {
+.z1r-loc-block {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-block-end: 2px;
-  font-size: var(--z1r-text-md);
-  font-weight: 600;
-  color: var(--z1r-muted);
+  gap: 3px;
 }
 
+/*
+ * The level, named once per line.
+ *
+ * `flex: none` with a minimum rather than a plain width: this is the one flex
+ * child on the line that carries text, and a shrinkable text child is exactly
+ * how a label has been squeezed narrower than its own content here before.
+ */
+.z1r-loc-level {
+  flex: none;
+  min-inline-size: 20px;
+  color: var(--z1r-muted);
+  font-size: var(--z1r-text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-align: end;
+}
+
+/*
+ * The extra-floor-slot controls, at the end of the level's own line.
+ *
+ * They appear only with Shuffle Minor Drops on, which is the flag that allows
+ * more than one item on a dungeon floor. Sized to the 24px line rather than to
+ * the group heading they used to sit in.
+ */
 .z1r-slot-add {
-  margin-inline-start: auto;
-  padding: 0 6px;
+  flex: none;
+  min-inline-size: 16px;
+  margin-inline-start: 2px;
+  padding: 0 3px;
   font: inherit;
   font-size: var(--z1r-text-sm);
+  /* No `line-height: 1` here: the sign's own line box is taller than its font
+     size, so a 1 would leave the glyph spilling two pixels out of a button
+     that reports no overflow to scroll. */
   color: var(--z1r-muted);
   background: transparent;
   border: var(--z1r-border-width) solid var(--z1r-border);
@@ -1158,100 +1195,115 @@
 }
 
 /*
- * One row per slot, at the height of the control inside it and no more.
+ * One 24px box per slot.
  *
- * The row was 26px: a 24px picker plus a pixel of padding each side. Forty-odd
- * of them is most of the panel's height, and the padding was buying nothing
- * that the groups' own padding does not already give the block.
+ * `flex: none` on a fixed size so a long line of boxes can never be squeezed
+ * below the art inside it — the same failure as a grid track that will not
+ * shrink below its content, approached from the other side.
  */
-.z1r-location {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 0;
-}
-
-.z1r-location[data-collected="true"] {
-  opacity: 0.55;
-}
-
-.z1r-location-kind {
+.z1r-loc-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
   flex: none;
-  /* Four characters at 10px — "OW", "Floor", "Stair", "Heart" all fit. */
-  inline-size: 34px;
-  padding: 0;
-  font-size: var(--z1r-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-align: center;
-  text-transform: uppercase;
-  border-radius: 3px;
-  cursor: help;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 1px;
+  color: var(--z1r-text);
+  background: var(--z1r-field);
+  /* Dashed until it has been picked up and solid once collected — the same two
+     channels the item cells use, so neither state rests on colour. */
+  border: var(--z1r-border-width) dashed var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+  overflow: hidden;
 }
 
-/* Floor vs stair is the distinction worth reading at a glance. */
-.z1r-location[data-kind="floor"] .z1r-location-kind {
-  color: var(--z1r-floor);
-  background: color-mix(in srgb, var(--z1r-floor) 15%, transparent);
+.z1r-loc-slot:disabled {
+  cursor: default;
 }
 
-.z1r-location[data-kind="stair"] .z1r-location-kind {
-  color: var(--z1r-stair);
-  background: color-mix(in srgb, var(--z1r-stair) 15%, transparent);
-}
-
-.z1r-location[data-kind="heart"] .z1r-location-kind {
-  color: var(--z1r-heart);
-  background: color-mix(in srgb, var(--z1r-heart) 15%, transparent);
-}
-
-.z1r-location[data-kind="overworld"] .z1r-location-kind {
-  color: var(--z1r-accent);
-  background: color-mix(in srgb, var(--z1r-overworld) 15%, transparent);
-}
-
-.z1r-location-label {
-  flex: none;
-  min-inline-size: 48px;
-  flex: 0 1 auto;
-  font-size: var(--z1r-text-sm);
-  color: var(--z1r-muted);
-}
-
-/* Matched to the row height below, so the sprite never sets it. */
-.z1r-location-sprite {
-  flex: none;
-  inline-size: 20px;
-  block-size: 20px;
+.z1r-loc-face {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  pointer-events: none;
 }
 
 /*
- * The shortest control height Spectrum defines, not the next one up.
- *
- * This select is what sets the row height, so the six pixels between the two
- * sizes are six pixels times every slot in the seed. 20px still clears the
- * 12px label inside it, and the picker and the checkbox beside it stay the
- * same controls they were.
+ * An empty box says which kind of slot it is, as a shape: a floor drop, the
+ * drawn staircase, a heart, an overworld spot. The hue is the third channel
+ * behind that shape and the tooltip, never the only one.
  */
-.z1r-location-picker {
-  flex: 1;
-  min-inline-size: 0;
-  block-size: var(--spectrum-component-height-50);
+.z1r-loc-slot[data-known="false"] .z1r-loc-face {
+  font-size: var(--z1r-text-md);
 }
 
-.z1r-location[data-known="false"] .z1r-location-picker {
-  color: var(--z1r-muted);
+.z1r-loc-slot[data-kind="floor"] .z1r-loc-face {
+  color: var(--z1r-floor);
 }
 
-/* Native checkboxes render at 13x13; 16px is the box itself, which is the hit
-   area — the margin only spaces it, so trimming it to match the 20px row costs
-   nothing a click can feel. */
-.z1r-location-check {
-  flex: none;
-  inline-size: 16px;
-  block-size: 16px;
-  margin: 2px;
-  cursor: pointer;
+.z1r-loc-slot[data-kind="stair"] .z1r-loc-face {
+  color: var(--z1r-stair);
+}
+
+.z1r-loc-slot[data-kind="heart"] .z1r-loc-face {
+  color: var(--z1r-heart);
+}
+
+.z1r-loc-slot[data-kind="overworld"] .z1r-loc-face {
+  color: var(--z1r-overworld);
+}
+
+/* Nothing recorded here yet is dimmed, which is the third state behind
+   collected and not collected, and is not a colour either. */
+.z1r-loc-slot[data-known="false"] {
+  opacity: 0.55;
+}
+
+/*
+ * Collected: a solid border and a corner check.
+ *
+ * The ground stays `--z1r-field` rather than lifting to `--z1r-inset`, which
+ * would put the check at 4.47:1 against it and a kind glyph at 4.49:1 — both
+ * below the 4.5:1 AA floor `npm run theme:check` holds the palette to.
+ */
+.z1r-loc-slot[data-collected="true"] {
+  border-style: solid;
+  border-color: var(--z1r-good);
+}
+
+/*
+ * The check, because the border is a colour difference on its own.
+ *
+ * It carries its own ground rather than a text shadow: the corner it sits in
+ * is over the item's sprite once one is recorded, and a drawn panel colour is
+ * a token while a black glow is a hand-picked hex.
+ */
+.z1r-loc-slot[data-collected="true"]::after {
+  content: "\2713";
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  padding-inline: 1px;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--z1r-good);
+  background: var(--z1r-panel);
+  border-start-start-radius: 3px;
+}
+
+/* While an item is armed, the set says a click will record it and the box
+   under the pointer says which one would take it. */
+.z1r-loc-rows[data-arming="true"] .z1r-loc-slot {
+  cursor: copy;
+}
+
+.z1r-loc-rows[data-arming="true"] .z1r-loc-slot:hover {
+  border-style: solid;
+  border-color: var(--z1r-accent);
+  opacity: 1;
 }
 
 /* ----------------------------------------------------------------- controls */
