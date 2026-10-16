@@ -2538,46 +2538,70 @@
   min-inline-size: 0;
 }
 
+/*
+ * Nine numerals, not nine chips.
+ *
+ * These were boxed buttons with the current one filled in the accent colour —
+ * the default chip, borrowed from no part of this game. They are drawn as the
+ * same heavy outlined figure the overworld map already uses for a dungeon
+ * level, so the row speaks a shape the tracker has taught you to read rather
+ * than introducing one that appears nowhere else. The box goes entirely; the
+ * panel below already has sixty-four of them.
+ */
 .z1r-room-levels {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  align-items: flex-end;
+  gap: 5px;
   margin-inline-start: var(--z1r-space-md);
 }
 
 .z1r-room-level {
-  inline-size: 26px;
-  block-size: 22px;
+  position: relative;
+  inline-size: 20px;
+  /* Fixed, because the selected numeral grows: let the button size itself and
+     every click would nudge the heading's height. */
+  block-size: 26px;
   padding: 0;
   font: inherit;
-  font-size: var(--z1r-text-md);
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  line-height: 24px;
+  text-align: center;
   color: var(--z1r-muted);
-  background: var(--z1r-field);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
+  background: none;
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
+  /* Outlined rather than plated, matching the map's own numeral: the heading
+     behind it is flat, but a browser source composites this over gameplay. */
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
 }
 
-.z1r-room-level[aria-pressed="true"] {
-  color: var(--z1r-bg);
-  background: var(--z1r-accent);
-  border-color: var(--z1r-accent);
-}
-
-/*
- * A level with rooms recorded is underscored inside its own pill and drawn at
- * full strength; one with nothing is dimmed. The rule takes the pill's own text
- * colour, so it reads whether the pill is selected or not, and nothing sits
- * under the digit.
- */
+/* A level with rooms recorded is drawn at full strength; one with nothing on it
+   is dimmed, so switching away does not hide that there is something there.
+   Ahead of the selected rules below, which have the same specificity and must
+   win: the level you are looking at is never dimmed, recorded or not. */
 .z1r-room-level[data-touched="false"] {
-  opacity: 0.55;
+  opacity: 0.45;
 }
 
-.z1r-room-level[data-touched="true"] {
-  box-shadow: inset 0 -2px 0 currentColor;
+/* Bigger, brighter, and underscored — three channels, so the selected level is
+   not telling you by colour alone. */
+.z1r-room-level[aria-pressed="true"] {
+  font-size: 23px;
+  color: var(--z1r-text);
+  opacity: 1;
+}
+
+.z1r-room-level[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 2px;
+  background: var(--z1r-accent);
 }
 
 .z1r-room-level:disabled {
