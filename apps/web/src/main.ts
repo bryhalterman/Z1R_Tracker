@@ -23,7 +23,16 @@ async function main(): Promise<void> {
   const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
 
   mountControls(controlsRoot, { store });
-  mountTracker(trackerRoot, { store, resolver });
+  /*
+   * Seed and Hints start folded on the page.
+   *
+   * Both are entered once and then read rarely — the seed settings are set
+   * before the run and the hint log is empty until a hint is heard — and
+   * between them they were costing a third of the first screen. Folded only
+   * until this browser saves a folded set of its own, so someone who opens
+   * Seed finds it open next time.
+   */
+  mountTracker(trackerRoot, { store, resolver, defaultCollapsed: ['Seed', 'Hints'] });
 }
 
 void main();

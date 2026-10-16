@@ -97,6 +97,22 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
      <rect x="4.4" y="8" width="4.8" height="1.2" fill="#efe8ff"/>`,
   ),
 
+  /*
+   * A warp staircase. Three descending steps, drawn as one silhouette.
+   *
+   * The stepped edge is the point: every other mark in the toolbar is a
+   * symmetric blob — an arch, an awning, a star, a hexagon, a bubble — so a
+   * shape that falls left to right is the one thing in the row that cannot be
+   * mistaken for its neighbours at 18px. The riser lines keep the steps apart
+   * once it is small enough for the notches to close up.
+   */
+  'mark.stairway': V(
+    `<path d="M1 1.8 L5.67 1.8 L5.67 6.26 L10.34 6.26 L10.34 10.71 L15 10.71 L15 14.8 L1 14.8 Z"
+        fill="#2fb0a6" stroke="#0f4a45" stroke-width="1.2" stroke-linejoin="round"/>
+     <path d="M5.67 6.26 L5.67 14.8 M10.34 10.71 L10.34 14.8" stroke="#0f4a45" stroke-width="1.2"
+        stroke-linecap="round" fill="none"/>`,
+  ),
+
   'mark.bombable': V(
     `<circle cx="7.5" cy="10" r="4.6" fill="#8e8e8e" stroke="#3d3d3d" stroke-width="1"/>
      <path d="M10.4 6 L12.4 3.6" stroke="#6b5432" stroke-width="1.5" stroke-linecap="round" fill="none"/>

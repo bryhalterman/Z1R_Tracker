@@ -196,7 +196,9 @@ function buildRow(
 
     const sprite = current.item ? (POOL_BY_ID.get(current.item)?.sprite ?? '') : '';
     renderedSprite = memoise(renderedSprite, sprite, () => {
-      if (sprite) slot.replaceChildren(createSprite(resolver, sprite, { size: 22 }));
+      // 20 to match the row height — see `.z1r-location-sprite`. A larger
+      // sprite would be the thing setting the row's height.
+      if (sprite) slot.replaceChildren(createSprite(resolver, sprite, { size: 20 }));
       else slot.replaceChildren();
     });
   });

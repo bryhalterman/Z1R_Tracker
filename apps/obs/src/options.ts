@@ -35,13 +35,17 @@ import type { TrackerSection } from '@z1r/ui';
 export const DOCK_SECTIONS: readonly TrackerSection[] = ['items', 'locations'];
 
 /**
- * The map dock: the overworld, and the hints that point at it.
+ * The map dock: the overworld, the hints that point at it, and the room sheet.
  *
  * A hint names a region and its whole payoff is the screens lighting up, so
  * reading one on a different window from the map it highlights meant looking
  * away from the answer to type the question. They travel together.
+ *
+ * The dungeon room sheet joins them because it is the other map: it wants width
+ * and it wants to be left alone, which is this window's whole premise. It sits
+ * last, below the overworld, so the panel that is glanced at keeps the top.
  */
-export const MAP_SECTIONS: readonly TrackerSection[] = ['seed', 'hintlog', 'map'];
+export const MAP_SECTIONS: readonly TrackerSection[] = ['seed', 'hintlog', 'map', 'rooms'];
 
 /**
  * What the overlay shows unless asked otherwise.
@@ -64,6 +68,10 @@ export const OVERLAY_DEFAULT_SECTIONS = 'items,dungeons';
  * Everything except the map. 128 screens carrying marks and codes is worth
  * reading in a window you can size and pointless as a static graphic over a
  * game capture; it has its own dock for that.
+ *
+ * The room sheet is excluded for a sharper reason: a browser source takes no
+ * clicks, and that panel is nothing but clicks. Every door, every room and
+ * every pick is a gesture, so on a stream it would be sixty-four dead cells.
  */
 export const OVERLAY_ALLOWED_SECTIONS: readonly TrackerSection[] = [
   'seed',

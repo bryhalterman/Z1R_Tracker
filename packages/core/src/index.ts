@@ -5,6 +5,7 @@ export * from './dungeons.js';
 export * from './overworld.js';
 export * from './regions.js';
 export * from './seed.js';
+export * from './rooms.js';
 export * from './state.js';
 export * from './logic.js';
 export * from './persistence.js';

@@ -621,8 +621,7 @@
 }
 
 /*
- * Detail written over the mark: the dungeon's number, or a shop's stock as
- * two-letter tags.
+ * Detail written over the mark: a dungeon's blockers, or a shop's prices.
  *
  * Text rather than more icons. At a dock's cell size a second icon is an
  * indistinct smudge, whereas a numeral stays a numeral — and "which dungeon"
@@ -646,7 +645,121 @@
   pointer-events: none;
 }
 
+/*
+ * A shop's price line: one column per stock icon, in the same thirds the icon
+ * row uses, so a number sits under the item it belongs to rather than in a
+ * centred run that has to be counted off against the sprites.
+ */
+.z1r-screen-detail[data-prices="true"] {
+  display: flex;
+  justify-content: center;
+  letter-spacing: 0;
+}
+
+.z1r-screen-price {
+  flex: 0 0 calc(100% / 3);
+  min-inline-size: 0;
+  /* A hand-typed four-figure price is the only thing that can reach the edge
+     of its column; clip it there rather than let it run into its neighbour.
+     The tooltip carries the exact number either way. */
+  overflow: hidden;
+}
+
+/*
+ * Three digits do not fit a 16px column at the base size, and rupee prices
+ * reach 255. The step down is only taken when a wide number is actually on the
+ * tile, so the common two-figure price keeps the larger type.
+ */
+.z1r-screen-detail[data-digits="3"] .z1r-screen-price {
+  font-size: calc(var(--z1r-text-2xs) - 1px);
+  letter-spacing: -0.04em;
+}
+
+.z1r-screen-detail[data-digits="4"] .z1r-screen-price {
+  font-size: calc(var(--z1r-text-2xs) - 2px);
+  letter-spacing: -0.06em;
+}
+
 .z1r-screen-detail[hidden] {
+  display: none;
+}
+
+/*
+ * What a shop sells, drawn as the items themselves along the bottom of the
+ * cell.
+ *
+ * The two-letter codes this replaced asked you to translate "AR BM PO" back
+ * into arrows, bombs and a potion on every glance. The codes and the names are
+ * in the tooltip, so the tile never depends on recognising the art — and the
+ * column widths are shared with the price line above so the two line up.
+ */
+.z1r-screen-stock {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.z1r-screen-stock:empty {
+  display: none;
+}
+
+/* Only when there is a price line to clear. */
+.z1r-screen[data-shop-prices="true"] .z1r-screen-stock {
+  inset-block-end: calc(var(--z1r-text-2xs) * 1.2);
+}
+
+.z1r-screen-stock-slot {
+  flex: 0 0 calc(100% / 3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 0;
+  /* The same constant dark backing the centred mark uses: terrain art varies
+     wildly and an icon that vanishes over forest is worse than no icon. */
+  background: color-mix(in srgb, var(--z1r-bg) 78%, transparent);
+  border-radius: 2px;
+}
+
+/* Sized from the cell rather than from the sprite call, so the row tracks the
+   map's zoom the way the warp staircase does. */
+.z1r-screen-stock-slot > .z1r-sprite {
+  inline-size: calc(var(--map-cell-height, 34px) * 0.4);
+  block-size: calc(var(--map-cell-height, 34px) * 0.4);
+}
+
+/*
+ * The overflow count, in the corner the region code leaves free.
+ *
+ * A shop with more stock than the row can hold still has to say so; a tile
+ * that silently drew three of five would be worse than the codes were.
+ */
+.z1r-screen-stock-more {
+  position: absolute;
+  inset-block-start: 1px;
+  inset-inline-end: 1px;
+  z-index: 3;
+  padding: 0 1px;
+  font-family: var(--z1r-font-mono);
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--z1r-text);
+  background: color-mix(in srgb, var(--z1r-bg) 88%, transparent);
+  border-radius: 0 0 0 3px;
+  pointer-events: none;
+}
+
+.z1r-screen-stock-more:empty {
+  display: none;
+}
+
+/* A shop drawing its stock has no use for the empty centre disc. */
+.z1r-screen[data-mark="shop"] .z1r-screen-mark:empty {
   display: none;
 }
 
@@ -726,6 +839,16 @@
   font-size: var(--z1r-text-xs);
   letter-spacing: 0.04em;
   color: var(--z1r-accent);
+}
+
+/* Warp staircases found, out of four. Sits between Regions and Clear. */
+.z1r-map-stairs {
+  margin-inline-start: 8px;
+  font-size: var(--z1r-text-xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--z1r-muted);
 }
 
 /* ------------------------------------------------------------- hint tracker */
@@ -985,24 +1108,33 @@
   color: var(--z1r-accent);
 }
 
+/*
+ * Ten groups, packed as tight as the rows inside them stay readable.
+ *
+ * The minimum column was 212px, which on a 1080px panel packed four columns
+ * and left the panel the tallest thing on the page after the map. 190px is
+ * what a row needs end to end — see the widths on `.z1r-location-kind` and
+ * `.z1r-location-label` below, which were trimmed to match — and it packs five
+ * columns in the same space, so the group rows go from three to two.
+ */
 .z1r-location-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 4px;
 }
 
 .z1r-location-group {
   background: var(--z1r-inset);
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
-  padding: 4px 5px;
+  padding: 3px 4px;
 }
 
 .z1r-location-group-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-block-end: 4px;
+  gap: 4px;
+  margin-block-end: 2px;
   font-size: var(--z1r-text-md);
   font-weight: 600;
   color: var(--z1r-muted);
@@ -1025,11 +1157,18 @@
   border-color: var(--z1r-accent);
 }
 
+/*
+ * One row per slot, at the height of the control inside it and no more.
+ *
+ * The row was 26px: a 24px picker plus a pixel of padding each side. Forty-odd
+ * of them is most of the panel's height, and the padding was buying nothing
+ * that the groups' own padding does not already give the block.
+ */
 .z1r-location {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 0;
+  gap: 3px;
+  padding: 0;
 }
 
 .z1r-location[data-collected="true"] {
@@ -1038,8 +1177,9 @@
 
 .z1r-location-kind {
   flex: none;
-  inline-size: 38px;
-  padding: 1px 0;
+  /* Four characters at 10px — "OW", "Floor", "Stair", "Heart" all fit. */
+  inline-size: 34px;
+  padding: 0;
   font-size: var(--z1r-text-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -1072,35 +1212,45 @@
 
 .z1r-location-label {
   flex: none;
-  min-inline-size: 56px;
+  min-inline-size: 48px;
   flex: 0 1 auto;
   font-size: var(--z1r-text-sm);
   color: var(--z1r-muted);
 }
 
+/* Matched to the row height below, so the sprite never sets it. */
 .z1r-location-sprite {
   flex: none;
-  inline-size: 22px;
-  block-size: 22px;
+  inline-size: 20px;
+  block-size: 20px;
 }
 
+/*
+ * The shortest control height Spectrum defines, not the next one up.
+ *
+ * This select is what sets the row height, so the six pixels between the two
+ * sizes are six pixels times every slot in the seed. 20px still clears the
+ * 12px label inside it, and the picker and the checkbox beside it stay the
+ * same controls they were.
+ */
 .z1r-location-picker {
   flex: 1;
   min-inline-size: 0;
-  block-size: var(--spectrum-component-height-75);
+  block-size: var(--spectrum-component-height-50);
 }
 
 .z1r-location[data-known="false"] .z1r-location-picker {
   color: var(--z1r-muted);
 }
 
-/* Native checkboxes render at 13x13. Padding the label out to 24px gives the
-   required hit area without resorting to a custom control. */
+/* Native checkboxes render at 13x13; 16px is the box itself, which is the hit
+   area — the margin only spaces it, so trimming it to match the 20px row costs
+   nothing a click can feel. */
 .z1r-location-check {
   flex: none;
   inline-size: 16px;
   block-size: 16px;
-  margin: 4px;
+  margin: 2px;
   cursor: pointer;
 }
 
@@ -1407,6 +1557,45 @@
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
   cursor: pointer;
+}
+
+/*
+ * One stock item: the toggle, and the price under it.
+ *
+ * Stacked rather than side by side. The row carries eight of these, and eight
+ * icon-and-box pairs laid out horizontally wrap into an unreadable ribbon in a
+ * dock-width panel.
+ */
+.z1r-mark-stock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  inline-size: var(--spectrum-component-height-100);
+}
+
+.z1r-mark-stock-price {
+  block-size: calc(var(--spectrum-component-height-100) * 0.7);
+  padding-inline: 2px;
+  font-size: var(--z1r-text-xs);
+  text-align: center;
+  /* Spinners would take most of a 32px box and there is nothing to step
+     through — prices are typed once, off the shop's own sign. */
+  appearance: textfield;
+}
+
+.z1r-mark-stock-price::-webkit-outer-spin-button,
+.z1r-mark-stock-price::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+/* Matches the unticked toggle above it: dimmed *and* dashed, never colour
+   alone. An item that is not stocked has no price to record. */
+.z1r-mark-stock-price:disabled {
+  border-style: dashed;
+  opacity: 0.4;
+  cursor: default;
 }
 
 .z1r-mark-stock-option {
@@ -1998,4 +2187,742 @@
 
 .z1r-locations-triforce[data-ready="true"] {
   color: var(--z1r-good);
+}
+
+/* ------------------------------------------------------ warp corner + routes */
+
+/*
+ * A warp's staircase, rooted in the bottom-left corner of its screen.
+ *
+ * Bigger than the other marks and placed rather than centred, because a warp is
+ * a piece of route rather than a thing on a screen — you look for it while
+ * planning a move across the map, not while reading one cell.
+ */
+.z1r-screen-warp {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.z1r-screen-warp:empty {
+  display: none;
+}
+
+/*
+ * A light halo around the staircase.
+ *
+ * The glyph is teal with a dark outline, which vanishes against the dark cave
+ * mouths and mountain tiles it most often sits on. The same problem the dungeon
+ * numeral solves with a black outline, solved the other way round because this
+ * shape is already dark-edged.
+ */
+.z1r-screen-warp > .z1r-sprite {
+  /* Sized here rather than at the call site so it tracks the cell as the panel
+     is resized, the same way the dungeon numeral does. */
+  inline-size: calc(var(--map-cell-height, 40px) * 0.95);
+  block-size: calc(var(--map-cell-height, 40px) * 0.95);
+  filter: drop-shadow(0 0 1px var(--z1r-text)) drop-shadow(0 0 1px var(--z1r-text));
+}
+
+/*
+ * Which of the four, sitting on the staircase itself.
+ *
+ * Beside the icon it was competing with it for a cell 50px wide, so both ended
+ * up small. On top of it, the staircase gets the whole corner and the digit
+ * gets the widest part of the tread.
+ *
+ * Inverted against `.z1r-screen-level`: that one is light with a dark outline,
+ * this one is dark with a light one. A dungeon number and a warp number are
+ * both single digits on the same map, so a runner has to tell them apart
+ * without reading either — the icon under it says warp, and the reversed
+ * treatment says it again for anyone glancing at the number alone.
+ */
+.z1r-screen-warp-num {
+  position: absolute;
+  inset-block-end: 8%;
+  inset-inline-start: 0;
+  inline-size: 76%;
+  color: var(--z1r-bg);
+  font-size: calc(var(--map-cell-height, 40px) * 0.42);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px 0 var(--z1r-text), 0 -1px 0 var(--z1r-text),
+    1px 0 0 var(--z1r-text), -1px 0 0 var(--z1r-text);
+}
+
+.z1r-screen-warp-num:empty {
+  display: none;
+}
+
+/*
+ * The warp routing table, above the grid.
+ *
+ * One row per warp: which screen it is on, then its three staircases in the
+ * order they stand in the room.
+ */
+.z1r-warp-routes {
+  display: grid;
+  gap: 2px;
+  margin-block-end: 6px;
+  font-size: var(--z1r-text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.z1r-warp-route {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* An unmarked warp still shows its row, dimmed and dashed — the routing holds
+   whether or not you have found it, and a row that disappeared would move the
+   others. Two channels, neither of them colour. */
+.z1r-warp-route[data-found="false"] {
+  opacity: 0.55;
+}
+
+.z1r-warp-route-from {
+  min-width: 14px;
+  padding-inline: 3px;
+  border: 1px solid var(--z1r-text);
+  border-radius: 3px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--z1r-text);
+}
+
+.z1r-warp-route-at {
+  min-width: 24px;
+  color: var(--z1r-text);
+  font-weight: 700;
+}
+
+.z1r-warp-route-exit {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 1px 4px;
+  border: 1px dashed var(--z1r-border);
+  border-radius: 3px;
+  color: var(--z1r-muted);
+}
+
+.z1r-warp-route-side {
+  color: var(--z1r-text);
+}
+
+.z1r-warp-route-to {
+  font-weight: 800;
+  color: var(--z1r-text);
+}
+
+.z1r-warp-route-screen {
+  color: var(--z1r-muted);
+}
+
+/* ------------------------------------------------------------- place mode */
+
+/*
+ * Arming an item for the dungeon room sheet.
+ *
+ * Everything here is behind the Place toggle, which only an interactive mount
+ * builds — the OBS overlay grows neither the control nor the extra group.
+ */
+
+.z1r-items-place {
+  margin-inline-start: auto;
+}
+
+/*
+ * On reads as a dashed ring and a lifted ground, the two channels the overworld
+ * marker toolbar already uses. Never hue on its own, and the word stays.
+ */
+.z1r-chip-button[data-on="true"] {
+  color: var(--z1r-text);
+  background: var(--z1r-inset);
+  border-color: var(--z1r-accent);
+  outline: var(--z1r-border-width-thick) dashed var(--z1r-accent);
+  outline-offset: 2px;
+}
+
+.z1r-chip-danger {
+  color: var(--z1r-bad);
+  border-color: var(--z1r-bad);
+}
+
+.z1r-chip-danger:hover,
+.z1r-chip-danger:focus-visible {
+  color: var(--z1r-bg);
+  background: var(--z1r-bad);
+  border-color: var(--z1r-bad);
+}
+
+/* The armed cell is the one the next room click spends: full strength, a solid
+   border, and a dashed ring outside it that no other item state uses. */
+.z1r-item[data-armed="true"] {
+  filter: none;
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--z1r-accent);
+  outline: var(--z1r-border-width-thick) dashed var(--z1r-accent);
+  outline-offset: 1px;
+}
+
+/*
+ * A corner tick on an item already recorded in some room, so this panel says
+ * what is spoken for without opening the sheet. The tooltip names the rooms, so
+ * the tick is never the only way to learn it.
+ *
+ * Not drawn on the overlay. That is a read-only graphic over a game capture and
+ * nothing about this feature should change what a viewer sees; the attribute is
+ * still set there, so a Custom CSS rule can opt back in.
+ */
+.z1r-tracker:not([data-mode="overlay"]) .z1r-item[data-placed="true"]::after {
+  content: "\25e5";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 1px;
+  font-size: var(--z1r-text-2xs);
+  line-height: 1;
+  color: var(--z1r-accent);
+  pointer-events: none;
+}
+
+/* While placing, a cell with no room item behind it is plainly out of the
+   gesture rather than quietly inert when clicked. */
+.z1r-panel[data-placing="true"] .z1r-item[data-placeable="false"] {
+  opacity: 0.25;
+  border-style: dotted;
+}
+
+/* Dungeon pickups are not inventory: nothing there can be held, so none of it
+   is drawn as a thing you are missing. */
+.z1r-item-dungeon {
+  filter: none;
+  opacity: 1;
+  border-style: solid;
+}
+
+/* ------------------------------------------------------------- room sheet */
+
+/*
+ * Graph paper, in the palette the rest of the tracker uses.
+ *
+ * Ruled in two weights the way squared paper is: a fine rule inside the cell
+ * and a heavy one on the cell boundary, so the eight-by-eight reads as a sheet
+ * rather than as a table of buttons. A room you have walked is drawn on the
+ * paper; a room you have not is bare paper, which is what mapping a dungeon on
+ * paper by hand ends up looking like.
+ */
+.z1r-rooms-panel {
+  /*
+   * Paper, ink and rules, derived from the palette rather than picked. These
+   * are surfaces and line weights, not new semantic colours, so they stay
+   * local to this panel instead of joining the aliases in theme.css.
+   */
+  --z1r-room-paper-bg: var(--z1r-field);
+  --z1r-room-ink: var(--z1r-text);
+  --z1r-room-rule: color-mix(in srgb, var(--z1r-text) 14%, transparent);
+  --z1r-room-rule-heavy: color-mix(in srgb, var(--z1r-text) 34%, transparent);
+  min-inline-size: 0;
+}
+
+.z1r-room-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-inline-start: var(--z1r-space-md);
+}
+
+.z1r-room-level {
+  inline-size: 26px;
+  block-size: 22px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--z1r-text-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-muted);
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+}
+
+.z1r-room-level[aria-pressed="true"] {
+  color: var(--z1r-bg);
+  background: var(--z1r-accent);
+  border-color: var(--z1r-accent);
+}
+
+/*
+ * A level with rooms recorded is underscored inside its own pill and drawn at
+ * full strength; one with nothing is dimmed. The rule takes the pill's own text
+ * colour, so it reads whether the pill is selected or not, and nothing sits
+ * under the digit.
+ */
+.z1r-room-level[data-touched="false"] {
+  opacity: 0.55;
+}
+
+.z1r-room-level[data-touched="true"] {
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+
+.z1r-room-level:disabled {
+  cursor: default;
+}
+
+.z1r-room-spacer {
+  margin-inline-start: auto;
+}
+
+.z1r-room-count {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.z1r-room-paper {
+  /*
+   * Capped rather than left to fill the panel. The sheet is sixty-four cells of
+   * a fixed aspect, so a full-page width makes every cell enormous and pushes
+   * the detail strip off the first screen.
+   */
+  max-inline-size: 460px;
+  padding: 6px;
+  background-color: var(--z1r-room-paper-bg);
+  background-image:
+    repeating-linear-gradient(to right, var(--z1r-room-rule) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(to bottom, var(--z1r-room-rule) 0 1px, transparent 1px 7px);
+  background-position: 6px 6px;
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius-sm);
+}
+
+/* While an item is armed, the whole sheet says a click will place it. */
+.z1r-room-paper[data-arming="true"],
+.z1r-room-paper[data-arming="true"] .z1r-room {
+  cursor: copy;
+}
+
+.z1r-room-grid {
+  display: grid;
+  /*
+   * minmax(0, 1fr), not 1fr: a bare 1fr track will not shrink below the
+   * min-content of what is in it, and a cell under an aspect-ratio carrying art
+   * has a min-content wider than an eighth of a narrow dock — so the last
+   * column laid out past the sheet's own edge.
+   */
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0;
+  /* The heavy rules are the cell boundaries themselves, drawn once on the
+     container so neighbours share a line instead of doubling it. */
+  border-block-start: var(--z1r-border-width) solid var(--z1r-room-rule-heavy);
+  border-inline-start: var(--z1r-border-width) solid var(--z1r-room-rule-heavy);
+}
+
+.z1r-room {
+  position: relative;
+  aspect-ratio: 1 / 0.8;
+  min-inline-size: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--z1r-room-ink);
+  background: transparent;
+  border: 0;
+  border-block-end: var(--z1r-border-width) solid var(--z1r-room-rule-heavy);
+  border-inline-end: var(--z1r-border-width) solid var(--z1r-room-rule-heavy);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.z1r-room:disabled {
+  cursor: default;
+}
+
+/*
+ * A visited room is pencilled in: an inked box inset from the rules, the way
+ * you would draw it over the squares. Unvisited is left as bare paper, so the
+ * difference is a drawn shape rather than a shade.
+ */
+.z1r-room[data-visited="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: color-mix(in srgb, var(--z1r-room-ink) 7%, transparent);
+  border: var(--z1r-border-width) solid var(--z1r-room-ink);
+  pointer-events: none;
+}
+
+.z1r-room[aria-current="true"] {
+  outline: var(--z1r-border-width-thick) solid var(--z1r-accent);
+  outline-offset: -2px;
+}
+
+.z1r-room:focus-visible {
+  outline: var(--z1r-border-width-thick) solid var(--z1r-room-ink);
+  outline-offset: -2px;
+}
+
+/* ------------------------------------------------------------- door edges */
+
+/*
+ * Each edge covers half its side and is 10px deep, which is a real target on a
+ * 50px cell rather than a sliver. The drawn rule stays thin; only the hit area
+ * is large.
+ */
+.z1r-room-door {
+  position: absolute;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.z1r-room-door.n,
+.z1r-room-door.s {
+  inset-inline: 25%;
+  block-size: 10px;
+}
+
+.z1r-room-door.e,
+.z1r-room-door.w {
+  inset-block: 22%;
+  inline-size: 10px;
+}
+
+.z1r-room-door.n {
+  inset-block-start: 0;
+}
+
+.z1r-room-door.s {
+  inset-block-end: 0;
+}
+
+.z1r-room-door.w {
+  inset-inline-start: 0;
+}
+
+.z1r-room-door.e {
+  inset-inline-end: 0;
+}
+
+.z1r-rooms-panel[data-interactive="false"] .z1r-room-door {
+  cursor: default;
+  pointer-events: none;
+}
+
+.z1r-room-door::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.z1r-room-door.n::after,
+.z1r-room-door.s::after {
+  inline-size: 100%;
+  block-size: 0;
+}
+
+.z1r-room-door.e::after,
+.z1r-room-door.w::after {
+  inline-size: 0;
+  block-size: 100%;
+}
+
+/* unknown draws nothing at all — most edges are unknown most of the time. */
+
+/*
+ * Six states, six line treatments: nothing, a gapped line, a solid one, dashed,
+ * double, dotted. Hue reinforces each and carries none of them.
+ *
+ * Open is drawn as two stubs with a gap, which is both how a doorway is drawn
+ * on paper and the reason it is not simply a solid line in another colour: open
+ * and wall were a green line and an ink line of the same shape, which is state
+ * by colour alone. Every edge also names its state, with the model's own
+ * two-letter tag, in its tooltip.
+ */
+.z1r-room-door.n[data-door="open"]::after,
+.z1r-room-door.s[data-door="open"]::after {
+  block-size: 3px;
+  background: linear-gradient(
+    to right,
+    var(--z1r-good) 0 32%,
+    transparent 32% 68%,
+    var(--z1r-good) 68% 100%
+  );
+}
+
+.z1r-room-door.e[data-door="open"]::after,
+.z1r-room-door.w[data-door="open"]::after {
+  inline-size: 3px;
+  background: linear-gradient(
+    to bottom,
+    var(--z1r-good) 0 32%,
+    transparent 32% 68%,
+    var(--z1r-good) 68% 100%
+  );
+}
+
+.z1r-room-door[data-door="wall"]::after {
+  border-block-start: 3px solid var(--z1r-room-ink);
+}
+
+.z1r-room-door[data-door="bomb"]::after {
+  border-block-start: 3px dashed var(--z1r-bad);
+}
+
+.z1r-room-door[data-door="locked"]::after {
+  border-block-start: 3px double var(--z1r-accent);
+}
+
+.z1r-room-door[data-door="shutter"]::after {
+  border-block-start: 3px dotted var(--z1r-stair);
+}
+
+.z1r-room-door.e[data-door="wall"]::after,
+.z1r-room-door.w[data-door="wall"]::after {
+  border-block-start: 0;
+  border-inline-start: 3px solid var(--z1r-room-ink);
+}
+
+.z1r-room-door.e[data-door="bomb"]::after,
+.z1r-room-door.w[data-door="bomb"]::after {
+  border-block-start: 0;
+  border-inline-start: 3px dashed var(--z1r-bad);
+}
+
+.z1r-room-door.e[data-door="locked"]::after,
+.z1r-room-door.w[data-door="locked"]::after {
+  border-block-start: 0;
+  border-inline-start: 3px double var(--z1r-accent);
+}
+
+.z1r-room-door.e[data-door="shutter"]::after,
+.z1r-room-door.w[data-door="shutter"]::after {
+  border-block-start: 0;
+  border-inline-start: 3px dotted var(--z1r-stair);
+}
+
+.z1r-room-door:hover {
+  background: color-mix(in srgb, var(--z1r-accent) 18%, transparent);
+}
+
+/* ----------------------------------------------------------- room contents */
+
+/*
+ * The boss fills the room rather than sitting in a corner: a boss room is the
+ * thing you scan this sheet for, and the sprite says which one without a
+ * legend. The item sprite and the stair marks ride above it.
+ */
+.z1r-room-boss {
+  position: absolute;
+  inset: 3px;
+  inline-size: calc(100% - 6px);
+  block-size: calc(100% - 6px);
+  background-size: contain;
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.z1r-room-mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.z1r-room-mark .z1r-sprite {
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+}
+
+.z1r-room-stairs {
+  font-size: var(--z1r-text-lg);
+  line-height: 1;
+  color: var(--z1r-stair);
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+}
+
+/* The pair number borrows the warp marker's treatment: a dark digit on a light
+   plate, the inverse of the big outlined dungeon numeral. */
+.z1r-room-transport {
+  min-inline-size: 13px;
+  padding-inline: 2px;
+  font-size: var(--z1r-text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--z1r-bg);
+  background: var(--z1r-stair);
+  border-radius: 3px;
+}
+
+/* ----------------------------------------------------------- detail strip */
+
+.z1r-room-detail {
+  display: grid;
+  gap: 5px;
+  margin-block-start: 7px;
+  padding-block-start: 7px;
+  font-size: var(--z1r-text-xs);
+  border-block-start: var(--z1r-border-width) solid var(--z1r-border);
+}
+
+.z1r-room-detail-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+.z1r-room-detail-row > .z1r-room-key {
+  /* flex: none, because the default shrink would squeeze a label narrower than
+     its own word and clip it. */
+  flex: none;
+  inline-size: 50px;
+  padding-block-start: 4px;
+  font-size: var(--z1r-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--z1r-muted);
+}
+
+.z1r-room-detail select {
+  min-inline-size: 0;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: var(--z1r-text-xs);
+  color: var(--z1r-text);
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+}
+
+/* The popup is drawn by the platform against a surface we do not own, so both
+   colours are set explicitly rather than inherited. See ARCHITECTURE.md. */
+.z1r-room-detail select option {
+  color: var(--z1r-text);
+  background-color: var(--z1r-panel);
+}
+
+/* With no room selected the editable rows are plainly not in play. Their
+   controls are disabled too, so this is reinforcement rather than the whole
+   story. */
+.z1r-room-detail[data-empty="true"] .z1r-room-editable {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.z1r-room-hint {
+  padding-block-start: 4px;
+  font-size: var(--z1r-text-2xs);
+  color: var(--z1r-muted);
+}
+
+/*
+ * One tight line under the item grid, not a paragraph. It is the only place the
+ * Items panel says which mode a click is in, so it stays — at the smallest type
+ * and a single line height.
+ */
+.z1r-room-item-status {
+  margin: 4px 0 0;
+  font-size: var(--z1r-text-2xs);
+  line-height: 1.2;
+  color: var(--z1r-muted);
+}
+
+.z1r-room-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.z1r-room-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* These sit in a flex row, where the default shrink would squeeze a word
+     button narrower than its own label and clip it. */
+  flex: none;
+  inline-size: 26px;
+  block-size: 24px;
+  padding: 1px;
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+}
+
+.z1r-room-pick[aria-pressed="true"] {
+  border-color: var(--z1r-accent);
+  box-shadow: inset 0 0 0 1px var(--z1r-accent);
+}
+
+.z1r-room-pick:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.z1r-room-pick.z1r-room-word {
+  inline-size: auto;
+  padding-inline: 6px;
+  font: inherit;
+  font-size: var(--z1r-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--z1r-muted);
+}
+
+.z1r-room-pick.z1r-room-word[aria-pressed="true"] {
+  color: var(--z1r-text);
+}
+
+/* The room's item is shown, not chosen, here — it comes from the Items panel. */
+.z1r-room-item {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-inline-size: 0;
+  padding-block-start: 2px;
+}
+
+.z1r-room-item-name {
+  color: var(--z1r-text);
+}
+
+.z1r-room-doors {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  flex: 1 1 240px;
+  min-inline-size: 0;
+}
+
+.z1r-room-doors label {
+  display: grid;
+  gap: 1px;
+  min-inline-size: 0;
+  font-size: var(--z1r-text-2xs);
+  color: var(--z1r-muted);
+}
+
+.z1r-room-doors select {
+  inline-size: 100%;
 }

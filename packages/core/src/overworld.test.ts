@@ -3,7 +3,12 @@ import { test } from 'node:test';
 
 import { migrate } from './persistence.js';
 import { createInitialState, reduce, type TrackerState } from './state.js';
-import { MARKS, MARKS_BY_KIND, type MarkKind } from './overworld.js';
+import {
+  MARKS,
+  MARKS_BY_KIND,
+  OVERWORLD_STAIRWAY_COUNT,
+  type MarkKind,
+} from './overworld.js';
 import { VECTORS } from './sprites/vectors.js';
 import { bundledManifest } from './index.js';
 
@@ -16,7 +21,7 @@ function marked(screen: string, mark: MarkKind): TrackerState {
 test('the mark kinds are the ones the toolbar offers', () => {
   assert.deepEqual(
     [...MARKS_BY_KIND.keys()].sort(),
-    ['dungeon', 'gamble', 'hintroom', 'item', 'none', 'shop', 'visited'],
+    ['dungeon', 'gamble', 'hintroom', 'item', 'none', 'shop', 'stairway', 'visited'],
   );
 });
 
@@ -153,6 +158,126 @@ test('migrate rejects malformed screen notes', () => {
   assert.equal('A5' in state.screenNotes, false);
 });
 
+test('meat, a heart container and the magical shield are stockable', () => {
+  let state = marked('E3', 'shop');
+  for (const stock of ['bait', 'heart', 'magicalShield']) {
+    state = reduce(state, { type: 'toggleShopStock', screen: 'E3', stock });
+  }
+  assert.deepEqual(state.screenNotes['E3']?.shop, ['bait', 'heart', 'magicalShield']);
+});
+
+test('a shop price is optional and clamps to a whole number of rupees', () => {
+  for (const [input, expected] of [
+    [100, 100],
+    // Rupees are whole; a typed fraction is truncated rather than refused.
+    [20.7, 20],
+    // Nothing below zero is a price, and nothing unparseable is either — both
+    // land on 0, which is the empty value.
+    [-40, 0],
+    [Number.NaN, 0],
+    [Number.POSITIVE_INFINITY, 0],
+  ] as const) {
+    let state = reduce(marked('E2', 'shop'), {
+      type: 'toggleShopStock',
+      screen: 'E2',
+      stock: 'bomb',
+    });
+    state = reduce(state, {
+      type: 'setShopPrice',
+      screen: 'E2',
+      stock: 'bomb',
+      price: input,
+    });
+    assert.equal(
+      state.screenNotes['E2']?.shopPrices['bomb'] ?? 0,
+      expected,
+      `price ${String(input)}`,
+    );
+  }
+});
+
+test('a price of 0 removes the key rather than storing a zero', () => {
+  // Otherwise every shop you thought about pricing carries `{"bomb":0}` into
+  // the save file and out again on export.
+  let state = reduce(marked('E2', 'shop'), {
+    type: 'toggleShopStock',
+    screen: 'E2',
+    stock: 'bomb',
+  });
+  state = reduce(state, { type: 'setShopPrice', screen: 'E2', stock: 'bomb', price: 20 });
+  assert.deepEqual(state.screenNotes['E2']?.shopPrices, { bomb: 20 });
+
+  state = reduce(state, { type: 'setShopPrice', screen: 'E2', stock: 'bomb', price: 0 });
+  assert.deepEqual(state.screenNotes['E2']?.shopPrices, {});
+  assert.deepEqual(state.screenNotes['E2']?.shop, ['bomb'], 'the stock itself stays');
+});
+
+test('untoggling a stock item drops its price with it', () => {
+  /*
+   * Otherwise ticking the same item again later brings back a number nobody
+   * saw in this shop, which reads as the tracker inventing data.
+   */
+  let state = reduce(marked('E2', 'shop'), {
+    type: 'toggleShopStock',
+    screen: 'E2',
+    stock: 'blueRing',
+  });
+  state = reduce(state, {
+    type: 'setShopPrice',
+    screen: 'E2',
+    stock: 'blueRing',
+    price: 250,
+  });
+  state = reduce(state, { type: 'toggleShopStock', screen: 'E2', stock: 'blueRing' });
+  assert.equal('E2' in state.screenNotes, false, 'nothing left, so the note goes');
+
+  state = reduce(state, { type: 'toggleShopStock', screen: 'E2', stock: 'blueRing' });
+  assert.deepEqual(state.screenNotes['E2']?.shopPrices, {});
+});
+
+test('a save written before prices existed loads with none', () => {
+  // Every save up to v9 predates `shopPrices`. The field has to arrive empty
+  // rather than undefined: the reducer spreads it and the map indexes into it.
+  const save = saveWith({
+    version: 9,
+    marks: { A1: 'shop' },
+    screenNotes: { A1: { dungeon: 0, shop: ['bomb', 'key'], spot: '', item: '' } },
+  });
+  const state = migrate(save);
+  assert.ok(state);
+  assert.deepEqual(state.screenNotes['A1']?.shop, ['bomb', 'key']);
+  assert.deepEqual(state.screenNotes['A1']?.shopPrices, {});
+});
+
+test('migrate rejects prices that are not whole positive numbers', () => {
+  const save = saveWith({
+    marks: { A1: 'shop', A2: 'shop' },
+    screenNotes: {
+      A1: {
+        shop: ['arrow', 'bomb', 'key', 'potion'],
+        // Drawn as a numeral on a 50px cell, so each of these would either
+        // print as nonsense or push the price line off the tile.
+        shopPrices: { bomb: -20, key: Number.NaN, potion: 'lots', arrow: 12.9 },
+        spot: '',
+        item: '',
+      },
+      // A hostile shape must not throw, and a price for something this shop
+      // does not stock renders nowhere — so it is not worth keeping.
+      A2: { shop: ['bomb'], shopPrices: 'nonsense', spot: '', item: '' },
+      A3: { shop: ['bomb'], shopPrices: { blueRing: 250 }, spot: '', item: '' },
+    },
+  });
+  const state = migrate(save);
+  assert.ok(state);
+  assert.deepEqual(
+    state.screenNotes['A1']?.shopPrices,
+    { arrow: 12 },
+    'negative, NaN and non-numeric dropped; a fraction truncates',
+  );
+  assert.deepEqual(state.screenNotes['A2']?.shopPrices, {}, 'a non-object is no prices');
+  assert.deepEqual(state.screenNotes['A3']?.shopPrices, {}, 'a price for unstocked goods goes');
+});
+
 test('a dungeon records what turned you back', () => {
   let state = marked('F2', 'dungeon');
   for (const block of ['ladder', 'key']) {
@@ -274,4 +399,69 @@ test('placeDungeon clamps to a real level', () => {
     });
     assert.equal(state.screenNotes['A1']?.dungeon, expected, `level ${input}`);
   }
+});
+
+test('a stairway number exists in exactly one place', () => {
+  /*
+   * There is one stairway 2. Marking a second means the first was wrong, so
+   * the number moves rather than sitting on two screens that cannot both be it.
+   */
+  let state = reduce(createInitialState(), { type: 'placeStairway', screen: 'A1', number: 2 });
+  state = reduce(state, { type: 'placeStairway', screen: 'H8', number: 2 });
+
+  assert.equal('A1' in state.marks, false, 'old screen cleared');
+  assert.equal('A1' in state.screenNotes, false, 'old note cleared');
+  assert.equal(state.marks['H8'], 'stairway');
+  assert.equal(state.screenNotes['H8']?.stairway, 2);
+  assert.equal(
+    Object.values(state.screenNotes).filter((n) => n.stairway === 2).length,
+    1,
+    'exactly one screen holds stairway 2',
+  );
+});
+
+test('two stairways with different numbers both stand', () => {
+  // Only the number is unique. Four marks on four screens is the whole point.
+  let state = reduce(createInitialState(), { type: 'placeStairway', screen: 'A1', number: 1 });
+  state = reduce(state, { type: 'placeStairway', screen: 'H8', number: 2 });
+
+  assert.equal(state.marks['A1'], 'stairway');
+  assert.equal(state.marks['H8'], 'stairway');
+  assert.equal(state.screenNotes['A1']?.stairway, 1);
+  assert.equal(state.screenNotes['H8']?.stairway, 2);
+});
+
+test('placeStairway clamps to one of the four', () => {
+  for (const [input, expected] of [[0, 1], [7, OVERWORLD_STAIRWAY_COUNT], [-4, 1]] as const) {
+    const state = reduce(createInitialState(), {
+      type: 'placeStairway',
+      screen: 'A1',
+      number: input,
+    });
+    assert.equal(state.screenNotes['A1']?.stairway, expected, `stairway ${input}`);
+  }
+});
+
+test('migrate rejects a malformed stairway number', () => {
+  const save = saveWith({
+    marks: { A1: 'stairway', A2: 'stairway', A3: 'stairway', A4: 'stairway' },
+    screenNotes: {
+      A1: { stairway: 'nonsense', shop: [], spot: '', item: '' },
+      A2: { stairway: '3', shop: [], spot: '', item: '' },
+      A3: { stairway: 9, shop: [], spot: '', item: '' },
+      A4: { stairway: -2, shop: [], spot: '', item: '' },
+    },
+  });
+  const state = migrate(save);
+  assert.ok(state);
+  // Nothing left worth keeping, so the note goes rather than sitting in the
+  // save as an invisible entry.
+  assert.equal('A1' in state.screenNotes, false, 'unparseable number dropped');
+  assert.equal(state.screenNotes['A2']?.stairway, 3, 'numeric string coerced');
+  assert.equal(
+    state.screenNotes['A3']?.stairway,
+    OVERWORLD_STAIRWAY_COUNT,
+    'clamped to the top of the range',
+  );
+  assert.equal('A4' in state.screenNotes, false, 'negative clamps to 0 and drops the note');
 });

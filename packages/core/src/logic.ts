@@ -11,6 +11,7 @@
  */
 
 import type { TrackerState } from './state.js';
+import { OVERWORLD_STAIRWAY_COUNT } from './overworld.js';
 import { triforceCount } from './state.js';
 import { TRIFORCE_REQUIRED_FOR_L9 } from './dungeons.js';
 import { deriveLocations } from './seed.js';
@@ -58,4 +59,65 @@ export function dungeonItems(state: TrackerState, level: number): string[] {
     .filter((location) => location.level === level && location.kind !== 'heart')
     .map((location) => state.locations[location.id]?.item ?? '')
     .filter((item): item is string => item !== '');
+}
+
+/**
+ * Where each staircase inside a warp room comes out.
+ *
+ * The four warps sit in a fixed cycle, and the three staircases in any one of
+ * them are, left to right, the next three warps around that cycle. Checked
+ * in the game's own code, not inferred from a walkthrough: the
+ * warp room adds the chosen staircase's value to the current room's index in a
+ * four-entry array and masks it to two bits, so left is the successor, middle
+ * the one after, right the one before you. The published vanilla chart agrees,
+ * and so does what the randomizer community documents. The randomizer can move
+ * the four caves and its author says they stay connected; that the ordering
+ * survives the move is community knowledge rather than documented behavior.
+ *
+ * That is why the map asks for the warps to be numbered in the order the
+ * leftmost staircase walks you through them: doing it that way makes the
+ * numbering the cycle, and then none of this has to be discovered. The screens
+ * are the only unknown, and they fill in as the other three get marked.
+ */
+export const WARP_EXITS = ['left', 'middle', 'right'] as const;
+
+export type WarpExit = (typeof WARP_EXITS)[number];
+
+export interface WarpExitRoute {
+  /** Which staircase in the room, as you face them. */
+  readonly position: WarpExit;
+  /** The warp it comes out at, 1-4. */
+  readonly warp: number;
+  /** That warp's screen, or null while it is still unmarked. */
+  readonly screen: string | null;
+}
+
+export interface WarpRoute {
+  readonly warp: number;
+  readonly screen: string | null;
+  readonly exits: readonly WarpExitRoute[];
+}
+
+/** The screen each numbered warp is marked on, indexed by number. */
+function warpScreens(state: TrackerState): Map<number, string> {
+  const found = new Map<number, string>();
+  for (const [screen, mark] of Object.entries(state.marks)) {
+    if (mark !== 'stairway') continue;
+    const number = state.screenNotes[screen]?.stairway ?? 0;
+    if (number >= 1 && number <= OVERWORLD_STAIRWAY_COUNT) found.set(number, screen);
+  }
+  return found;
+}
+
+export function warpRoutes(state: TrackerState): WarpRoute[] {
+  const screens = warpScreens(state);
+  const routes: WarpRoute[] = [];
+  for (let warp = 1; warp <= OVERWORLD_STAIRWAY_COUNT; warp++) {
+    const exits = WARP_EXITS.map((position, step) => {
+      const target = ((warp - 1 + step + 1) % OVERWORLD_STAIRWAY_COUNT) + 1;
+      return { position, warp: target, screen: screens.get(target) ?? null };
+    });
+    routes.push({ warp, screen: screens.get(warp) ?? null, exits });
+  }
+  return routes;
 }

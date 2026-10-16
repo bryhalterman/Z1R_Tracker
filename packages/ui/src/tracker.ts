@@ -21,7 +21,10 @@ import {
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
+  OVERWORLD_STAIRWAY_COUNT,
+  warpRoutes,
   POOL_BY_ID,
+  ROOM_ITEMS_BY_ID,
   REGIONS_BY_ID,
   regionForScreen,
   SHOP_STOCK,
@@ -34,6 +37,7 @@ import {
   spriteFor,
   type ItemDef,
   type MarkKind,
+  type RoomItemDef,
   type ScreenNote,
   type SpriteResolver,
   type Store,
@@ -45,6 +49,14 @@ import { buildSeedPanel } from './seed-panel.js';
 import { buildLocations } from './locations.js';
 import { buildHintTracker } from './hints.js';
 import { buildTriforce } from './triforce.js';
+import {
+  UNHELD_ROOM_ITEMS,
+  buildRooms,
+  createPlacement,
+  roomItemForInventory,
+  roomItemsForInventory,
+  type PlacementChannel,
+} from './rooms.js';
 
 export type TrackerSection =
   | 'seed'
@@ -52,7 +64,8 @@ export type TrackerSection =
   | 'dungeons'
   | 'locations'
   | 'hintlog'
-  | 'map';
+  | 'map'
+  | 'rooms';
 
 export interface MountOptions {
   readonly store: Store;
@@ -69,6 +82,19 @@ export interface MountOptions {
    * have a compact form use it; the rest are unaffected.
    */
   readonly compact?: boolean;
+  /**
+   * Panels a first-time visitor finds folded, named by their heading text —
+   * the same key `wireCollapsing` stores, so `['Seed', 'Hints']` folds those
+   * two.
+   *
+   * Only ever a *default*. Once this window has saved a folded set of its own
+   * it wins outright, so a panel someone chose to open stays open.
+   *
+   * Per app rather than global: the OBS dock and the map dock mount in the
+   * same `full` mode as the page, and neither should start folding panels
+   * because the page wanted to.
+   */
+  readonly defaultCollapsed?: readonly string[];
 }
 
 const DEFAULT_SECTIONS: readonly TrackerSection[] = [
@@ -78,6 +104,10 @@ const DEFAULT_SECTIONS: readonly TrackerSection[] = [
   'locations',
   'hintlog',
   'map',
+  // Last, below the overworld. The room sheet is the panel you lean into for a
+  // level at a time; the overworld is the one that stays put and gets glanced
+  // at, so it keeps the top of the page.
+  'rooms',
 ];
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -106,6 +136,16 @@ function shortCode(name: string | undefined): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+/**
+ * How many stock icons a shop tile draws.
+ *
+ * A map cell is about 50x34 CSS pixels at dock width, which is three columns of
+ * roughly 16px: a 14px sprite and a price of up to three digits under it. A
+ * fourth column would be legible as neither. Anything past the third is
+ * counted in the corner and spelled out in full in the tooltip.
+ */
+const MAX_SHOP_ICONS = 3;
+
 function section(title: string, bodyClass: string): { root: HTMLElement; body: HTMLElement } {
   const root = el('section', 'z1r-panel');
   root.append(el('h2', 'z1r-panel-title', title));
@@ -117,10 +157,21 @@ function section(title: string, bodyClass: string): { root: HTMLElement; body: H
 /** Which panels are folded away. A view preference, not run data. */
 const COLLAPSE_KEY = 'z1r-tracker:collapsed';
 
-function readCollapsed(): Set<string> {
+/**
+ * The folded set this window has saved, or `null` if it has never saved one.
+ *
+ * The distinction is the whole point of the return type. "Nothing is folded"
+ * and "nobody has ever said" look identical as an empty set, and the caller
+ * has to tell them apart: the first is a choice to keep everything open and
+ * must be honoured, the second is a first visit and gets the app's defaults.
+ * A missing key is the only reliable record of "never chosen" — it is written
+ * the first time anything is folded or unfolded and never removed after.
+ */
+function readCollapsed(): Set<string> | null {
   try {
     const raw = safeStorage()?.getItem(COLLAPSE_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (raw === null || raw === undefined) return null;
+    const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
     return new Set(parsed.filter((value): value is string => typeof value === 'string'));
   } catch {
@@ -141,8 +192,15 @@ function readCollapsed(): Set<string> {
  * folded up on the other monitor — this is a property of the window you are
  * looking at, so it lives in its own storage key.
  */
-function wireCollapsing(root: HTMLElement): void {
-  const collapsed = readCollapsed();
+function wireCollapsing(root: HTMLElement, defaults: readonly string[] = []): void {
+  /*
+   * A saved set beats the defaults, including an empty saved set.
+   *
+   * Which is what keeps this from overriding the user: the moment anything is
+   * folded or unfolded, the full set is written, so a panel that was opened on
+   * purpose is recorded as open and the default never gets a second go at it.
+   */
+  const collapsed = readCollapsed() ?? new Set(defaults);
 
   const persist = () => {
     try {
@@ -212,6 +270,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     sections = DEFAULT_SECTIONS,
     itemSize = 40,
     compact = false,
+    defaultCollapsed = [],
   } = options;
 
   // Spectrum scopes its tokens to these classes, so the mount root carries them
@@ -224,13 +283,35 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   root.replaceChildren();
 
   const patches: Patch[] = [];
+
+  /*
+   * Where an armed item lives while it is in the air.
+   *
+   * Shared by the Items panel, which arms it, and the room sheet, which drops
+   * it — the two panels built by this same call. It is deliberately not store
+   * state: see `createPlacement`.
+   */
+  const placement = createPlacement();
+
+  /*
+   * Place is offered only where there is a sheet to place onto.
+   *
+   * Arming is view state that reaches the panels of this one mount and no
+   * others, by design — so in a window with the inventory and no room sheet the
+   * toggle could arm an item that nothing could ever receive. The OBS dock is
+   * exactly that window, and it must not change.
+   */
+  const placeable = interactive && sections.includes('rooms');
+
   const builders: Record<TrackerSection, () => HTMLElement> = {
     seed: () => buildSeedPanel(store, patches, interactive),
-    items: () => buildItems(store, resolver, patches, { interactive, itemSize }),
+    items: () =>
+      buildItems(store, resolver, patches, { interactive, itemSize, placement, placeable }),
     dungeons: () => buildTriforce(store, resolver, patches, interactive),
     locations: () => buildLocations(store, resolver, patches, interactive, compact),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive),
+    rooms: () => buildRooms(store, resolver, patches, interactive, placement),
   };
 
   // Items and the Triforce share a row when both are shown — the triangle is
@@ -367,7 +448,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    * Folding is for the dock and the page, never the overlay: a browser source
    * takes no clicks, so a caret there would be furniture that cannot be used.
    */
-  if (interactive) wireCollapsing(root);
+  if (interactive) wireCollapsing(root, defaultCollapsed);
 
   applyLayout();
   const widthObserver = new ResizeObserver(applyLayout);
@@ -390,10 +471,27 @@ function buildItems(
   store: Store,
   resolver: SpriteResolver,
   patches: Patch[],
-  opts: { interactive: boolean; itemSize: number },
+  opts: {
+    interactive: boolean;
+    itemSize: number;
+    placement: PlacementChannel;
+    placeable: boolean;
+  },
 ): HTMLElement {
+  const { placeable, placement } = opts;
   const { root, body } = section('Items', 'z1r-item-groups');
+  const heading = root.querySelector('.z1r-panel-title');
   const cellPatches: Patch[] = [];
+
+  /*
+   * Where each room item has been recorded, rebuilt once per pass.
+   *
+   * Every cell wants "is this spoken for, and where", and there are eighteen of
+   * them. Eighteen walks of nine levels of rooms per state change is work this
+   * index does once.
+   */
+  const placedAt = new Map<string, string[]>();
+  const cellOpts = { ...opts, placedAt };
 
   // Two groups, in the game's own order: always-active items on top, then the
   // boxed B-slot items, mirroring the inventory screen.
@@ -406,17 +504,103 @@ function buildItems(
     wrap.append(el('span', 'z1r-item-group-label', caption));
     const grid = el('div', 'z1r-item-grid');
     for (const def of ITEMS.filter((item) => item.group === group)) {
-      grid.append(buildItemCell(store, resolver, def, cellPatches, opts));
+      grid.append(buildItemCell(store, resolver, def, cellPatches, cellOpts));
     }
     wrap.append(grid);
     body.append(wrap);
   }
 
-  // Per cell, not per panel: these eighteen shared one registered patch, so a
-  // throw in one dropped every cell after it.
-  patches.push((state) => runPatches(cellPatches, state));
+  /*
+   * The dungeon pickups, which are placeable but not holdable.
+   *
+   * The Map, the Compass, a Triforce piece and a Heart Container are among the
+   * things most worth writing on a dungeon map, and none of them has an
+   * inventory cell to arm from — the first three never travel, and the heart
+   * total is on the game's own HUD. They appear only while Place is on, so with
+   * it off this panel is exactly the inventory it has always been.
+   */
+  const dungeonGroup = el('div', 'z1r-item-group z1r-item-group-dungeon');
+  if (placeable) {
+    dungeonGroup.dataset.group = 'dungeon';
+    dungeonGroup.hidden = true;
+    dungeonGroup.append(el('span', 'z1r-item-group-label', 'Dungeon pickups'));
+    const grid = el('div', 'z1r-item-grid');
+    for (const def of UNHELD_ROOM_ITEMS) {
+      grid.append(buildRoomItemCell(resolver, def, cellPatches, cellOpts));
+    }
+    dungeonGroup.append(grid);
+    body.append(dungeonGroup);
+  }
+
+  /*
+   * One line under the grid saying what a click is about to do.
+   *
+   * It is the only place the panel says which mode it is in, so it stays — but
+   * at the smallest type, on one line, and only while Place is on. A window
+   * with no room sheet grows neither control, the overlay included.
+   */
+  const status = el('p', 'z1r-room-item-status');
+  if (placeable) {
+    const toggle = el('button', 'z1r-chip-button z1r-items-place', 'Place');
+    toggle.type = 'button';
+    toggle.dataset.on = 'false';
+    toggle.title =
+      'Arm an item here, then click a room on the dungeon sheet to record where it is. Placing never collects.';
+    toggle.setAttribute('aria-pressed', 'false');
+    toggle.addEventListener('click', () => placement.set({ placing: !placement.get().placing }));
+    heading?.append(toggle);
+
+    status.hidden = true;
+    root.append(status);
+
+    cellPatches.push(() => {
+      const { placing, item } = placement.get();
+      root.dataset.placing = String(placing);
+      toggle.dataset.on = String(placing);
+      toggle.setAttribute('aria-pressed', String(placing));
+      dungeonGroup.hidden = !placing;
+      status.hidden = !placing;
+      const armed = item ? ROOM_ITEMS_BY_ID.get(item) : undefined;
+      status.textContent = armed
+        ? `${armed.name} armed — click a room to record where it is.`
+        : 'Click an item to arm it. Placing records a location; it never collects.';
+    });
+  }
+
+  const own: Patch[] = [
+    (state) => {
+      placedAt.clear();
+      for (const [level, rooms] of Object.entries(state.rooms)) {
+        for (const [room, note] of Object.entries(rooms)) {
+          if (!note.item) continue;
+          const where = placedAt.get(note.item);
+          if (where) where.push(`L${level} ${room}`);
+          else placedAt.set(note.item, [`L${level} ${room}`]);
+        }
+      }
+    },
+    // Per cell, not per panel: these eighteen shared one registered patch, so a
+    // throw in one dropped every cell after it.
+    (state) => runPatches(cellPatches, state),
+  ];
+
+  patches.push((state) => runPatches(own, state));
+  // Arming changes nothing in the store, so the channel drives its own redraw.
+  if (placeable) placement.watch(() => runPatches(own, store.getState()));
 
   return root;
+}
+
+/** Each room this item has been recorded in, phrased for a tooltip. */
+function placedSuffix(ids: readonly string[], placedAt: Map<string, string[]>): string {
+  const parts: string[] = [];
+  for (const id of ids) {
+    const where = placedAt.get(id);
+    if (!where?.length) continue;
+    const name = ROOM_ITEMS_BY_ID.get(id)?.name ?? id;
+    parts.push(`${name} at ${where.join(', ')}`);
+  }
+  return parts.length ? ` — placed: ${parts.join('; ')}` : '';
 }
 
 function buildItemCell(
@@ -424,13 +608,28 @@ function buildItemCell(
   resolver: SpriteResolver,
   def: ItemDef,
   patches: Patch[],
-  opts: { interactive: boolean; itemSize: number },
+  opts: {
+    interactive: boolean;
+    itemSize: number;
+    placement: PlacementChannel;
+    placedAt: Map<string, string[]>;
+  },
 ): HTMLElement {
+  const { placement, placedAt } = opts;
   const cell = el('button', 'z1r-item');
   cell.type = 'button';
   cell.dataset.itemId = def.id;
+  // The hook the OBS Custom CSS is written against. `data-item-id` stays as
+  // well: rules already exist against it, and dropping it would break them.
+  cell.dataset.item = def.id;
   cell.dataset.group = def.group;
+  cell.dataset.armed = 'false';
+  cell.dataset.placed = 'false';
   if (!opts.interactive) cell.disabled = true;
+
+  /** Every room item this cell can stand for — a chain covers more than one. */
+  const covers = roomItemsForInventory(def);
+  cell.dataset.placeable = String(covers.length > 0);
 
   // The sprite is swapped wholesale on stage change, so keep a slot to swap in.
   const slot = el('span', 'z1r-item-sprite');
@@ -440,12 +639,27 @@ function buildItemCell(
   if (opts.interactive) {
     const step = (direction: 1 | -1) =>
       store.dispatch({ type: 'cycleItem', id: def.id, direction });
-    cell.addEventListener('click', (event) => step(event.shiftKey ? -1 : 1));
+    cell.addEventListener('click', (event) => {
+      if (placement.get().placing) {
+        const target = roomItemForInventory(def, store.getState().items[def.id] ?? 0);
+        if (!target) return;
+        // Arming is a toggle, so the same click both picks an item up and puts
+        // it down — there is no separate way to disarm.
+        placement.set({ item: placement.get().item === target ? '' : target });
+        return;
+      }
+      step(event.shiftKey ? -1 : 1);
+    });
     cell.addEventListener('contextmenu', (event) => {
       event.preventDefault();
+      // While placing, the remove gesture is off: a right-click here is aimed
+      // at the sheet's door cycle often enough that taking an item away on it
+      // would be a real loss.
+      if (placement.get().placing) return;
       step(-1);
     });
     cell.addEventListener('keydown', (event) => {
+      if (placement.get().placing) return;
       if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
         event.preventDefault();
         step(-1);
@@ -462,9 +676,32 @@ function buildItemCell(
       slot.replaceChildren(createSprite(resolver, key, { size: opts.itemSize }));
     });
     cell.dataset.owned = String(value > 0);
-    cell.title = def.note ? `${labelFor(def, value)} — ${def.note}` : labelFor(def, value);
-    cell.setAttribute('aria-pressed', String(value > 0));
-    cell.setAttribute('aria-label', `${labelFor(def, value)} — ${value > 0 ? 'held' : 'not held'}`);
+    // Mirrors `data-owned` under the name the room sheet's stable hooks use.
+    cell.dataset.held = String(value > 0);
+
+    const { placing, item } = placement.get();
+    const target = roomItemForInventory(def, value);
+    const armed = !!target && item === target;
+    cell.dataset.armed = String(armed);
+    cell.dataset.placed = String(covers.some((id) => (placedAt.get(id)?.length ?? 0) > 0));
+    // An item with no room-item counterpart must not look armable, so while
+    // placing it is plainly out of the gesture rather than inert-on-click.
+    cell.disabled = !opts.interactive || (placing && !target);
+
+    const held = labelFor(def, value);
+    const base = def.note ? `${held} — ${def.note}` : held;
+    const where = placedSuffix(covers, placedAt);
+    const placeHint = !placing
+      ? ''
+      : target
+        ? ` — click to ${armed ? 'disarm' : 'arm'} ${ROOM_ITEMS_BY_ID.get(target)?.name ?? target} for a room`
+        : ' — cannot be placed in a room';
+    cell.title = `${base}${where}${placeHint}`;
+    cell.setAttribute('aria-pressed', String(placing ? armed : value > 0));
+    cell.setAttribute(
+      'aria-label',
+      `${held} — ${value > 0 ? 'held' : 'not held'}${where}${placeHint}`,
+    );
 
     if (def.kind === 'progressive' && value > 0 && maxValue(def) > 1) {
       badge.textContent = String(value);
@@ -472,6 +709,50 @@ function buildItemCell(
     } else {
       badge.hidden = true;
     }
+  });
+
+  return cell;
+}
+
+/**
+ * A cell for a room item with no inventory counterpart.
+ *
+ * It has no held state at all — nothing here can be collected, and `data-held`
+ * is left off rather than written as a false that would dim it like an item you
+ * have not found. It arms and places exactly as an inventory cell does.
+ */
+function buildRoomItemCell(
+  resolver: SpriteResolver,
+  def: RoomItemDef,
+  patches: Patch[],
+  opts: {
+    interactive: boolean;
+    itemSize: number;
+    placement: PlacementChannel;
+    placedAt: Map<string, string[]>;
+  },
+): HTMLElement {
+  const { placement, placedAt } = opts;
+  const cell = el('button', 'z1r-item z1r-item-dungeon');
+  cell.type = 'button';
+  cell.dataset.item = def.id;
+  cell.dataset.group = 'dungeon';
+  cell.dataset.placeable = 'true';
+  cell.dataset.armed = 'false';
+  cell.dataset.placed = 'false';
+  cell.append(createSprite(resolver, def.sprite, { size: opts.itemSize, label: '' }));
+  cell.addEventListener('click', () => {
+    placement.set({ item: placement.get().item === def.id ? '' : def.id });
+  });
+
+  patches.push(() => {
+    const armed = placement.get().item === def.id;
+    cell.dataset.armed = String(armed);
+    const where = placedSuffix([def.id], placedAt);
+    cell.dataset.placed = String(!!where);
+    cell.title = `${def.name}${where} — click to ${armed ? 'disarm' : 'arm'} for a room`;
+    cell.setAttribute('aria-pressed', String(armed));
+    cell.setAttribute('aria-label', cell.title);
   });
 
   return cell;
@@ -505,6 +786,26 @@ function buildMap(
   });
   body.dataset.regions = 'false';
   heading?.append(regionToggle);
+
+  /*
+   * How many of the four warp staircases have been found.
+   *
+   * A stairway cell says which of the four it is; what it cannot say is how
+   * many are still missing, and a map with a hundred marks on it does not
+   * answer that by being looked at. Counted from the marks rather than from the
+   * numbers, so a stairway cycled onto a tile without one still counts, and not
+   * capped: a fifth shows as 5/4 rather than being refused.
+   *
+   * Ahead of the Clear button, whose `margin-inline-start: auto` keeps it at
+   * the far end regardless of what sits before it.
+   */
+  const stairCount = el('span', 'z1r-map-stairs');
+  stairCount.title = 'Warp staircases marked, out of the four a seed has';
+  heading?.append(stairCount);
+  patches.push((state) => {
+    const found = Object.values(state.marks).filter((mark) => mark === 'stairway').length;
+    stairCount.textContent = `Warps ${found}/${OVERWORLD_STAIRWAY_COUNT}`;
+  });
 
   /*
    * Clear every mark in one go.
@@ -565,6 +866,61 @@ function buildMap(
   root.insertBefore(toolbar, body);
 
   /*
+   * Which staircase in a warp room takes you where.
+   *
+   * The routing is fixed — see `warpRoutes` — so this is not a thing the player
+   * records, it is a thing they should not have to hold in their head. What
+   * they want mid-run is "I am standing in warp 3 and I want to get to the
+   * screen with Level 6 on it", and the answer is a staircase, not a number.
+   *
+   * Screens fill in as the four get marked, and each row stays put whether or
+   * not its warp is found yet, so the shape of the table does not move around
+   * under a player who has learned where to look on it.
+   */
+  const routes = el('div', 'z1r-warp-routes');
+  const routeRows = warpRoutes(store.getState()).map((route) => {
+    const row = el('div', 'z1r-warp-route');
+    const from = el('span', 'z1r-warp-route-from', String(route.warp));
+    const at = el('span', 'z1r-warp-route-at');
+    row.append(from, at);
+    const exits = route.exits.map((exit) => {
+      // The staircase's initial, then where it lands. Written out rather than
+      // drawn, because "left" is a position in a room and no icon says that
+      // better than the word does.
+      const cell = el('span', 'z1r-warp-route-exit');
+      cell.append(
+        el('b', 'z1r-warp-route-side', exit.position[0]?.toUpperCase() ?? ''),
+        el('span', 'z1r-warp-route-to', String(exit.warp)),
+        el('span', 'z1r-warp-route-screen'),
+      );
+      return cell;
+    });
+    row.append(...exits);
+    routes.append(row);
+    return { row, at, exits };
+  });
+  root.insertBefore(routes, body);
+  patches.push((state) => {
+    const model = warpRoutes(state);
+    for (const [index, entry] of routeRows.entries()) {
+      const route = model[index];
+      if (!route) continue;
+      entry.at.textContent = route.screen ?? '—';
+      entry.row.dataset.found = String(!!route.screen);
+      for (const [slot, exit] of route.exits.entries()) {
+        const cell = entry.exits[slot];
+        const screen = cell?.querySelector('.z1r-warp-route-screen');
+        if (screen) screen.textContent = exit.screen ?? '—';
+        cell?.setAttribute(
+          'title',
+          `From warp ${route.warp}, the ${exit.position} staircase comes out at warp ${exit.warp}` +
+            (exit.screen ? ` on ${exit.screen}` : ', which is not marked yet'),
+        );
+      }
+    }
+  });
+
+  /*
    * Select a screen, then edit it.
    *
    * This was a brush — you set what you were placing, then clicked screens to
@@ -599,6 +955,8 @@ function buildMap(
   let armed: MarkKind | '' = '';
   /** Which level the armed Dungeon marker will place. 0 means none chosen. */
   let armedLevel = 0;
+  /** Which of the four the armed Stairway marker will place. 0 means none. */
+  let armedStairway = 0;
 
   const highlightSelection = () => {
     for (const cell of body.querySelectorAll<HTMLElement>('.z1r-screen')) {
@@ -624,9 +982,14 @@ function buildMap(
     // into it, so by the time you are marking one you know — and an unnumbered
     // dungeon marker is a note to yourself that says nothing useful.
     if (armed === 'dungeon' && !armedLevel) return;
+    // A stairway the same. The four are indistinguishable on the map, so an
+    // unnumbered one records nothing you did not already know from the mark.
+    if (armed === 'stairway' && !armedStairway) return;
 
     if (armed === 'dungeon') {
       store.dispatch({ type: 'placeDungeon', screen, level: armedLevel });
+    } else if (armed === 'stairway') {
+      store.dispatch({ type: 'placeStairway', screen, number: armedStairway });
     } else {
       store.dispatch({ type: 'setMark', screen, mark: armed });
     }
@@ -640,6 +1003,7 @@ function buildMap(
   const setArmed = (kind: MarkKind | '') => {
     armed = kind;
     if (kind !== 'dungeon') armedLevel = 0;
+    if (kind !== 'stairway') armedStairway = 0;
     body.dataset.armed = String(!!armed);
     syncToolbar(store.getState());
   };
@@ -676,15 +1040,25 @@ function buildMap(
 
     toolbar.dataset.active = String(!!selected || !!armed);
     const armedName = armed ? MARKS_BY_KIND.get(armed)?.name : '';
+    // Two markers are placed by number and neither can be stamped without one.
     const needsLevel = armed === 'dungeon' && !armedLevel;
+    const needsStairway = armed === 'stairway' && !armedStairway;
+    const placing =
+      armed === 'dungeon'
+        ? `Level ${armedLevel}`
+        : armed === 'stairway'
+          ? `Warp ${armedStairway}`
+          : armedName;
     // Says what the next click does, in the order the toolbar reads: pick the
-    // marker, pick the level, then place it.
+    // marker, pick the number, then place it.
     target.textContent = needsLevel
       ? 'Pick a level'
-      : armed
-        ? `Placing ${armed === 'dungeon' ? `Level ${armedLevel}` : armedName}`
-        : selected || 'Pick a screen';
-    toolbar.dataset.waiting = String(needsLevel);
+      : needsStairway
+        ? 'Pick a warp'
+        : armed
+          ? `Placing ${placing}`
+          : selected || 'Pick a screen';
+    toolbar.dataset.waiting = String(needsLevel || needsStairway);
 
     for (const button of kindButtons) {
       const kind = button.dataset.mark as MarkKind;
@@ -714,8 +1088,22 @@ function buildMap(
       const shown = armed === 'dungeon' ? armedLevel : (note?.dungeon ?? 0);
       button.dataset.active = String(Number(button.dataset.level) === shown);
     }
+    for (const button of stairwayButtons) {
+      const shown = armed === 'stairway' ? armedStairway : (note?.stairway ?? 0);
+      button.dataset.active = String(Number(button.dataset.stairway) === shown);
+    }
     for (const button of stockButtons) {
       button.dataset.active = String(!!note?.shop.includes(button.dataset.stock ?? ''));
+    }
+    for (const input of stockPriceInputs) {
+      const id = input.dataset.stock ?? '';
+      const stocked = !!note?.shop.includes(id);
+      // Disabled rather than hidden: the boxes keep their places under the
+      // toggles, so the row does not reflow every time an item is ticked.
+      input.disabled = !stocked || !interactive;
+      const recorded = note?.shopPrices[id] ?? 0;
+      // Never overwritten mid-edit, or typing fights the patch loop.
+      if (document.activeElement !== input) input.value = recorded ? String(recorded) : '';
     }
     for (const button of blockButtons) {
       button.dataset.active = String(!!note?.blocks.includes(button.dataset.block ?? ''));
@@ -810,10 +1198,51 @@ function buildMap(
     blockRow.append(button);
   }
 
-  /* What the shop sells. Multi-select, since most sell more than one thing. */
+  /*
+   * Which of the four warp staircases this is.
+   *
+   * The same shape as the level row, for the same reason: the four are
+   * identical to look at, so the number is the whole of what there is to record
+   * about one, and a stairway cannot be placed without it.
+   */
+  const stairwayRow = detailRow('stairway', 'Warp');
+  const stairwayButtons: HTMLButtonElement[] = [];
+  for (let stairway = 1; stairway <= OVERWORLD_STAIRWAY_COUNT; stairway++) {
+    const button = el('button', 'z1r-mark-level', String(stairway));
+    button.type = 'button';
+    button.dataset.stairway = String(stairway);
+    button.title = `Warp ${stairway}`;
+    button.addEventListener('click', () => {
+      if (armed === 'stairway') {
+        // Arming half of the flow: marker, then number, then click the map.
+        armedStairway = armedStairway === stairway ? 0 : stairway;
+        syncToolbar(store.getState());
+        return;
+      }
+      // Editing a tile already on the map. Goes through `placeStairway` too, so
+      // renumbering one still moves the number off wherever it used to be.
+      if (selected) {
+        store.dispatch({ type: 'placeStairway', screen: selected, number: stairway });
+      }
+    });
+    stairwayButtons.push(button);
+    stairwayRow.append(button);
+  }
+
+  /*
+   * What the shop sells, and for how much.
+   *
+   * Multi-select, since most sell more than one thing. The price box under each
+   * toggle is optional everywhere — the question the map answers is still "did
+   * I see arrows anywhere", and a price is only worth typing for the ones you
+   * are saving up for. It stays disabled until the item is ticked, so the box
+   * can never hold a number for something this shop does not stock.
+   */
   const stockRow = detailRow('shop', 'Sells');
   const stockButtons: HTMLButtonElement[] = [];
+  const stockPriceInputs: HTMLInputElement[] = [];
   for (const stock of SHOP_STOCK) {
+    const group = el('div', 'z1r-mark-stock');
     const button = el('button', 'z1r-mark-stock-option');
     button.type = 'button';
     button.dataset.stock = stock.id;
@@ -823,8 +1252,34 @@ function buildMap(
     button.addEventListener('click', () => {
       if (selected) store.dispatch({ type: 'toggleShopStock', screen: selected, stock: stock.id });
     });
+
+    const price = document.createElement('input');
+    price.type = 'number';
+    price.className = 'z1r-input z1r-mark-stock-price';
+    price.dataset.stock = stock.id;
+    price.min = '0';
+    price.step = '1';
+    price.placeholder = '–';
+    // Named per item: the row is eight identical-looking boxes, so "Price"
+    // alone would leave a screen reader unable to say which one it is on.
+    price.title = `Price of ${stock.name}`;
+    price.setAttribute('aria-label', `Price of ${stock.name}`);
+    price.addEventListener('input', () => {
+      if (!selected) return;
+      // An empty box is 0, which the reducer reads as "no price recorded" and
+      // deletes. Clearing the field is how you take a price back.
+      store.dispatch({
+        type: 'setShopPrice',
+        screen: selected,
+        stock: stock.id,
+        price: Number(price.value),
+      });
+    });
+
     stockButtons.push(button);
-    stockRow.append(button);
+    stockPriceInputs.push(price);
+    group.append(button, price);
+    stockRow.append(group);
   }
 
   /*
@@ -962,7 +1417,29 @@ function buildMap(
       const numeral = el('span', 'z1r-screen-level');
       // What is known to be inside, from the location slots — see `dungeonItems`.
       const badge = el('span', 'z1r-screen-badge');
-      cell.append(terrain, code, slot, numeral, badge, detail);
+      /*
+       * A warp draws its staircase big, in the bottom-left corner.
+       *
+       * Deliberately nothing like the dungeon numeral. That one is a bare
+       * outlined figure filling the middle-left; this is a plated digit tucked
+       * against a staircase. A runner glancing at the map has to tell "level 3"
+       * from "warp 3" without reading either, and two numbers in the same
+       * treatment would not let them.
+       */
+      const warp = el('span', 'z1r-screen-warp');
+      /*
+       * A shop draws what it sells, as a row of the items themselves.
+       *
+       * This used to be the two-letter codes in `detail`, which asked you to
+       * translate "AR BM PO" back into arrows, bombs and a potion every time
+       * you scanned the map. The sprites answer the same question without the
+       * translation; the codes and the names are in the tooltip, so nothing on
+       * the tile depends on recognising the art.
+       */
+      const stockIcons = el('span', 'z1r-screen-stock');
+      /** How many stocked items did not fit — see `MAX_SHOP_ICONS`. */
+      const stockMore = el('span', 'z1r-screen-stock-more');
+      cell.append(terrain, code, slot, numeral, warp, badge, stockIcons, stockMore, detail);
 
       let renderedMap: string | null = null;
       patches.push(() => {
@@ -1003,20 +1480,75 @@ function buildMap(
             ? dungeonItems(state, note.dungeon).map((id) => POOL_BY_ID.get(id)).filter(Boolean)
             : [];
 
-        const markKey = `${mark}|${held?.sprite ?? ''}|${inside.map((e) => e!.sprite).join(',')}|${note?.dungeon ?? 0}`;
+        /*
+         * What this shop sells, capped at what a map cell can hold.
+         *
+         * Three icons and three prices fill a 50x34 cell exactly; a fourth
+         * column is neither a readable sprite nor a readable number. The rest
+         * are counted in the corner and listed in full in the tooltip.
+         */
+        const stocked = mark === 'shop' ? (note?.shop ?? []).slice(0, MAX_SHOP_ICONS) : [];
+        const overflow = mark === 'shop' ? (note?.shop.length ?? 0) - stocked.length : 0;
+        const prices = stocked.map((stockId) => note?.shopPrices[stockId] ?? 0);
+
+        const markKey = [
+          mark,
+          held?.sprite ?? '',
+          inside.map((e) => e!.sprite).join(','),
+          note?.dungeon ?? 0,
+          // In the key because the numeral below reads it. A field this memo
+          // draws from and does not key on stops redrawing when it changes.
+          note?.stairway ?? 0,
+          // Same rule: the stock row below is drawn from these, and a shop that
+          // gains an item has to redraw.
+          stocked.join(','),
+          overflow,
+        ].join('|');
         renderedMark = memoise(renderedMark, markKey, () => {
           cell.dataset.mark = mark;
           cell.style.setProperty('--mark-color', def?.color ?? 'transparent');
 
-          // A dungeon is its number; every other mark is its icon.
+          // The big outlined numeral belongs to dungeons alone.
           numeral.textContent = mark === 'dungeon' && note?.dungeon ? String(note.dungeon) : '';
-          const sprite = mark === 'dungeon' ? undefined : (held?.sprite ?? def?.sprite);
+
+          // The warp's own corner: staircase plus which of the four it is.
+          if (mark === 'stairway' && def?.sprite) {
+            warp.replaceChildren(
+              createSprite(resolver, def.sprite, { size: 32, label: def.name }),
+              el('span', 'z1r-screen-warp-num', note?.stairway ? String(note.stairway) : ''),
+            );
+          } else warp.replaceChildren();
+
+          // Those two draw their own art, and so does a shop with stock
+          // recorded — none of them wants the centred one as well.
+          const sprite =
+            mark === 'dungeon' || mark === 'stairway' || stocked.length > 0
+              ? undefined
+              : (held?.sprite ?? def?.sprite);
           if (!sprite) slot.replaceChildren();
           else {
             slot.replaceChildren(
               createSprite(resolver, sprite, { size: 18, label: held?.name ?? def?.name }),
             );
           }
+
+          // The stock row, one fixed-width column per item so the price line
+          // below lands under the icon it belongs to.
+          stockIcons.replaceChildren(
+            ...stocked.map((stockId) => {
+              const entry = SHOP_STOCK_BY_ID.get(stockId);
+              const column = el('span', 'z1r-screen-stock-slot');
+              if (entry) {
+                column.append(
+                  createSprite(resolver, entry.sprite, { size: 14, label: entry.name }),
+                );
+              }
+              return column;
+            }),
+          );
+          // A count, not an ellipsis: "how many more" is the part you would
+          // otherwise have to open the tooltip to learn.
+          stockMore.textContent = overflow > 0 ? `+${overflow}` : '';
 
           // Only the first: two icons in a 70px cell is a smudge, and the rest
           // are in the tooltip and the Locations panel.
@@ -1041,6 +1573,9 @@ function buildMap(
           // `blocks` out meant a dungeon's tags showed up in the tooltip and
           // never on the cell, because the memo saw no reason to redraw.
           note?.blocks.join('') ?? '',
+          // The price line is drawn from these, so a price typed into the
+          // toolbar has to reach the tile.
+          prices.join(','),
           note?.spot ?? '',
           note?.item ?? '',
           isCoast,
@@ -1051,6 +1586,11 @@ function buildMap(
           cell.dataset.coast = String(isCoast);
           cell.dataset.coastReady = String(coastReady);
           cell.dataset.ready = String(level9Ready);
+          // Reset first: every other branch writes plain text here, and a
+          // leftover "prices" flag would lay that text out in columns.
+          cell.dataset.shopPrices = 'false';
+          detail.dataset.prices = 'false';
+          detail.dataset.digits = '2';
 
           if (mark === 'dungeon') {
             // Just the blockers now — the numeral carries the level, so
@@ -1059,10 +1599,30 @@ function buildMap(
               .map((id) => DUNGEON_BLOCKS_BY_ID.get(id)?.code ?? '')
               .filter(Boolean)
               .join(' ');
-          } else if (mark === 'shop' && note?.shop.length) {
-            detail.textContent = note.shop
-              .map((stock) => SHOP_STOCK_BY_ID.get(stock)?.code ?? '')
-              .join(' ');
+          } else if (mark === 'shop') {
+            /*
+             * Prices under the icons, one column each, and nothing at all when
+             * none is recorded — which is most shops. The stock itself is the
+             * row of sprites above; repeating it here as codes would spend the
+             * width the numbers need.
+             */
+            const shown = prices.some((price) => price > 0);
+            detail.replaceChildren(
+              ...(shown
+                ? prices.map((price) =>
+                    el('span', 'z1r-screen-price', price > 0 ? String(price) : ''),
+                  )
+                : []),
+            );
+            // The widest number decides the type size: three columns of "250"
+            // at the normal size would run into each other.
+            const widest = shown
+              ? Math.max(...prices.map((price) => (price > 0 ? String(price).length : 0)))
+              : 0;
+            detail.dataset.prices = String(shown);
+            detail.dataset.digits = String(Math.min(Math.max(widest, 2), 4));
+            // Lifts the icon row clear of the price line, and only then.
+            cell.dataset.shopPrices = String(shown);
           } else if (mark === 'item') {
             /*
              * The contents win over the name of the spot. Once you know the
@@ -1108,7 +1668,18 @@ function buildMap(
           if (blocked.length) parts.push(`blocked by ${blocked.join(', ')}`);
           if (level9Ready) parts.push('every Triforce piece held — Level 9 is open');
         } else if (mark === 'shop') {
-          const stock = note?.shop.map((s) => SHOP_STOCK_BY_ID.get(s)?.name ?? s) ?? [];
+          /*
+           * Every item, not just the three the cell had room for, and the price
+           * beside each one that has it. This is also the tile's non-colour,
+           * non-picture channel: the names are here in words, so a shop still
+           * reads without recognising a single sprite.
+           */
+          const recorded = note?.shopPrices ?? {};
+          const stock = (note?.shop ?? []).map((s) => {
+            const name = SHOP_STOCK_BY_ID.get(s)?.name ?? s;
+            const price = recorded[s] ?? 0;
+            return price > 0 ? `${name} ${price}` : name;
+          });
           parts.push(stock.length ? `Shop: ${stock.join(', ')}` : 'Shop');
         } else if (mark === 'item') {
           const spot = note?.spot
@@ -1119,6 +1690,8 @@ function buildMap(
           if (isCoast) {
             parts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');
           }
+        } else if (mark === 'stairway') {
+          parts.push(note?.stairway ? `Warp ${note.stairway}` : 'Warp (unnumbered)');
         } else if (def && mark !== 'none') {
           parts.push(def.name);
         }

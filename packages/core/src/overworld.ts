@@ -41,6 +41,7 @@ export type MarkKind =
   | 'item'
   | 'gamble'
   | 'hintroom'
+  | 'stairway'
   | 'visited';
 
 export interface MarkDef {
@@ -72,11 +73,25 @@ export const MARKS: readonly MarkDef[] = [
   // forgotten what it said — and neither is an item, a shop or a dead end.
   { kind: 'gamble', name: 'Gambling', sprite: 'mark.gamble', color: '#4bb572' },
   { kind: 'hintroom', name: 'Hint room', sprite: 'mark.hintroom', color: '#9b7fd4' },
+  // The four warp staircases. Each carries its number, 1-4, because the four
+  // look alike and the number is the only thing that says which one you just
+  // came out of — so this mark has a detail row like a dungeon's.
+  { kind: 'stairway', name: 'Warp', sprite: 'mark.stairway', color: '#2fb0a6' },
   // "Been here, nothing to come back for" is as worth recording as a find —
   // without it every unmarked screen is ambiguous between unchecked and empty,
   // which is most of the map for most of a run.
   { kind: 'visited', name: 'Checked, nothing', sprite: 'mark.empty', color: '#8e8e8e' },
 ];
+
+/**
+ * How many warp staircases a seed has.
+ *
+ * Counted, not enforced. The map shows found-of-four so the set can be seen to
+ * be complete; a rule that refused a fifth mark would be asserting an invariant
+ * across every seed and settings combination, and would fight the player over
+ * it when wrong.
+ */
+export const OVERWORLD_STAIRWAY_COUNT = 4;
 
 /**
  * Shop stock worth remembering.
@@ -95,12 +110,15 @@ export interface ShopStockDef {
 
 export const SHOP_STOCK: readonly ShopStockDef[] = [
   { id: 'bomb', name: 'Bombs', sprite: 'item.bomb', code: 'BM' },
-  { id: 'key', name: 'Keys', sprite: 'item.key.magical', code: 'KY' },
+  { id: 'key', name: 'Keys', sprite: 'item.key', code: 'KY' },
   { id: 'arrow', name: 'Arrows', sprite: 'item.arrow.wood', code: 'AR' },
   { id: 'potion', name: 'Potion', sprite: 'item.potion.blue', code: 'PO' },
   // The one piece of real progression sold rather than found, and the one you
   // most want to be able to find your way back to once the rupees are in.
   { id: 'blueRing', name: 'Blue Ring', sprite: 'item.ring.blue', code: 'BR' },
+  { id: 'bait', name: 'Meat', sprite: 'item.bait', code: 'MT' },
+  { id: 'heart', name: 'Heart Container', sprite: 'item.heart', code: 'HC' },
+  { id: 'magicalShield', name: 'Magical Shield', sprite: 'item.shield.magical', code: 'MS' },
 ];
 
 export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = new Map(

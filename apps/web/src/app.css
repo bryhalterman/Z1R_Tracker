@@ -42,8 +42,124 @@ body {
   color: var(--z1r-accent);
 }
 
+/*
+ * Wide enough for both columns at their comfortable size, and no wider.
+ *
+ * Was 1100px, which is about what the single column needed. At this cap the
+ * two columns measure 1036px and 756px: the left one has room for the items
+ * grid and the Triforce side by side with the locations panel packing five
+ * group columns under them, and the map draws sixteen screens of 43px, which
+ * is close to the size the OBS dock uses. Past here the map keeps growing and
+ * the left column has already run out of things to spread out, so the page
+ * would only get wider.
+ *
+ * Still a cap, not a width. On a 1280px screen the viewport is what binds and
+ * the page lays out at about 1233px.
+ */
 main {
-  max-inline-size: 1100px;
+  max-inline-size: 1800px;
+}
+
+/*
+ * Two columns: the map on the right, everything else stacked on the left.
+ *
+ * In one column the page was 1508px against an 800px viewport, and the
+ * Overworld alone was a third of it. The map is also the one panel whose
+ * natural shape is wide rather than tall, so it is the one that pays for
+ * itself in a column of its own.
+ *
+ * Done here, in CSS, on the panels `mountTracker` already appends — the OBS
+ * dock, map dock and overlay mount the same DOM and must keep the layout they
+ * have, so there is nothing to restructure and nothing for them to inherit.
+ *
+ * Keyed off `data-width`, which the tracker publishes from its own width, so a
+ * narrow window keeps the single column rather than squeezing two.
+ */
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] {
+  display: grid;
+  /*
+   * A share, not a fixed width: the map is the panel that can use whatever is
+   * going, and `applyMapScale` re-derives its cell size from the column it
+   * ends up with. 360px is the floor at which sixteen screens are still worth
+   * drawing; below it the band drops to `sm` and this rule stops applying.
+   */
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 42%);
+  column-gap: var(--z1r-space-md);
+  /*
+   * Zero, with the spacing put back as margins below.
+   *
+   * The map spans more rows than the left column has panels, which leaves
+   * empty implicit rows at the bottom — and a row gap is charged between
+   * tracks whether or not they hold anything, so a gap here would add a
+   * phantom inch of page per empty row.
+   */
+  row-gap: 0;
+  align-items: start;
+}
+
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > * {
+  grid-column: 1;
+  /* Grid items are `auto` sized, which does not shrink below content. The
+     panels hold grids and selects that would otherwise widen the column. */
+  min-inline-size: 0;
+}
+
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > * + *:not(.z1r-map-panel) {
+  margin-block-start: var(--z1r-space-md);
+}
+
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-map-panel {
+  grid-column: 2;
+  /*
+   * Row 1, spanning further than the tracker will ever have panels.
+   *
+   * `1 / -1` is the usual way to say "every row" and does not work here: a
+   * negative line resolves against the *explicit* grid, which has no rows at
+   * all, so it collapses to a single row and the map's height would push the
+   * second left-hand panel down past it.
+   */
+  grid-row: 1 / span 20;
+  margin-block-start: 0;
+}
+
+/*
+ * The Overworld never grows past the screen; its grid scrolls instead.
+ *
+ * Even in its own column it is the tallest panel on the page, and it is the
+ * one whose content can be read a part at a time — eight rows of screens, of
+ * which the half you are working in is the half you are looking at.
+ *
+ * The subtraction is the page's own chrome: 16px of body padding top and
+ * bottom, the 61px header, and the footer line.
+ */
+#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel {
+  display: flex;
+  flex-direction: column;
+  max-block-size: calc(100vh - 128px);
+}
+
+#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel > * {
+  /* Only the grid gives up height. The title, the marker toolbar and the warp
+     routes are each a fixed handful of rows, and a toolbar that scrolled away
+     from the map it edits would be worse than a shorter map. */
+  flex: none;
+}
+
+#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel > .z1r-map {
+  flex: 0 1 auto;
+  /* Flex items floor at their content height without this, so the cap above
+     would be ignored and the panel would overflow instead of scrolling. */
+  min-block-size: 0;
+  overflow-y: auto;
+  /*
+   * The gutter is reserved whether or not the grid overflows, and that is
+   * load-bearing rather than cosmetic. `applyMapScale` sizes the cells from
+   * this element's `clientWidth`: with the scrollbar coming and going, a
+   * narrower box gives smaller cells, smaller cells give a shorter grid, a
+   * shorter grid takes the scrollbar away, and the resize observer sits there
+   * flipping between two cell sizes. A fixed gutter means one measurement.
+   */
+  scrollbar-gutter: stable;
 }
 
 @media (max-width: 720px) {

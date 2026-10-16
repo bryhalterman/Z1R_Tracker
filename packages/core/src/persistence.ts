@@ -20,8 +20,27 @@ import {
 } from './state.js';
 
 import {
+  bossAllowedOnLevel,
+  DOOR_STATES_BY_ID,
+  emptyRoom,
+  isRoomId,
+  isRoomLevel,
+  roomIsBare,
+  ROOM_ITEMS_BY_ID,
+  ROOM_SIDES,
+  ROOM_STAIRS_BY_ID,
+  ROOM_TRANSPORT_COUNT,
+  ROOM_TRANSPORT_PAIR_SIZE,
+  type DoorState,
+  type RoomDoors,
+  type RoomNote,
+  type RoomStairKind,
+} from './rooms.js';
+
+import {
   DUNGEON_BLOCKS_BY_ID,
   MARKS_BY_KIND,
+  OVERWORLD_STAIRWAY_COUNT,
   SHOP_STOCK_BY_ID,
   type MarkKind,
 } from './overworld.js';
@@ -98,6 +117,31 @@ function conformMarks(saved: unknown): Record<string, MarkKind> {
 }
 
 /**
+ * Prices, keyed by stock id and clamped the way the reducer clamps them.
+ *
+ * Everything here is drawn as a numeral on a 50px map cell, so a NaN, an
+ * Infinity or a negative would either print as nonsense or push the line off
+ * the tile. Anything that is not a whole positive number is dropped rather
+ * than repaired, and so is a price for an item this shop does not stock — an
+ * orphan renders nowhere and would sit in the save forever.
+ */
+function conformShopPrices(saved: unknown, shop: readonly string[]): Record<string, number> {
+  if (!saved || typeof saved !== 'object') return {};
+  const out: Record<string, number> = {};
+  for (const [stock, value] of Object.entries(saved as Record<string, unknown>)) {
+    if (!shop.includes(stock)) continue;
+    const price = Number(value);
+    if (!Number.isFinite(price)) continue;
+    // Truncated, not rejected, so this matches `setShopPrice` exactly and the
+    // two cannot drift. 0 and below is the empty value: no key.
+    const whole = Math.max(Math.trunc(price), 0);
+    if (whole === 0) continue;
+    out[stock] = whole;
+  }
+  return out;
+}
+
+/**
  * Structural check on per-screen detail, which is entirely new in v6.
  *
  * Everything here is drawn straight onto the map, so a bad shape is a render
@@ -113,6 +157,12 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
 
     const level = Number(note.dungeon);
     const dungeon = Number.isInteger(level) ? Math.min(Math.max(level, 0), 9) : 0;
+    // Same treatment as the level: coerced, then clamped to the numbers that
+    // exist. 0 is "unnumbered", which a stairway written by an older save is.
+    const stairNumber = Number(note.stairway);
+    const stairway = Number.isInteger(stairNumber)
+      ? Math.min(Math.max(stairNumber, 0), OVERWORLD_STAIRWAY_COUNT)
+      : 0;
     // Ids are looked up in a table to render, so an unknown one draws nothing
     // and would sit in the save forever as an invisible entry.
     const shop = Array.isArray(note.shop)
@@ -120,6 +170,8 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
           .filter((id) => SHOP_STOCK_BY_ID.has(id))
           .sort()
       : [];
+    // Absent in every save written before v10, which is simply no prices.
+    const shopPrices = conformShopPrices(note.shopPrices, shop);
     const blocks = Array.isArray(note.blocks)
       ? [...new Set(note.blocks.filter((id): id is string => typeof id === 'string'))]
           .filter((id) => DUNGEON_BLOCKS_BY_ID.has(id))
@@ -133,10 +185,124 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
         ? note.spot
         : '';
 
-    if (dungeon === 0 && shop.length === 0 && blocks.length === 0 && spot === '' && item === '') {
+    if (
+      dungeon === 0 &&
+      stairway === 0 &&
+      shop.length === 0 &&
+      blocks.length === 0 &&
+      spot === '' &&
+      item === ''
+    ) {
       continue;
     }
-    out[screen] = { dungeon, shop, blocks, spot, item };
+    out[screen] = { dungeon, stairway, shop, shopPrices, blocks, spot, item };
+  }
+  return out;
+}
+
+/** Each side checked against the table; anything else reads as `unknown`. */
+function conformDoors(saved: unknown): RoomDoors {
+  const doors = emptyRoom().doors;
+  if (!saved || typeof saved !== 'object') return doors;
+  const source = saved as Record<string, unknown>;
+  for (const side of ROOM_SIDES) {
+    const value = source[side];
+    if (typeof value !== 'string' || !DOOR_STATES_BY_ID.has(value)) continue;
+    doors[side] = value as DoorState;
+  }
+  return doors;
+}
+
+/**
+ * Keep at most two rooms per transport number.
+ *
+ * A number names one staircase, so a save holding three is corrupt however it
+ * got that way. The oldest claims go, which is the same comparison the reducer
+ * evicts by — a repaired save then behaves exactly like one that was never
+ * broken. The staircase itself stays recorded on the rooms that lose the
+ * number; only the pairing was impossible.
+ */
+function conformPairs(rooms: Record<string, RoomNote>): Record<string, RoomNote> {
+  const byNumber = new Map<number, [string, RoomNote][]>();
+  for (const entry of Object.entries(rooms)) {
+    if (entry[1].transport === 0) continue;
+    const held = byNumber.get(entry[1].transport) ?? [];
+    held.push(entry);
+    byNumber.set(entry[1].transport, held);
+  }
+
+  const out = { ...rooms };
+  for (const held of byNumber.values()) {
+    if (held.length <= ROOM_TRANSPORT_PAIR_SIZE) continue;
+    held.sort(([aId, a], [bId, b]) => a.transportSeq - b.transportSeq || aId.localeCompare(bId));
+    for (const [room, note] of held.slice(0, held.length - ROOM_TRANSPORT_PAIR_SIZE)) {
+      out[room] = { ...note, transport: 0, transportSeq: 0 };
+    }
+  }
+  return out;
+}
+
+/**
+ * Per-level room maps, new in v11.
+ *
+ * Absent in every earlier save, which is simply no rooms recorded. Everything
+ * below is checked against the tables rather than merged, for the same reason
+ * marks are: a door state, a staircase kind, a boss or an item id that has no
+ * definition renders as nothing, and merging it in would keep it in the save
+ * and in every export forever. Both key levels are validated too — a room id
+ * off the 8x8 grid has no cell to draw in, and a level outside 1-9 has no grid
+ * at all.
+ */
+function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> {
+  if (!saved || typeof saved !== 'object') return {};
+  const out: Record<string, Record<string, RoomNote>> = {};
+
+  for (const [level, value] of Object.entries(saved as Record<string, unknown>)) {
+    const number = Number(level);
+    if (!isRoomLevel(number)) continue;
+    if (!value || typeof value !== 'object') continue;
+
+    const kept: Record<string, RoomNote> = {};
+    for (const [room, raw] of Object.entries(value as Record<string, unknown>)) {
+      if (!isRoomId(room)) continue;
+      if (!raw || typeof raw !== 'object') continue;
+      const note = raw as Partial<RoomNote>;
+
+      // Strictly true, so a truthy string or 1 does not read as visited.
+      const visited = note.visited === true;
+      const item =
+        typeof note.item === 'string' && ROOM_ITEMS_BY_ID.has(note.item) ? note.item : '';
+      // Ganon and Zelda on any level but 9 are dropped rather than moved: the
+      // room they were recorded in cannot exist, so neither can the boss.
+      const boss =
+        typeof note.boss === 'string' && bossAllowedOnLevel(note.boss, number) ? note.boss : '';
+      const stairs: RoomStairKind =
+        typeof note.stairs === 'string' && ROOM_STAIRS_BY_ID.has(note.stairs)
+          ? (note.stairs as RoomStairKind)
+          : 'none';
+      // Only transport stairs carry a pair number, same rule the reducer holds.
+      // Coerced then checked whole: a 2.5, a -1 and a NaN all read as unpaired
+      // rather than being rounded into a pair nobody placed.
+      const pair = Number(note.transport);
+      const transport =
+        stairs === 'transport' && Number.isInteger(pair) && pair >= 1 && pair <= ROOM_TRANSPORT_COUNT
+          ? pair
+          : 0;
+      // The eviction stamp is meaningless without a number. A missing one
+      // leaves 0, which simply makes that room the first candidate to evict.
+      const seq = Number(note.transportSeq);
+      const transportSeq = transport !== 0 && Number.isInteger(seq) && seq > 0 ? seq : 0;
+      const doors = conformDoors(note.doors);
+
+      const conformed: RoomNote = { visited, item, boss, stairs, transport, transportSeq, doors };
+      // Absence is the empty state, so a room that conformed down to nothing
+      // must not be written back out as sixty-four unknown doors.
+      if (roomIsBare(conformed)) continue;
+      kept[room] = conformed;
+    }
+
+    if (Object.keys(kept).length === 0) continue;
+    out[level] = conformPairs(kept);
   }
   return out;
 }
@@ -207,6 +373,8 @@ export function migrate(raw: unknown): TrackerState | null {
     dungeons: pruneDungeons(base.dungeons, candidate.dungeons),
     marks: conformMarks(candidate.marks),
     screenNotes: conformScreenNotes(candidate.screenNotes),
+    // Absent in every save written before v11, which loads as no rooms.
+    rooms: conformRooms(candidate.rooms),
     // v1 saves predate seed tracking; merging over the defaults fills in any
     // setting added since without discarding what the save does carry.
     seed: conformSeed(base.seed, candidate.seed),

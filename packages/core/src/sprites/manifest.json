@@ -103,6 +103,11 @@
       "name": "Power Bracelet",
       "glyph": "PB"
     },
+    "item.key": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Key.gif",
+      "name": "Key",
+      "glyph": "KY"
+    },
     "item.key.magical": {
       "url": "https://www.videogamesprites.net/Zelda1/Objects/Magical%20Key.gif",
       "name": "Magical Key",
@@ -226,7 +231,7 @@
     "ui.triforce": {
       "url": "https://www.videogamesprites.net/Zelda1/Objects/Triforce1.gif",
       "name": "Triforce Piece",
-      "glyph": "▲"
+      "glyph": "â–²"
     },
     "ref.overworld": {
       "url": "./maps/overworld.webp",
@@ -245,6 +250,56 @@
     "npc.zelda": {
       "name": "Princess Zelda",
       "url": "https://www.videogamesprites.net/Zelda1/NPCs/Princess%20Zelda.gif"
+    },
+    "boss.aquamentus": {
+      "url": "https://www.videogamesprites.net/Zelda1/Bosses/1%20-%20Aquamentus-1.gif",
+      "name": "Aquamentus",
+      "glyph": "AQ"
+    },
+    "boss.dodongo": {
+      "url": "https://www.videogamesprites.net/Zelda1/Bosses/2%20-%20Dodongo%20(Front).gif",
+      "name": "Dodongo",
+      "glyph": "DD"
+    },
+    "boss.manhandla": {
+      "url": "https://www.videogamesprites.net/Zelda1/Bosses/3%20-%20Manhandla.gif",
+      "name": "Manhandla",
+      "glyph": "MH"
+    },
+    "boss.gleeok": {
+      "url": "https://www.videogamesprites.net/Zelda1/Bosses/4%20-%20Gleeok.gif",
+      "name": "Gleeok",
+      "glyph": "GL"
+    },
+    "boss.digdogger": {
+      "url": "https://www.videogamesprites.net/Zelda1/Bosses/5%20-%20Digdogger1.gif",
+      "name": "Digdogger",
+      "glyph": "DG"
+    },
+    "boss.gohma": {
+      "url": "https://www.videogamesprites.net/Zelda1/Bosses/6%20-%20Gohma%20-%20Red.gif",
+      "name": "Gohma",
+      "glyph": "GH"
+    },
+    "boss.patra": {
+      "url": "https://www.videogamesprites.net/Zelda1/Enemies/Patra%20-%20Red.gif",
+      "name": "Patra",
+      "glyph": "PT"
+    },
+    "item.map": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Map.gif",
+      "name": "Map",
+      "glyph": "MP"
+    },
+    "item.compass": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Compass.gif",
+      "name": "Compass",
+      "glyph": "CP"
+    },
+    "item.triforce": {
+      "url": "https://www.videogamesprites.net/Zelda1/Objects/Triforce1.gif",
+      "name": "Triforce Piece",
+      "glyph": "TR"
     }
   }
 }
