@@ -310,12 +310,26 @@ export function buildRooms(
 
   /* ------------------------------------------------------------- the sheet */
 
+  /*
+   * The sheet and the rows that describe the selected room, side by side when
+   * there is width for both and stacked when there is not.
+   *
+   * Nothing here chooses between the two: the wrapper is a wrapping flex row
+   * and the two children carry flex bases, so the rows drop below the sheet
+   * exactly when they no longer fit beside it. A breakpoint would have to
+   * restate the sheet's own 460px cap to know where that is, and would be
+   * wrong in the OBS map dock, whose width is whatever the user dragged the
+   * dock to rather than anything a media query can see.
+   */
+  const body = el('div', 'z1r-room-body');
+  root.append(body);
+
   const paper = el('div', 'z1r-room-paper');
   const grid = el('div', 'z1r-room-grid');
   grid.setAttribute('role', 'group');
   grid.setAttribute('aria-label', 'Room grid');
   paper.append(grid);
-  root.append(paper);
+  body.append(paper);
 
   /** A room click: drop the armed item, or mark the room walked. */
   const touchRoom = (room: string) => {
@@ -490,7 +504,27 @@ export function buildRooms(
 
   const detail = el('div', 'z1r-room-detail');
   detail.dataset.empty = 'true';
-  root.append(detail);
+  body.append(detail);
+
+  /*
+   * The door row's own strip, always the full width of the panel.
+   *
+   * It is the one row of the five whose controls carry words — `Open (OP)`,
+   * `Locked (LK)`, `Bombed, solid (BX)` — and those words are the non-colour
+   * channel for a door's state. Beside the sheet the row gets a column narrow
+   * enough to clip them: measured, the four selects go from 129px at the full
+   * width of a 600px panel to 66px in a 272px column, which is not enough for
+   * the longest of those labels. So it keeps the full width under both and
+   * only the other four rows move.
+   *
+   * A second element rather than a `grid-column: 1 / -1` on the same one,
+   * because the strip beside the sheet is a flex item whose height must stay
+   * its own — a full-width child inside it would be inside the narrow column,
+   * not beside it.
+   */
+  const doorsStrip = el('div', 'z1r-room-detail z1r-room-doors-strip');
+  doorsStrip.dataset.empty = 'true';
+  root.append(doorsStrip);
 
   const idRow = el('div', 'z1r-room-detail-row');
   idRow.append(el('span', 'z1r-room-key', 'Room'));
@@ -646,7 +680,7 @@ export function buildRooms(
   doorsRow.append(el('span', 'z1r-room-key', 'Doors'));
   const doors = el('span', 'z1r-room-doors');
   doorsRow.append(doors);
-  detail.append(doorsRow);
+  doorsStrip.append(doorsRow);
 
   const doorSelects = ROOM_SIDES.map((side) => {
     const label = document.createElement('label');
@@ -695,7 +729,11 @@ export function buildRooms(
     paper.dataset.arming = String(!!brush.item);
 
     const note = selected ? roomsOf(state)[selected] : undefined;
+    // Both strips, because the door row lives in one of its own now and the
+    // "no room selected" dim is a fact about every editable row, not about
+    // which box each one happens to sit in.
     detail.dataset.empty = String(!selected);
+    doorsStrip.dataset.empty = String(!selected);
     roomLabel.textContent = selected || 'click a room on the grid';
 
     visitedToggle.disabled = !interactive || !selected;

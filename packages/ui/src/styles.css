@@ -939,6 +939,24 @@
   background: color-mix(in srgb, var(--z1r-accent) 12%, transparent);
 }
 
+/*
+ * One height for all six controls in the row.
+ *
+ * A row is as tall as the tallest thing in it, and these rows mixed the 32px
+ * field height every input and select on the page uses with the 24px chip the
+ * show-on-map and remove buttons are drawn at — so eight of those pixels were
+ * paid by the row and used by nothing. The two buttons set the height because
+ * they are the ones with a size of their own; the fields follow them down.
+ *
+ * Scoped to this row rather than changed on `.z1r-input`, which is the shared
+ * field: the seed panel's inputs are the page's main typing surface and have
+ * no 24px control beside them to agree with. Here the fields carry a pool name
+ * or a region, both of them picked rather than typed.
+ */
+.z1r-hint-row .z1r-input {
+  block-size: var(--spectrum-component-height-75);
+}
+
 .z1r-hint-row .z1r-hint-subject {
   flex: 2 1 190px;
   min-inline-size: 0;
@@ -1217,11 +1235,37 @@
   max-inline-size: 100%;
 }
 
+/*
+ * Ten short lines in two columns, not ten stacked.
+ *
+ * One per line cost 303px of panel height for a panel 171px wide, which is the
+ * shape of a column that has run out of things to put in it. The levels are
+ * about to share a row with Items and the Triforce, both of which are under
+ * 181px tall, and the row is as tall as its tallest panel — so the height was
+ * being paid by the whole row rather than by this panel.
+ *
+ * Filled down the first column and then across, which is `grid-auto-flow:
+ * column` over an explicit row count — L1 to L5, then L6 to OW. Row-major
+ * would be cheaper (no row count to set) and reads worse: L1 L2 / L3 L4 makes
+ * "which line is L7 on" a calculation, where a column keeps the run of
+ * numerals that the stack had.
+ *
+ * `--z1r-loc-rows` is set by `buildLocations` from the number of blocks it
+ * built, because the groups come from the seed settings rather than from a
+ * fixed list. The fallback of 5 is the count for a default seed, so a missing
+ * property lays out rather than collapsing to one row.
+ */
 .z1r-loc-rows {
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  gap: 3px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--z1r-loc-rows, 5), auto);
+  /* max-content, so a column is as wide as its widest line and no wider: the
+     lines differ by slot count and a 1fr track would pad every short one out
+     to the longest. */
+  grid-auto-columns: max-content;
+  justify-items: start;
+  align-items: center;
+  gap: 3px var(--z1r-space-lg);
 }
 
 .z1r-loc-block {
@@ -1574,8 +1618,16 @@
   max-inline-size: 320px;
 }
 
+/*
+ * Sized so the panel matches the Items panel beside it.
+ *
+ * The triangle is the only thing setting this panel's height, and the whole
+ * difference between the two — 181px against 160px — was its 230px cap. In a
+ * row the taller panel sets the row, so the shorter one pays the difference as
+ * dead space under it. 190px lands the panel within a pixel of Items.
+ */
 .z1r-triforce {
-  max-inline-size: 230px;
+  max-inline-size: 190px;
 }
 
 /*
@@ -2592,7 +2644,76 @@
   --z1r-room-ink: var(--z1r-text);
   --z1r-room-rule: color-mix(in srgb, var(--z1r-text) 14%, transparent);
   --z1r-room-rule-heavy: color-mix(in srgb, var(--z1r-text) 34%, transparent);
+  /*
+   * The sheet's own cap, named here because two rules need to agree on it: the
+   * sheet is capped at it and the strip's flex basis is what decides whether
+   * the two fit side by side, which is a question about this number.
+   *
+   * Lowered from 460px so the strip fits beside the sheet in the half-row the
+   * page's last row gives this panel. The arithmetic is the one in the
+   * `.z1r-room-body` comment read backwards: the panel's content box, less this
+   * 12px gap and the strip's 272px, is what is left for the sheet. A 1280px
+   * window lays the page out at 1233px, so each half of that row is 612px and
+   * the panel's content box is 592px, leaving 308px — and a window whose
+   * scrollbar is two pixels wider leaves 307px. 300px clears both with slack to
+   * spare rather than sitting on the boundary, where a pixel of rounding would
+   * drop the strip back under the sheet and add a hundred pixels to the panel.
+   *
+   * The cost is paid everywhere the panel is drawn wider than this, since this
+   * is a cap rather than a width: the one-column page and the OBS map dock both
+   * drew a bigger sheet before. A room cell goes from 55.6x44.5 to 35.6x28.5,
+   * which still carries the door lines, the item sprite at its fixed 15px and
+   * the transport plate; the boss art, which scales with the cell, is the part
+   * that gives up the most.
+   */
+  --z1r-room-sheet: 300px;
+  /*
+   * How much width the four detail rows ask for before they will sit beside
+   * the sheet rather than under it.
+   *
+   * Measured, not guessed. Cloned into a box of a fixed width, the rows go to
+   * one line each at: Room 177px, Stairs 198px, Item 245px, Boss 306px. 272px
+   * is where the Item row — the one naming what is in the room — stops
+   * wrapping under its own label; the Boss row is a ten-button palette that
+   * already wraps by design and takes two rows of art here. Below this the
+   * strip wraps back under the sheet instead of being squeezed: in a 112px
+   * column — roughly the 108px a 600px panel would have left — the same four
+   * rows measure 253px tall against 124px here, with the room label broken
+   * over two lines and the boss palette over three.
+   */
+  --z1r-room-aside: 272px;
   min-inline-size: 0;
+}
+
+/*
+ * The sheet and the detail rows, side by side when both fit.
+ *
+ * `flex-wrap` rather than a breakpoint. The point at which the two stop
+ * fitting is the sheet's width plus the strip's, and a media or container
+ * query would have to restate both to find it — while flex already drops a
+ * child to the next line at exactly that point and gives it the full width
+ * when it lands there, which is the stacked layout this replaces. It also
+ * means the OBS map dock needs no rule of its own: the dock's width is
+ * whatever the user dragged it to, and the wrap answers to the box rather than
+ * to the viewport.
+ *
+ * Side by side starts at a panel 604px wide — 20px of panel padding and
+ * border, the 300px sheet, this 12px gap and 272px of rows — and stacks below
+ * it. At the 460px sheet this panel used to cap at, that threshold was 764px,
+ * which no half of a 1233px row could pay.
+ */
+.z1r-room-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  /*
+   * The row gap is the strip's own 5px, so stacked, the sheet sits above the
+   * rows at the same rhythm the rows sit above each other. It replaces 7px of
+   * margin, 7px of padding and a rule, which is what the strip used to carry —
+   * and which measured 3px taller than this while drawing a second line
+   * directly under the sheet's own border.
+   */
+  gap: 5px var(--z1r-space-lg);
 }
 
 /*
@@ -2682,8 +2803,14 @@
    * Capped rather than left to fill the panel. The sheet is sixty-four cells of
    * a fixed aspect, so a full-page width makes every cell enormous and pushes
    * the detail strip off the first screen.
+   *
+   * As a flex item it asks for the cap as its basis and may still shrink, which
+   * is what a panel narrower than the sheet has always done — a dock dragged to
+   * 320px draws a 284px sheet. It cannot shrink while the strip is beside it:
+   * a flex line that did not wrap has no negative free space to take.
    */
-  max-inline-size: 460px;
+  flex: 0 1 var(--z1r-room-sheet);
+  max-inline-size: var(--z1r-room-sheet);
   padding: 6px;
   background-color: var(--z1r-room-paper-bg);
   background-image:
@@ -2987,12 +3114,37 @@
 
 /* ----------------------------------------------------------- detail strip */
 
+/*
+ * The four rows that describe the selected room.
+ *
+ * `flex: 1 1 var(--z1r-room-aside)` is the whole side-by-side mechanism: the
+ * basis is what the rows ask for, so they sit beside the sheet while the panel
+ * can pay it and wrap under the sheet when it cannot, and the grow takes
+ * whatever is left over beyond it so a wide panel puts every row on one line.
+ * `min-inline-size: 0` because a flex item floors at the min-content of its
+ * widest child otherwise, and the Boss palette's is wider than this basis.
+ */
 .z1r-room-detail {
   display: grid;
+  flex: 1 1 var(--z1r-room-aside);
+  min-inline-size: 0;
   gap: 5px;
+  font-size: var(--z1r-text-xs);
+}
+
+/*
+ * Doors, always under both.
+ *
+ * It keeps the rule the whole strip used to carry, because it is the one part
+ * that is still always below the sheet, so the rule still separates the sheet
+ * from what follows it. The four rows above it do not: beside the sheet a
+ * horizontal rule over a column would be drawing a boundary that isn't there,
+ * and stacked they already have the sheet's own border above them — the rule
+ * was a second line 7px under the first.
+ */
+.z1r-room-doors-strip {
   margin-block-start: 7px;
   padding-block-start: 7px;
-  font-size: var(--z1r-text-xs);
   border-block-start: var(--z1r-border-width) solid var(--z1r-border);
 }
 
