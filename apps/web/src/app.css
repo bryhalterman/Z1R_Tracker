@@ -61,12 +61,17 @@ main {
 }
 
 /*
- * Two columns: the map on the right, everything else stacked on the left.
+ * Two columns: Seed, the items-and-Triforce pair and Item locations on the
+ * left; Hints, the Overworld and Levels on the right.
  *
  * In one column the page was 1508px against an 800px viewport, and the
- * Overworld alone was a third of it. The map is also the one panel whose
- * natural shape is wide rather than tall, so it is the one that pays for
- * itself in a column of its own.
+ * Overworld alone was a third of it. The map is the one panel whose natural
+ * shape is wide rather than tall, so it is the one worth sizing a column
+ * around — and with the map alone in it that column then stood empty for most
+ * of the page while Levels, the panel worked in during a run, sat below the
+ * fold under everything else. Hints now goes above the map and Levels below
+ * it, which fills that column and puts the panel the run is spent in on the
+ * first screen.
  *
  * Done here, in CSS, on the panels `mountTracker` already appends — the OBS
  * dock, map dock and overlay mount the same DOM and must keep the layout they
@@ -76,58 +81,131 @@ main {
  * narrow window keeps the single column rather than squeezing two.
  */
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] {
-  display: grid;
   /*
+   * Floats, where this was a grid — and the reason is that the two columns now
+   * have to size themselves independently.
+   *
+   * A grid shares one set of row tracks between both columns, so every track
+   * is as tall as the taller of the two panels in it and the shorter column
+   * pays the difference as a hole between its own panels. With a single panel
+   * on the right that cost nothing: it spanned every row and nothing sat under
+   * it. With three it does, because the Overworld is far taller than the pair
+   * beside it and Levels is taller than Item locations, and the left column
+   * would carry a couple of hundred pixels of space it never asked for. Every
+   * wrapping layout in one container has the same property, flex included.
+   *
+   * Two independent stacks want two block flows, and floats are the way to get
+   * a second one without a wrapper element to nest a container in. The left
+   * column floats. The right column stays in normal flow, which places blocks
+   * as though the floats were not there, so it starts at the top of the
+   * tracker rather than under the panel that precedes it in the DOM, and each
+   * column packs against its own panels only. `flow-root` is what makes the
+   * tracker contain the floats, so the footer lands under the taller column
+   * instead of beside it.
+   *
+   * What the mechanism asks of the DOM: every floated panel has to come before
+   * every in-flow one in source order, because a float cannot rise above the
+   * in-flow content that precedes it. `mountTracker` appends Seed, the pair
+   * and Item locations ahead of the other three, which is the order this
+   * relies on — a panel added to the left column after Hints would be pushed
+   * below the right column rather than joining the left one.
+   */
+  display: flow-root;
+  /*
+   * The right column's share, named once: the left column's width and the
+   * right column's indent are both measured from it, and they have to agree or
+   * the columns overlap.
+   *
    * A share, not a fixed width: the map is the panel that can use whatever is
    * going, and `applyMapScale` re-derives its cell size from the column it
-   * ends up with. 360px is the floor at which sixteen screens are still worth
-   * drawing; below it the band drops to `sm` and this rule stops applying.
-   */
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 42%);
-  column-gap: var(--z1r-space-md);
-  /*
-   * Zero, with the spacing put back as margins below.
+   * ends up with. The 320px floor keeps sixteen screens drawable at the narrow
+   * end of the band; below that the band drops to `sm` and this rule stops
+   * applying.
    *
-   * The map spans more rows than the left column has panels, which leaves
-   * empty implicit rows at the bottom — and a row gap is charged between
-   * tracks whether or not they hold anything, so a gap here would add a
-   * phantom inch of page per empty row.
+   * Named for the column rather than the map, because the map grid already
+   * reads a `--map-columns` and a `--map-cell` that mean something else
+   * entirely, and a custom property inherits into it from here.
    */
-  row-gap: 0;
-  align-items: start;
+  --right-column: max(320px, 42%);
 }
 
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > * {
-  grid-column: 1;
-  /* Grid items are `auto` sized, which does not shrink below content. The
-     panels hold grids and selects that would otherwise widen the column. */
-  min-inline-size: 0;
+  /*
+   * The left column, and the default for any panel added later.
+   *
+   * Physical `left` rather than `inline-start`: the tracker is left-to-right
+   * only. `clear` is what guarantees a stack rather than a row — a panel
+   * narrower than this (Item locations shrinks to its content) would otherwise
+   * let the next float sit beside it.
+   *
+   * The width is what the grid's `minmax(0, 1fr)` drew against a 42% second
+   * column, to the pixel.
+   */
+  float: left;
+  clear: left;
+  inline-size: calc(100% - var(--right-column) - var(--z1r-space-md));
 }
 
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] > * + *:not(.z1r-map-panel) {
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-locations {
+  /*
+   * Item locations asks to shrink to its content — it carries a start
+   * alignment of its own, which only a grid or flex parent honors, and in the
+   * single column it still does. A float with an auto width is the block
+   * layout's shrink-to-fit, so the panel keeps the width it has always drawn
+   * at and the column is only its ceiling.
+   */
+  inline-size: auto;
+  max-inline-size: calc(100% - var(--right-column) - var(--z1r-space-md));
+}
+
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-hint-tracker,
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-map-panel,
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-rooms-panel {
+  /*
+   * The right column, in DOM order: Hints, the Overworld, Levels.
+   *
+   * The indent is doing the work a grid column would. A block box in normal
+   * flow is laid out at the full width of its container whether or not a float
+   * is in the way — only line boxes shorten around one — so the margin is what
+   * keeps these three clear of the left column, and the width left over is the
+   * column's share.
+   */
+  float: none;
+  clear: none;
+  inline-size: auto;
+  margin-inline-start: calc(100% - var(--right-column));
+}
+
+/*
+ * Spacing as margins rather than a gap, because a gap is a property of a grid
+ * or flex container and neither column is one any more.
+ */
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > * + * {
   margin-block-start: var(--z1r-space-md);
 }
 
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-map-panel {
-  grid-column: 2;
-  /*
-   * Row 1, spanning further than the tracker will ever have panels.
-   *
-   * `1 / -1` is the usual way to say "every row" and does not work here: a
-   * negative line resolves against the *explicit* grid, which has no rows at
-   * all, so it collapses to a single row and the map's height would push the
-   * second left-hand panel down past it.
-   */
-  grid-row: 1 / span 20;
+/*
+ * Each column starts at the top of the tracker. Seed is first in the DOM and
+ * is never given a margin; Hints is fourth, so the rule above would push the
+ * whole right column down by a gutter.
+ */
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-hint-tracker {
   margin-block-start: 0;
 }
 
 /*
  * The Overworld never grows past the screen; its grid scrolls instead.
  *
- * Even in its own column it is the tallest panel on the page, and it is the
- * one whose content can be read a part at a time — eight rows of screens, of
- * which the half you are working in is the half you are looking at.
+ * It is the tallest panel on the page, and the one whose content can be read a
+ * part at a time — eight rows of screens, of which the half you are working in
+ * is the half you are looking at.
+ *
+ * The cap earns more now that Levels sits under the map rather than beside it:
+ * on a short window it is what stops the Overworld from pushing Levels off the
+ * page, and the part of the map that goes is the part the scrollbar brings
+ * back. At a window tall enough to read either panel it does not bind at all,
+ * because the map's cells are sized from the column's width and sixteen
+ * screens of a 42% column are nowhere near a screen tall.
  *
  * The subtraction is the page's own chrome: 16px of body padding top and
  * bottom, the 61px header, and the footer line.
