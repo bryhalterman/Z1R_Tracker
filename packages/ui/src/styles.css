@@ -138,6 +138,18 @@
   justify-content: start;
 }
 
+/*
+ * Nine across, so the eighteen inventory items make two even rows.
+ *
+ * `auto-fill` packs as many as the panel happens to fit, which left a ragged
+ * second row that moved every time the column resized. A fixed count is the
+ * only way the two rows stay equal. `minmax(0, …)` so a panel too narrow for
+ * nine shrinks the cells rather than overflowing.
+ */
+.z1r-item-group[data-group="all"] .z1r-item-grid {
+  grid-template-columns: repeat(9, minmax(0, var(--z1r-item-min, 44px)));
+}
+
 .z1r-item {
   position: relative;
   display: flex;
