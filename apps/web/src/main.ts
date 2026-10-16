@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     // Small enough to sit beside the panels it shares a column with. The
     // inventory is scanned for what is missing, not studied, and the art is
     // 16px of NES sprite however large the cell around it is.
-    itemSize: 24,
+    itemSize: 16,
   });
 }
 

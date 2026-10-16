@@ -321,6 +321,8 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
         placement,
         placeable,
         placeInto,
+        // The browser sources keep the split; a page does not.
+        grouped: mode === 'overlay' || compact,
       }),
     dungeons: () => buildTriforce(store, resolver, patches, interactive),
     locations: () => buildLocations(store, resolver, patches, interactive, compact, placement),
@@ -493,6 +495,8 @@ function buildItems(
     placeable: boolean;
     /** Which panels of this mount a placement can land on. */
     placeInto: { rooms: boolean; locations: boolean };
+    /** Keep the inventory screen's always-active / B-slot split. */
+    grouped: boolean;
   },
 ): HTMLElement {
   const { placeable, placement, placeInto } = opts;
@@ -530,19 +534,42 @@ function buildItems(
   const placedAt = new Map<string, string[]>();
   const cellOpts = { ...opts, placedAt, placeTarget };
 
-  // Two groups, in the game's own order: always-active items on top, then the
-  // boxed B-slot items, mirroring the inventory screen.
-  for (const [group, caption] of [
-    ['passive', 'Always active'],
-    ['bslot', 'B slot'],
-  ] as const) {
-    const wrap = el('div', 'z1r-item-group');
-    wrap.dataset.group = group;
-    wrap.append(el('span', 'z1r-item-group-label', caption));
-    const grid = el('div', 'z1r-item-grid');
+  /*
+   * One grid on a page, two labelled groups on a stream.
+   *
+   * The inventory screen's own split — always-active on top, the boxed B-slot
+   * below — cost two captions, two gaps and a border drawn around whatever
+   * empty space the B-slot row did not fill. On a page that is furniture: the
+   * items are in the game's order either way, and which half an item lives in
+   * is not a question anyone asks the tracker. The browser sources keep the
+   * split, because they are composed by hand against a stream layout and the
+   * overlay balances each grid's columns separately.
+   */
+  const buildGroup = (group: 'passive' | 'bslot', grid: HTMLElement) => {
     for (const def of ITEMS.filter((item) => item.group === group)) {
       grid.append(buildItemCell(store, resolver, def, cellPatches, cellOpts));
     }
+  };
+
+  if (opts.grouped) {
+    for (const [group, caption] of [
+      ['passive', 'Always active'],
+      ['bslot', 'B slot'],
+    ] as const) {
+      const wrap = el('div', 'z1r-item-group');
+      wrap.dataset.group = group;
+      wrap.append(el('span', 'z1r-item-group-label', caption));
+      const grid = el('div', 'z1r-item-grid');
+      buildGroup(group, grid);
+      wrap.append(grid);
+      body.append(wrap);
+    }
+  } else {
+    const wrap = el('div', 'z1r-item-group');
+    wrap.dataset.group = 'all';
+    const grid = el('div', 'z1r-item-grid');
+    buildGroup('passive', grid);
+    buildGroup('bslot', grid);
     wrap.append(grid);
     body.append(wrap);
   }

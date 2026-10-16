@@ -98,8 +98,16 @@
   color: var(--z1r-muted);
 }
 
-/* The B-slot group is boxed, as it is on the game's own inventory screen. */
+/*
+ * The B-slot group is boxed, as it is on the game's own inventory screen.
+ *
+ * `fit-content` so the box ends where the cells do. Stretched, it drew a
+ * border around the empty half of a row that did not fill, which read as part
+ * of the group rather than as leftover space.
+ */
 .z1r-item-group[data-group="bslot"] .z1r-item-grid {
+  inline-size: fit-content;
+  max-inline-size: 100%;
   padding: var(--z1r-space-sm);
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
