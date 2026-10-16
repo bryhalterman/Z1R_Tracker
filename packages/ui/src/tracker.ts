@@ -501,6 +501,13 @@ function buildItems(
   const cellPatches: Patch[] = [];
 
   /*
+   * The cell is the sprite plus its own padding and border, so the grid's
+   * minimum track follows `itemSize` rather than a fixed 44px that stayed
+   * put however small the art was asked to be.
+   */
+  root.style.setProperty('--z1r-item-min', `${opts.itemSize + 10}px`);
+
+  /*
    * What a placement can be dropped onto, named for the panel's own prompts.
    *
    * The room sheet is no longer the only receiver, so the wording comes from

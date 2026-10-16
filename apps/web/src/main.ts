@@ -32,7 +32,15 @@ async function main(): Promise<void> {
    * until this browser saves a folded set of its own, so someone who opens
    * Seed finds it open next time.
    */
-  mountTracker(trackerRoot, { store, resolver, defaultCollapsed: ['Seed', 'Hints'] });
+  mountTracker(trackerRoot, {
+    store,
+    resolver,
+    defaultCollapsed: ['Seed', 'Hints'],
+    // Small enough to sit beside the panels it shares a column with. The
+    // inventory is scanned for what is missing, not studied, and the art is
+    // 16px of NES sprite however large the cell around it is.
+    itemSize: 24,
+  });
 }
 
 void main();

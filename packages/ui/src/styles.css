@@ -109,9 +109,25 @@
   display: grid;
   /* Replaced at runtime with a balanced column count — see `balanceItemGrids`.
      This is the fallback for the first paint and for a zero-width measure. */
-  --z1r-item-min: 44px;
-  grid-template-columns: repeat(auto-fill, minmax(var(--z1r-item-min), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--z1r-item-min, 44px), var(--z1r-item-max, 1fr)));
   gap: 4px;
+}
+
+/*
+ * On a page, a track that cannot grow past its minimum.
+ *
+ * `1fr` as the maximum lets every column stretch to fill the panel, so asking
+ * for a smaller sprite bought nothing: the cells simply spread out and the art
+ * sat in the middle of the same large box. Capping the track turns a wider
+ * panel into more columns instead of bigger cells.
+ *
+ * The compact mounts keep the stretch: the OBS dock and overlay are sized by
+ * hand against a stream layout, and changing how they fill is not this rule's
+ * business.
+ */
+.z1r-tracker[data-compact="false"] .z1r-item-grid {
+  --z1r-item-max: var(--z1r-item-min, 44px);
+  justify-content: start;
 }
 
 .z1r-item {
