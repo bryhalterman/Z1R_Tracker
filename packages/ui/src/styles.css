@@ -1503,6 +1503,23 @@
   min-inline-size: 300px;
 }
 
+/*
+ * On a page, the Items panel is as wide as its items and no wider.
+ *
+ * Growing to fill the pair row made the panel 550px around a grid of nine
+ * 26px cells, so most of the box was empty and the border drew a frame around
+ * the emptiness. The row's leftover width is better left as leftover than
+ * handed to a panel with nothing to put in it.
+ *
+ * The overlay keeps the stretch: it is composed against a fixed stream width
+ * and its grids are balanced by `balanceItemGrids`, which sizes columns from
+ * the width the panel is given.
+ */
+.z1r-tracker[data-mode="full"] .z1r-pair > .z1r-items-panel {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+}
+
 .z1r-pair > .z1r-triforce-panel {
   flex: 1 1 240px;
   max-inline-size: 320px;
