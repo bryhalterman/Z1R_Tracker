@@ -200,14 +200,36 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
   return out;
 }
 
-/** Each side checked against the table; anything else reads as `unknown`. */
+/**
+ * Door ids this model has renamed, old id to current one.
+ *
+ * `bomb` became `bombed` when the state's meaning inverted: it used to mark a
+ * bombable wall, a way through that wanted a bomb, and now marks one that was
+ * bombed and stayed shut. The id is carried across rather than dropped, because
+ * an edge somebody deliberately marked is worth keeping on the sheet, and a
+ * state visible enough to argue with invites the correction a silent reset to
+ * `unknown` never would.
+ */
+const DOOR_STATE_RENAMES: ReadonlyMap<string, DoorState> = new Map([['bomb', 'bombed']]);
+
+/**
+ * Each side checked against the table; anything else reads as `unknown`.
+ *
+ * Renamed ids are translated first, so they never reach the unknown-value path.
+ */
 function conformDoors(saved: unknown): RoomDoors {
   const doors = emptyRoom().doors;
   if (!saved || typeof saved !== 'object') return doors;
   const source = saved as Record<string, unknown>;
   for (const side of ROOM_SIDES) {
     const value = source[side];
-    if (typeof value !== 'string' || !DOOR_STATES_BY_ID.has(value)) continue;
+    if (typeof value !== 'string') continue;
+    const renamed = DOOR_STATE_RENAMES.get(value);
+    if (renamed) {
+      doors[side] = renamed;
+      continue;
+    }
+    if (!DOOR_STATES_BY_ID.has(value)) continue;
     doors[side] = value as DoorState;
   }
   return doors;

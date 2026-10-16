@@ -2770,13 +2770,17 @@
 /* unknown draws nothing at all — most edges are unknown most of the time. */
 
 /*
- * Six states, six line treatments: nothing, a gapped line, a solid one, dashed,
- * double, dotted. Hue reinforces each and carries none of them.
+ * Six states, six line treatments: nothing, a gapped line, a solid one, a solid
+ * one struck through, double, dotted. Hue reinforces each and carries none of
+ * them.
  *
  * Open is drawn as two stubs with a gap, which is both how a doorway is drawn
  * on paper and the reason it is not simply a solid line in another colour: open
  * and wall were a green line and an ink line of the same shape, which is state
- * by colour alone. Every edge also names its state, with the model's own
+ * by colour alone. Bombed is the wall's own solid line with a short tick across
+ * it: it is a wall, and the tick is the bomb already spent on it. It was dashed
+ * once, which read as a gap you could get through — the opposite of what the
+ * state now means. Every edge also names its state, with the model's own
  * two-letter tag, in its tooltip.
  */
 .z1r-room-door.n[data-door="open"]::after,
@@ -2805,8 +2809,24 @@
   border-block-start: 3px solid var(--z1r-room-ink);
 }
 
-.z1r-room-door[data-door="bomb"]::after {
-  border-block-start: 3px dashed var(--z1r-bad);
+.z1r-room-door[data-door="bombed"]::after {
+  border-block-start: 3px solid var(--z1r-bad);
+}
+
+/*
+ * The tick. `::after` carries the wall line for every state, so the strike gets
+ * the free pseudo-element, and it is only generated for this one state. It runs
+ * across the line — upright on a north or south edge, flat on an east or west
+ * one — and stays inside the 10px edge so it cannot reach into the cell art.
+ */
+.z1r-room-door[data-door="bombed"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  inline-size: 3px;
+  block-size: 9px;
+  background: var(--z1r-bad);
 }
 
 .z1r-room-door[data-door="locked"]::after {
@@ -2823,10 +2843,16 @@
   border-inline-start: 3px solid var(--z1r-room-ink);
 }
 
-.z1r-room-door.e[data-door="bomb"]::after,
-.z1r-room-door.w[data-door="bomb"]::after {
+.z1r-room-door.e[data-door="bombed"]::after,
+.z1r-room-door.w[data-door="bombed"]::after {
   border-block-start: 0;
-  border-inline-start: 3px dashed var(--z1r-bad);
+  border-inline-start: 3px solid var(--z1r-bad);
+}
+
+.z1r-room-door.e[data-door="bombed"]::before,
+.z1r-room-door.w[data-door="bombed"]::before {
+  inline-size: 9px;
+  block-size: 3px;
 }
 
 .z1r-room-door.e[data-door="locked"]::after,

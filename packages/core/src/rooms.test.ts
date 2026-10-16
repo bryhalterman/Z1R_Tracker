@@ -6,6 +6,7 @@ import { createInitialState, reduce, STATE_VERSION, type TrackerState } from './
 import {
   allRoomIds,
   DOOR_STATES,
+  DOOR_STATES_BY_ID,
   DUNGEON_BOSSES,
   emptyRoom,
   isRoomId,
@@ -357,7 +358,7 @@ test('a well-formed room map survives a load unchanged', () => {
           stairs: 'transport',
           transport: 1,
           transportSeq: 1,
-          doors: { north: 'open', east: 'bomb', south: 'locked', west: 'unknown' },
+          doors: { north: 'open', east: 'bombed', south: 'locked', west: 'unknown' },
         },
       },
     },
@@ -365,6 +366,29 @@ test('a well-formed room map survives a load unchanged', () => {
   const state = migrate(saved);
   assert.ok(state);
   assert.deepEqual(state.rooms, saved.rooms);
+});
+
+test('a save holding the pre-rename `bomb` door loads as `bombed`', () => {
+  // `bomb` meant a bombable wall before the state inverted into "bombed and it
+  // stayed shut". The id is renamed on load rather than failing the table check
+  // and resetting the edge to unknown, which would throw away the fact that
+  // somebody stood there and marked it.
+  const state = migrate({
+    ...preRoomsSave(),
+    version: 11,
+    rooms: { '4': { B6: { visited: true, doors: { north: 'bomb', east: 'wall' } } } },
+  });
+  assert.ok(state);
+  const note = state.rooms['4']?.B6;
+  assert.ok(note);
+  assert.equal(note.doors.north, 'bombed');
+  // The sides around it are untouched by the translation.
+  assert.equal(note.doors.east, 'wall');
+  assert.equal(note.doors.south, 'unknown');
+  // And the old id is no longer a state in its own right, so nothing can set it
+  // again and an export carries only the current name.
+  assert.equal(DOOR_STATES_BY_ID.has('bomb'), false);
+  assert.ok(DOOR_STATES_BY_ID.has('bombed'));
 });
 
 test('corrupt room containers and keys are coerced away rather than crashing', () => {

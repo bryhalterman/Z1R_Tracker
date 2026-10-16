@@ -160,7 +160,7 @@ const LEVELS: readonly number[] = DUNGEONS.map((dungeon) => dungeon.level);
  * The short cycle a click on a room's edge walks.
  *
  * Unknown, open and wall are what you learn by walking into a wall, so they are
- * the three worth a click on the sheet itself. Bombable, locked and shutter are
+ * the three worth a click on the sheet itself. Bombed, locked and shutter are
  * rare and deliberate, so they live in the detail strip rather than costing
  * four clicks to pass on every other edge.
  */

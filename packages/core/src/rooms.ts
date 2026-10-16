@@ -88,7 +88,7 @@ export function isRoomSide(side: string): side is RoomSide {
  * `unknown` is the starting value and a real answer in itself: "I have not
  * stood in front of this wall" is different from "there is nothing there".
  */
-export type DoorState = 'unknown' | 'open' | 'wall' | 'bomb' | 'locked' | 'shutter';
+export type DoorState = 'unknown' | 'open' | 'wall' | 'bombed' | 'locked' | 'shutter';
 
 export interface DoorStateDef {
   readonly id: DoorState;
@@ -117,7 +117,11 @@ export const DOOR_STATES: readonly DoorStateDef[] = [
   { id: 'unknown', name: 'Unknown', tag: '??' },
   { id: 'open', name: 'Open', tag: 'OP' },
   { id: 'wall', name: 'Wall', tag: 'WL' },
-  { id: 'bomb', name: 'Bombable', tag: 'BM' },
+  // A wall you have already spent a bomb on and that did not open, which is
+  // worth a state of its own precisely because it looks identical to one you
+  // have not tested yet. The tag is the bomb struck out, not an invitation to
+  // bring another.
+  { id: 'bombed', name: 'Bombed, solid', tag: 'BX' },
   { id: 'locked', name: 'Locked', tag: 'LK' },
   // Closes behind you and opens again when the room is cleared, so a shutter
   // you remember is a fight you have not finished.
