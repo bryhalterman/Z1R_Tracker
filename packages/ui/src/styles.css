@@ -2649,24 +2649,16 @@
    * sheet is capped at it and the strip's flex basis is what decides whether
    * the two fit side by side, which is a question about this number.
    *
-   * Lowered from 460px so the strip fits beside the sheet in the half-row the
-   * page's last row gives this panel. The arithmetic is the one in the
-   * `.z1r-room-body` comment read backwards: the panel's content box, less this
-   * 12px gap and the strip's 272px, is what is left for the sheet. A 1280px
-   * window lays the page out at 1233px, so each half of that row is 612px and
-   * the panel's content box is 592px, leaving 308px — and a window whose
-   * scrollbar is two pixels wider leaves 307px. 300px clears both with slack to
-   * spare rather than sitting on the boundary, where a pixel of rounding would
-   * drop the strip back under the sheet and add a hundred pixels to the panel.
+   * 460px is what the sheet is worth drawing at: a room cell of 55.6x44.5,
+   * where the boss art reads and the door lines are unambiguous. Anywhere the
+   * panel has that much room, it gets it.
    *
-   * The cost is paid everywhere the panel is drawn wider than this, since this
-   * is a cap rather than a width: the one-column page and the OBS map dock both
-   * drew a bigger sheet before. A room cell goes from 55.6x44.5 to 35.6x28.5,
-   * which still carries the door lines, the item sprite at its fixed 15px and
-   * the transport plate; the boss art, which scales with the cell, is the part
-   * that gives up the most.
+   * A narrower sheet is a trade for the strip sitting beside it rather than
+   * under it, and only the page's half-row forces that trade — so the page
+   * overrides this value there, and nowhere else. The one-column page and the
+   * OBS map dock keep the sheet they have room for.
    */
-  --z1r-room-sheet: 300px;
+  --z1r-room-sheet: 460px;
   /*
    * How much width the four detail rows ask for before they will sit beside
    * the sheet rather than under it.

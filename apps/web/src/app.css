@@ -214,6 +214,22 @@ main {
 
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-rooms-panel {
   order: 7;
+  /*
+   * A smaller sheet, so the detail strip fits beside it in half a row.
+   *
+   * The panel's own stylesheet caps the sheet at 460px, which is what it is
+   * worth drawing at. Half of this row is not enough for that plus the strip:
+   * at a 1233px tracker each half is 612px and the panel's content box 592px,
+   * which after the 12px gap and the strip's 272px leaves 308px for the sheet —
+   * 307px in a window with a wider scrollbar. 300 clears both rather than
+   * sitting on the boundary, where a pixel of rounding would drop the strip
+   * back under the sheet and add a hundred pixels to the panel.
+   *
+   * Here rather than in the shared sheet, because this row is the only place
+   * that forces the trade. The one-column page below this band, and the OBS
+   * map dock, both have room for the larger sheet and keep it.
+   */
+  --z1r-room-sheet: 300px;
 }
 
 /*
