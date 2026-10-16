@@ -428,9 +428,22 @@ export function buildRooms(
         const item = note?.item ?? '';
         renderedMark = memoise(renderedMark, `${stairs}|${transport}|${item}`, () => {
           mark.replaceChildren();
-          // The stair glyph and the pair plate are drawn shapes, not tints, so
+          // The staircase and the pair plate are drawn shapes, not tints, so
           // the two kinds of staircase read apart without colour.
-          if (stairs === 'item') mark.append(el('span', 'z1r-room-stairs', '▲'));
+          //
+          // The tracker's own staircase art rather than a triangle: a triangle
+          // says nothing about stairs, and this is the same shape the warp
+          // markers draw on the overworld, so a staircase reads the same way
+          // wherever it appears.
+          if (stairs === 'item') {
+            mark.append(
+              createSprite(resolver, 'mark.stairway', {
+                size: MARK_ART_SIZE,
+                className: 'z1r-room-stairs',
+                label: '',
+              }),
+            );
+          }
           if (transport) {
             mark.append(el('span', 'z1r-room-transport', String(transport)));
           }

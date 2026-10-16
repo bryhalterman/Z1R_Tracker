@@ -2749,11 +2749,10 @@
   filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
 }
 
+/* The staircase is drawn art now, so it needs the outline the other marks get
+   rather than the text shadow a glyph wanted. */
 .z1r-room-stairs {
-  font-size: var(--z1r-text-lg);
-  line-height: 1;
-  color: var(--z1r-stair);
-  text-shadow: 0 0 2px #000, 0 0 2px #000;
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
 }
 
 /* The pair number borrows the warp marker's treatment: a dark digit on a light
