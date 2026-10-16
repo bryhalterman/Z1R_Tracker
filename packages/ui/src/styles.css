@@ -156,6 +156,9 @@
   align-items: center;
   justify-content: center;
   padding: 4px;
+  /* A button does not inherit the page's font: the user agent hands it one of
+     its own, and every node nested inside inherits that instead. */
+  font: inherit;
   background: var(--z1r-inset);
   /* Dashed border + heavy desaturation both say "not obtained", so the state
      survives without colour vision. */
@@ -559,9 +562,19 @@
   align-items: center;
   justify-content: center;
   padding: 0;
+  /* A button does not inherit the page's font, so everything drawn inside the
+     cell inherited the user agent's instead. Without this the level numeral and
+     the price line came out in a different typeface from the rest of the
+     tracker — and the numeral stopped matching the level selector's, which is
+     meant to be the same figure. */
+  font: inherit;
   overflow: hidden;
   background: var(--z1r-field);
   border: var(--z1r-border-width) solid var(--z1r-border);
+  /* Deliberately tighter than --z1r-radius, which is the token everything else
+     uses. A cell is 12px tall in the narrow width band, where a 4px radius
+     rounds away a third of each edge, and the mark's colour is drawn as a 2px
+     inset ring whose corners the larger radius eats into. */
   border-radius: 2px;
   cursor: pointer;
   box-shadow: inset 0 0 0 0 var(--mark-color, transparent);
@@ -570,10 +583,6 @@
 
 .z1r-screen:not([data-mark="none"]) {
   box-shadow: inset 0 0 0 2px var(--mark-color, transparent);
-}
-
-.z1r-screen[data-mark="empty"] {
-  opacity: 0.4;
 }
 
 .z1r-screen:not(:disabled):hover {
@@ -643,13 +652,32 @@
   z-index: 2;
   align-items: center;
   justify-content: center;
-  padding: 2px;
+  /*
+   * Disc, padding and ring are all sized from the cell, the way the stock row
+   * and the warp staircase below are.
+   *
+   * They were fixed pixels against a cell that is not: an 18px sprite plus 2px
+   * of padding plus a 1.5px ring paints 25px across, and the cell is 19px tall
+   * at a 1280px window and 14px in the narrow band. The cell clips, so what got
+   * cut was the ring — the one part of the disc carrying the mark's colour.
+   *
+   * The three factors sum to 0.85, so the painted disc is always smaller than
+   * the cell is tall and a little of the cell's own field still shows around
+   * the ring. That puts it between the stock row's 0.4 and the warp staircase's
+   * 0.95, which is where a single centred glyph belongs.
+   */
+  padding: calc(var(--map-cell-height, 34px) * 0.07);
   border-radius: 50%;
   /* A constant dark disc under the icon: terrain art underneath varies wildly,
      and a mark that disappears over forest is worse than no mark. */
   background: color-mix(in srgb, var(--z1r-bg) 80%, transparent);
-  box-shadow: 0 0 0 1.5px var(--mark-color, transparent);
+  box-shadow: 0 0 0 calc(var(--map-cell-height, 34px) * 0.045) var(--mark-color, transparent);
   pointer-events: none;
+}
+
+.z1r-screen-mark > .z1r-sprite {
+  inline-size: calc(var(--map-cell-height, 34px) * 0.62);
+  block-size: calc(var(--map-cell-height, 34px) * 0.62);
 }
 
 .z1r-screen:not([data-mark="none"]) .z1r-screen-mark {
@@ -933,18 +961,45 @@
   min-inline-size: 0;
 }
 
-.z1r-hint-show {
+/*
+ * One chip.
+ *
+ * A panel heading's chip, the hint tracker's show-on-map button and the Rooms
+ * strip's word buttons were three drawings of the same 24px control — 10px
+ * upper at a 3px radius with no fill, 11px mixed case at 3px, and 9px upper at
+ * 4px over a filled well. Two of them sit in the same panel a few hundred
+ * pixels apart, which is where three treatments stop reading as a style and
+ * start reading as three different kinds of button.
+ *
+ * They share this rule now. The only difference left between them is a dashed
+ * border against a solid one, and that difference carries state.
+ */
+.z1r-chip-button,
+.z1r-hint-show,
+.z1r-room-pick.z1r-room-word {
   flex: none;
   min-block-size: var(--spectrum-component-height-75);
-  padding: 2px 7px;
+  padding: 1px 8px;
   font: inherit;
-  font-size: var(--z1r-text-sm);
+  font-size: var(--z1r-text-xs);
+  /* Stated rather than inherited. A chip sits in a panel heading in one place
+     and in a detail row in another, and `font: inherit` alone had the same
+     control coming out at 600 in the first and 400 in the second. */
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   white-space: nowrap;
   color: var(--z1r-muted);
   background: transparent;
-  border: var(--z1r-border-width) dashed var(--z1r-border);
-  border-radius: 3px;
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
   cursor: pointer;
+}
+
+/* Dashed until this hint is the one highlighted on the map; the focused rule
+   below turns it solid. That is the state, and it is not a colour. */
+.z1r-hint-show {
+  border-style: dashed;
 }
 
 .z1r-hint-row[data-focused="true"] .z1r-hint-show {
@@ -982,19 +1037,9 @@
   color: var(--z1r-muted);
 }
 
+/* Everything but the gap comes from the shared chip rule above. */
 .z1r-chip-button {
   margin-inline-start: var(--z1r-space-md);
-  min-block-size: var(--spectrum-component-height-75);
-  padding: 1px 8px;
-  font: inherit;
-  font-size: var(--z1r-text-xs);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--z1r-muted);
-  background: transparent;
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: 3px;
-  cursor: pointer;
 }
 
 .z1r-chip-button:hover,
@@ -1039,10 +1084,12 @@
   color: var(--z1r-muted);
 }
 
+/* No opacity here: --z1r-muted is 6.37:1 on a panel and passes, and the 0.75
+   this carried dropped it to 4.28:1. The smaller type sets a hint apart on its
+   own. */
 .z1r-field-hint {
   font-size: var(--z1r-text-sm);
   color: var(--z1r-muted);
-  opacity: 0.75;
 }
 
 .z1r-input {
@@ -1221,7 +1268,7 @@
   color: var(--z1r-muted);
   background: transparent;
   border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: 3px;
+  border-radius: var(--z1r-radius);
   cursor: pointer;
 }
 
@@ -1245,6 +1292,8 @@
   inline-size: 24px;
   block-size: 24px;
   padding: 1px;
+  /* A button imposes the user agent's font on its contents unless told not to. */
+  font: inherit;
   color: var(--z1r-text);
   background: var(--z1r-field);
   /* Dashed until it has been picked up and solid once collected — the same two
@@ -1699,7 +1748,10 @@
    alone. An item that is not stocked has no price to record. */
 .z1r-mark-stock-price:disabled {
   border-style: dashed;
-  opacity: 0.4;
+  /* 0.4 measured 3.50:1 for the typed price against the composited well. The
+     text starts at 14.21:1 on its own field, so 0.6 clears AA at 5.97:1 and
+     the box still reads as the dimmer of the two states. */
+  opacity: 0.6;
   cursor: default;
 }
 
@@ -1807,7 +1859,7 @@
   color: var(--z1r-muted);
   background: var(--z1r-inset);
   border: var(--z1r-border-width) dashed var(--z1r-border);
-  border-radius: 3px;
+  border-radius: var(--z1r-radius);
   cursor: pointer;
 }
 
@@ -1823,7 +1875,10 @@
 }
 
 .z1r-compact-slot[data-collected="false"] {
-  opacity: 0.7;
+  /* These 9px codes are the smallest text in the app and the only thing naming
+     a slot's kind on the dock. 0.7 measured 3.69:1 against the composited
+     well; 0.85 measures 4.69:1. The dashed border is the state either way. */
+  opacity: 0.85;
 }
 
 .z1r-compact-slot:disabled {
@@ -2385,9 +2440,11 @@
   gap: 4px;
 }
 
-/* An unmarked warp still shows its row, dimmed and dashed — the routing holds
-   whether or not you have found it, and a row that disappeared would move the
-   others. Two channels, neither of them colour. */
+/* An unmarked warp still shows its row — the routing holds whether or not you
+   have found it, and a row that disappeared would move the others.
+   The dim is the only conditional part of the treatment: the exit boxes below
+   are dashed on every row, found or not. The second channel is the "—" the row
+   prints in place of the screen it has not been found on. */
 .z1r-warp-route[data-found="false"] {
   opacity: 0.55;
 }
@@ -2396,7 +2453,7 @@
   min-width: 14px;
   padding-inline: 3px;
   border: 1px solid var(--z1r-text);
-  border-radius: 3px;
+  border-radius: var(--z1r-radius);
   font-weight: 800;
   text-align: center;
   color: var(--z1r-text);
@@ -2414,7 +2471,7 @@
   gap: 2px;
   padding: 1px 4px;
   border: 1px dashed var(--z1r-border);
-  border-radius: 3px;
+  border-radius: var(--z1r-radius);
   color: var(--z1r-muted);
 }
 
@@ -2584,7 +2641,10 @@
    Ahead of the selected rules below, which have the same specificity and must
    win: the level you are looking at is never dimmed, recorded or not. */
 .z1r-room-level[data-touched="false"] {
-  opacity: 0.45;
+  /* 0.45 put --z1r-muted at 2.47:1 over the panel, and these are enabled
+     buttons carrying 17px text, so the 4.5:1 floor applies to them. 0.8
+     measures 4.65:1 and still reads as the quieter of the two states. */
+  opacity: 0.8;
 }
 
 /* Bigger, brighter, and underscored — three channels, so the selected level is
@@ -2922,7 +2982,7 @@
   text-align: center;
   color: var(--z1r-bg);
   background: var(--z1r-stair);
-  border-radius: 3px;
+  border-radius: var(--z1r-radius);
 }
 
 /* ----------------------------------------------------------- detail strip */
@@ -2978,7 +3038,11 @@
    controls are disabled too, so this is reinforcement rather than the whole
    story. */
 .z1r-room-detail[data-empty="true"] .z1r-room-editable {
-  opacity: 0.4;
+  /* This is the strip's state on every page load, so its labels have to stay
+     readable in it. 0.4 put the keys at 2.23:1 and the select text at 3.49:1
+     over their own composited wells; 0.8 is 4.65:1 and 9.51:1. The disabled
+     controls, not the dim, are what say the rows are out of play. */
+  opacity: 0.8;
   pointer-events: none;
 }
 
@@ -3017,6 +3081,9 @@
   inline-size: 26px;
   block-size: 24px;
   padding: 1px;
+  /* A button imposes the user agent's font on its contents unless told not to;
+     the word variant sets only its size on top of this. */
+  font: inherit;
   background: var(--z1r-field);
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
@@ -3028,19 +3095,21 @@
   box-shadow: inset 0 0 0 1px var(--z1r-accent);
 }
 
+/* The display above is an author declaration and would beat the user agent's
+   [hidden] rule, so hiding a pick has to be said here. Ganon and Zelda are
+   absent outside Level 9 rather than greyed out. */
+.z1r-room-pick[hidden] {
+  display: none;
+}
+
 .z1r-room-pick:disabled {
   opacity: 0.3;
   cursor: default;
 }
 
+/* A word needs the width its own label asks for; the rest is the shared chip. */
 .z1r-room-pick.z1r-room-word {
   inline-size: auto;
-  padding-inline: 6px;
-  font: inherit;
-  font-size: var(--z1r-text-2xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--z1r-muted);
 }
 
 .z1r-room-pick.z1r-room-word[aria-pressed="true"] {

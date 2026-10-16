@@ -213,7 +213,17 @@ export function buildRooms(
   const root = el('section', 'z1r-panel z1r-rooms-panel');
   root.dataset.interactive = String(interactive);
 
-  const title = el('h2', 'z1r-panel-title', 'Rooms');
+  /*
+   * "Levels", not "Rooms" — the heading sits directly above the nine level
+   * numerals that are the first thing anyone touches here, and the room grid is
+   * what you get after choosing one.
+   *
+   * The section id, the `z1r-room*` class hooks and everything in core keep the
+   * room name. `wireCollapsing` keys a panel's folded state off this text, so
+   * the rename does cost a window its saved preference for this one panel the
+   * first time it loads; nothing tracked is affected.
+   */
+  const title = el('h2', 'z1r-panel-title', 'Levels');
   root.append(title);
 
   /*
@@ -726,11 +736,17 @@ export function buildRooms(
     noneBoss.setAttribute('aria-pressed', String(!!note && note.boss === ''));
     for (const { boss, button } of bossButtons) {
       /*
-       * Ganon and Zelda are offered on Level 9 and greyed out elsewhere rather
-       * than hidden: a control that moves between levels is harder to find than
-       * one that dims, and its absence reads as a missing feature.
+       * Ganon and Zelda are absent outside Level 9, not greyed out. A disabled
+       * chip still asks to be read and wondered about, and these two are never
+       * an option on any other level — there is nothing to wonder about.
+       *
+       * They are the last two entries in `DUNGEON_BOSSES`, so hiding them trims
+       * the end of the row and leaves every other chip exactly where it was.
+       * Still disabled as well as hidden, so neither can be reached by keyboard
+       * while it is off the row.
        */
       const allowed = bossAllowedOnLevel(boss.id, level);
+      button.hidden = !allowed;
       button.disabled = !interactive || !selected || !allowed;
       button.dataset.allowed = String(allowed);
       button.setAttribute('aria-pressed', String(note?.boss === boss.id));

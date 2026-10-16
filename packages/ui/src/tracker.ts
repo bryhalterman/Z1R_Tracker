@@ -1613,6 +1613,13 @@ function buildMap(
               : (held?.sprite ?? def?.sprite);
           if (!sprite) slot.replaceChildren();
           else {
+            /*
+             * 18 is the nominal size at a full-width cell, not the drawn one.
+             * The box itself is sized from `--map-cell-height` in the
+             * stylesheet so the disc and its coloured ring track the map's
+             * zoom instead of being clipped by a cell smaller than they are —
+             * the same split the stock row and the warp staircase use.
+             */
             slot.replaceChildren(
               createSprite(resolver, sprite, { size: 18, label: held?.name ?? def?.name }),
             );
