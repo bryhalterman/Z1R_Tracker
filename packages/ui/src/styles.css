@@ -3414,134 +3414,189 @@
   text-underline-offset: 3px;
 }
 
-/* ---------------------------------------------------------------- compass */
+/* ------------------------------------------------------------ door brush */
 
 /*
- * The four doorways of the selected room as a cross: north above, south below,
- * west and east to either side, the room's id in the middle.
+ * The door editor: six state buttons, then the selected room with a big wall
+ * on each side. Pick a state, click walls.
+ *
+ * Every state is a line treatment, the same one the sheet draws, plus a word
+ * on the brush and the model's two-letter tag on the wall — so none of the six
+ * rests on its hue.
  */
-.z1r-room-compass {
-  display: grid;
-  grid-template-columns: auto auto auto;
-  grid-template-rows: auto auto auto;
-  align-items: center;
-  justify-items: center;
-  gap: 3px;
-  inline-size: max-content;
-}
-
-.z1r-compass-arm {
-  display: flex;
-  gap: 2px;
-}
-
-.z1r-compass-arm[data-axis="v"] {
+.z1r-room-doors-row .z1r-room-detail-value {
   flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 
-.z1r-compass-arm[data-side="n"] {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.z1r-compass-arm[data-side="s"] {
-  grid-column: 2;
-  grid-row: 3;
-}
-
-.z1r-compass-arm[data-side="w"] {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.z1r-compass-arm[data-side="e"] {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-/* The room itself, inked the way a visited room is on the sheet. */
-.z1r-compass-hub {
+.z1r-door-brushes {
   display: grid;
-  grid-column: 2;
-  grid-row: 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  max-inline-size: 240px;
+}
+
+.z1r-door-brush {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 28px;
+  padding: 2px 5px;
+  font: inherit;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 600;
+  text-align: start;
+  color: var(--z1r-text);
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius-sm);
+  cursor: pointer;
+}
+
+.z1r-door-brush:hover {
+  border-color: var(--z1r-muted);
+}
+
+/* Armed: ringed and lifted, the palette's treatment. The ring is a second
+   line, so which state is armed is a shape and not only the accent. */
+.z1r-door-brush[aria-pressed="true"] {
+  background: var(--z1r-inset);
+  border-color: var(--z1r-accent);
+  outline: var(--z1r-border-width-thick) solid var(--z1r-accent);
+  outline-offset: -1px;
+}
+
+.z1r-door-word {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.z1r-door-key {
+  font: inherit;
+  font-weight: 400;
+  color: var(--z1r-muted);
+}
+
+/* The room: a hub with a wall button on each side, each wall as long as its
+   side and 24px deep. */
+.z1r-door-room {
+  --wall: 24px;
+  position: relative;
+  inline-size: min(100%, 220px);
+  block-size: 150px;
+}
+
+.z1r-door-hub {
+  position: absolute;
+  inset: var(--wall);
+  display: grid;
   place-items: center;
-  inline-size: 88px;
-  block-size: 64px;
   font-size: var(--z1r-text-md);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--z1r-text);
   background: color-mix(in srgb, var(--z1r-text) 5%, transparent);
-  border: var(--z1r-border-width) solid var(--z1r-text);
+  border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius-sm);
 }
 
-.z1r-door-pick {
-  position: relative;
-  display: grid;
-  place-items: center;
-  flex: none;
-  inline-size: 14px;
-  block-size: 14px;
+.z1r-door-wall {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 0;
   font: inherit;
-  background: var(--z1r-field);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: 3px;
+  color: var(--z1r-text);
+  background: transparent;
+  border: var(--z1r-border-width) solid transparent;
+  border-radius: var(--z1r-radius-sm);
   cursor: pointer;
-  overflow: hidden;
 }
 
-.z1r-door-pick:hover {
-  border-color: var(--z1r-muted);
-}
-
-/* The side's current state: ringed and lifted. The ring is a second line, so
-   which button is current is a shape and not only the accent. */
-.z1r-door-pick[aria-pressed="true"] {
-  z-index: 1;
+.z1r-door-wall:hover:not(:disabled) {
   background: var(--z1r-inset);
-  border-color: var(--z1r-accent);
-  outline: var(--z1r-border-width) solid var(--z1r-accent);
+  border-color: var(--z1r-border);
 }
 
-/* Disabled with no room selected, but not dimmed further than the row is: the
-   swatches double as the legend for the sheet's lines and stay readable. */
-.z1r-door-pick:disabled {
+.z1r-door-wall:disabled {
   cursor: default;
 }
 
-.z1r-door-unknown {
+.z1r-door-wall[data-side="n"],
+.z1r-door-wall[data-side="s"] {
+  inset-inline: var(--wall);
+  block-size: var(--wall);
+}
+
+.z1r-door-wall[data-side="n"] {
+  inset-block-start: 0;
+}
+
+.z1r-door-wall[data-side="s"] {
+  inset-block-end: 0;
+}
+
+.z1r-door-wall[data-side="w"],
+.z1r-door-wall[data-side="e"] {
+  inset-block: var(--wall);
+  inline-size: var(--wall);
+  flex-direction: column;
+}
+
+.z1r-door-wall[data-side="w"] {
+  inset-inline-start: 0;
+}
+
+.z1r-door-wall[data-side="e"] {
+  inset-inline-end: 0;
+}
+
+.z1r-door-tag {
   font-size: var(--z1r-text-2xs);
   font-weight: 700;
-  line-height: 1;
-  color: var(--z1r-muted);
+  letter-spacing: 0.04em;
 }
 
 /*
- * The swatch is the sheet's own line for that state, at button size: nothing,
- * gapped, solid, solid struck through, double, dotted. Laid along the arm's
- * axis — across for north and south, upright for east and west — the way the
- * sheet draws that side.
+ * The state line. Laid across on the brushes and on north and south walls,
+ * upright on east and west walls, the way the sheet draws that side.
  */
-.z1r-door-swatch {
-  position: absolute;
-  inset: 0;
-  margin: auto;
+.z1r-door-line {
+  position: relative;
+  flex: none;
+  inline-size: 18px;
+  block-size: 7px;
+  border-radius: 1px;
 }
 
-.z1r-compass-arm[data-axis="h"] .z1r-door-swatch {
-  inline-size: calc(100% - 2px);
-  block-size: 0;
+.z1r-door-wall[data-side="w"] .z1r-door-line,
+.z1r-door-wall[data-side="e"] .z1r-door-line {
+  inline-size: 7px;
+  block-size: 18px;
 }
 
-.z1r-compass-arm[data-axis="v"] .z1r-door-swatch {
-  inline-size: 0;
-  block-size: calc(100% - 2px);
+.z1r-door-wall[data-side="n"] .z1r-door-line,
+.z1r-door-wall[data-side="s"] .z1r-door-line {
+  inline-size: 28px;
 }
 
-.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="open"] .z1r-door-swatch {
-  block-size: 3px;
+.z1r-door-wall[data-side="w"] .z1r-door-line,
+.z1r-door-wall[data-side="e"] .z1r-door-line {
+  block-size: 28px;
+}
+
+/* Unknown: a dashed outline, an edge nobody has looked at yet. */
+[data-door="unknown"] > .z1r-door-line {
+  border: var(--z1r-border-width) dashed var(--z1r-muted);
+}
+
+/* Open: two stubs with a gap — a doorway, drawn the way paper draws one. */
+[data-door="open"] > .z1r-door-line {
   background: linear-gradient(
     to right,
     var(--z1r-good) 0 32%,
@@ -3550,8 +3605,8 @@
   );
 }
 
-.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="open"] .z1r-door-swatch {
-  inline-size: 3px;
+.z1r-door-wall[data-side="w"][data-door="open"] > .z1r-door-line,
+.z1r-door-wall[data-side="e"][data-door="open"] > .z1r-door-line {
   background: linear-gradient(
     to bottom,
     var(--z1r-good) 0 32%,
@@ -3560,54 +3615,60 @@
   );
 }
 
-.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="wall"] .z1r-door-swatch {
-  border-block-start: 3px solid var(--z1r-text);
+/* Wall: solid. */
+[data-door="wall"] > .z1r-door-line {
+  background: var(--z1r-text);
 }
 
-.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="wall"] .z1r-door-swatch {
-  border-inline-start: 3px solid var(--z1r-text);
-}
-
-.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="bombed"] .z1r-door-swatch {
-  border-block-start: 3px solid var(--z1r-bad);
-}
-
-.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="bombed"] .z1r-door-swatch {
-  border-inline-start: 3px solid var(--z1r-bad);
-}
-
-/* The bomb's tick across the line, on the button so it centres on the box
-   rather than on the swatch's border. */
-.z1r-door-pick[data-door="bombed"]::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  margin: auto;
+/* Bombed: the wall's solid line with a tick across it, the bomb spent. */
+[data-door="bombed"] > .z1r-door-line {
   background: var(--z1r-bad);
 }
 
-.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="bombed"]::before {
-  inline-size: 2px;
-  block-size: 8px;
+[data-door="bombed"] > .z1r-door-line::after {
+  content: "";
+  position: absolute;
+  inset: -3px 0;
+  margin-inline: auto;
+  inline-size: 3px;
+  background: var(--z1r-bad);
+  box-shadow: 0 0 0 1px var(--z1r-panel);
 }
 
-.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="bombed"]::before {
-  inline-size: 8px;
-  block-size: 2px;
+.z1r-door-wall[data-side="w"][data-door="bombed"] > .z1r-door-line::after,
+.z1r-door-wall[data-side="e"][data-door="bombed"] > .z1r-door-line::after {
+  inset: 0 -3px;
+  margin-inline: 0;
+  margin-block: auto;
+  inline-size: auto;
+  block-size: 3px;
 }
 
-.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="locked"] .z1r-door-swatch {
-  border-block-start: 3px double var(--z1r-accent);
+/* Locked: double. */
+[data-door="locked"] > .z1r-door-line {
+  border-block: 2px solid var(--z1r-accent);
 }
 
-.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="locked"] .z1r-door-swatch {
-  border-inline-start: 3px double var(--z1r-accent);
+.z1r-door-wall[data-side="w"][data-door="locked"] > .z1r-door-line,
+.z1r-door-wall[data-side="e"][data-door="locked"] > .z1r-door-line {
+  border-block: 0;
+  border-inline: 2px solid var(--z1r-accent);
 }
 
-.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="shutter"] .z1r-door-swatch {
-  border-block-start: 3px dotted var(--z1r-stair);
+/* Shutter: bars. */
+[data-door="shutter"] > .z1r-door-line {
+  background: repeating-linear-gradient(
+    to right,
+    var(--z1r-stair) 0 2px,
+    transparent 2px 4px
+  );
 }
 
-.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="shutter"] .z1r-door-swatch {
-  border-inline-start: 3px dotted var(--z1r-stair);
+.z1r-door-wall[data-side="w"][data-door="shutter"] > .z1r-door-line,
+.z1r-door-wall[data-side="e"][data-door="shutter"] > .z1r-door-line {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--z1r-stair) 0 2px,
+    transparent 2px 4px
+  );
 }

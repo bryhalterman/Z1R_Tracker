@@ -20,7 +20,6 @@
  */
 
 import {
-  DOOR_STATES,
   DOOR_STATES_BY_ID,
   DUNGEONS,
   DUNGEON_BOSSES,
@@ -753,56 +752,93 @@ export function buildRooms(
   }
 
   /*
-   * The doors, as a compass around the room.
+   * The doors: pick a state, then click walls.
    *
-   * North above, south below, west and east to either side, the room's id in
-   * the middle — the shape of the room itself, so which side a button sets is
-   * read off where it sits. Each arm holds all six states, so any of them is
-   * one click: no cycling, no dropdown, and every option visible at once.
+   * The compass this replaces put all six states on every side — twenty-four
+   * buttons of 14px, which in a fast game is a lot of small targets to land
+   * on. Now there are six state buttons, each with its word, and four walls
+   * that are the length of their side. The state stays armed like the item
+   * palette's, so a room of four open doors is five clicks. Clicking a wall
+   * that already shows the armed state takes it back to unknown, and the right
+   * button always does. Keys 1-6 arm a state, outside text fields.
    *
-   * Each button's swatch is the line treatment the sheet draws for that state,
-   * which makes the compass the sheet's legend as well as its editor.
+   * Each wall draws its own state with the sheet's line for it plus the
+   * model's two-letter tag, so the room reads as words as well as shapes.
    */
   const { row: doorsLine, value: doorsRow } = detailRow('Doors');
   doorsLine.classList.add('z1r-room-doors-row');
-  const compass = el('div', 'z1r-room-compass');
-  compass.setAttribute('role', 'group');
-  compass.setAttribute('aria-label', 'Doors');
-  doorsRow.append(compass);
 
-  const doorButtons: { side: RoomSide; door: DoorState; button: HTMLButtonElement }[] = [];
-  for (const side of ROOM_SIDES) {
-    const arm = el('div', 'z1r-compass-arm');
-    arm.dataset.side = SIDE_CLASS[side];
-    // Which way the arm runs decides which way its swatches are drawn.
-    arm.dataset.axis = side === 'east' || side === 'west' ? 'v' : 'h';
-    arm.setAttribute('role', 'group');
-    arm.setAttribute('aria-label', `${SIDE_NAME[side]} door`);
-    for (const door of DOOR_STATES) {
-      const button = el('button', 'z1r-door-pick');
-      button.type = 'button';
-      button.dataset.side = SIDE_CLASS[side];
-      button.dataset.door = door.id;
-      button.title = `${SIDE_NAME[side]}: ${doorLabel(door.id)}`;
-      button.setAttribute('aria-label', button.title);
-      // Unknown draws nothing on the sheet, so its button carries a mark of
-      // its own rather than an empty box that would look broken.
-      button.append(
-        door.id === 'unknown'
-          ? el('span', 'z1r-door-unknown', '?')
-          : el('span', 'z1r-door-swatch'),
-      );
-      button.addEventListener('click', () => {
-        if (!selected) return;
-        commit(selected, { type: 'setRoomDoor', level, room: selected, side, state: door.id });
-      });
-      arm.append(button);
-      doorButtons.push({ side, door: door.id, button });
-    }
-    compass.append(arm);
+  /** Most-met first, so the keys under the left hand are the common ones. */
+  const BRUSH_ORDER: readonly DoorState[] = ['open', 'locked', 'shutter', 'wall', 'bombed', 'unknown'];
+  let doorBrush: DoorState = 'open';
+
+  const brushRow = el('div', 'z1r-door-brushes');
+  brushRow.setAttribute('role', 'group');
+  brushRow.setAttribute('aria-label', 'Door state to paint');
+  const brushButtons: { door: DoorState; button: HTMLButtonElement }[] = [];
+  BRUSH_ORDER.forEach((door, index) => {
+    const def = DOOR_STATES_BY_ID.get(door);
+    const button = el('button', 'z1r-door-brush');
+    button.type = 'button';
+    button.dataset.door = door;
+    button.title = `Paint walls ${def?.name.toLowerCase() ?? door} — key ${index + 1}`;
+    button.setAttribute('aria-label', button.title);
+    button.append(
+      el('span', 'z1r-door-line'),
+      el('span', 'z1r-door-word', door === 'unknown' ? 'Clear' : (def?.name.split(',')[0] ?? door)),
+      el('kbd', 'z1r-door-key', String(index + 1)),
+    );
+    button.addEventListener('click', () => {
+      doorBrush = door;
+      redraw();
+    });
+    brushRow.append(button);
+    brushButtons.push({ door, button });
+  });
+
+  if (interactive) {
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const door = BRUSH_ORDER[Number(event.key) - 1];
+      if (!door || !/^[1-6]$/.test(event.key)) return;
+      doorBrush = door;
+      redraw();
+    });
   }
-  const hub = el('div', 'z1r-compass-hub');
-  compass.append(hub);
+
+  const room = el('div', 'z1r-door-room');
+  room.setAttribute('role', 'group');
+  room.setAttribute('aria-label', 'Doors');
+  const hub = el('div', 'z1r-door-hub');
+  room.append(hub);
+
+  const walls: { side: RoomSide; button: HTMLButtonElement; tag: HTMLElement }[] = [];
+  for (const side of ROOM_SIDES) {
+    const button = el('button', 'z1r-door-wall');
+    button.type = 'button';
+    button.dataset.side = SIDE_CLASS[side];
+    const tag = el('span', 'z1r-door-tag');
+    button.append(el('span', 'z1r-door-line'), tag);
+    const paint = (door: DoorState) => {
+      if (!selected) return;
+      commit(selected, { type: 'setRoomDoor', level, room: selected, side, state: door });
+    };
+    button.addEventListener('click', () => {
+      if (!selected) return;
+      const current = roomsOf(store.getState())[selected]?.doors[side] ?? 'unknown';
+      paint(current === doorBrush ? 'unknown' : doorBrush);
+    });
+    button.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      paint('unknown');
+    });
+    room.append(button);
+    walls.push({ side, button, tag });
+  }
+
+  doorsRow.append(brushRow, room);
 
   /* ------------------------------------------------------------- the passes */
 
@@ -924,10 +960,19 @@ export function buildRooms(
     }
 
     hub.textContent = selected;
-    for (const { side, door, button } of doorButtons) {
+    for (const { door, button } of brushButtons) {
+      button.setAttribute('aria-pressed', String(door === doorBrush));
+    }
+    for (const { side, button, tag } of walls) {
       button.disabled = off;
       const current = note?.doors[side] ?? 'unknown';
-      button.setAttribute('aria-pressed', String(!!selected && current === door));
+      button.dataset.door = current;
+      const def = DOOR_STATES_BY_ID.get(current);
+      tag.textContent = current === 'unknown' ? '?' : (def?.tag ?? '');
+      button.title = selected
+        ? `${SIDE_NAME[side]}: ${doorLabel(current)} — click to paint ${doorLabel(doorBrush)}, right-click to clear`
+        : 'Pick a room first';
+      button.setAttribute('aria-label', button.title);
     }
   });
 
