@@ -14,7 +14,7 @@ import type { TrackerState } from './state.js';
 import { OVERWORLD_STAIRWAY_COUNT } from './overworld.js';
 import { triforceCount } from './state.js';
 import { TRIFORCE_REQUIRED_FOR_L9 } from './dungeons.js';
-import { deriveLocations } from './seed.js';
+import { deriveItemLocations } from './placements.js';
 
 /** Level 9's entrance stays shut until every Triforce piece is in hand. */
 export function canEnterLevel9(state: TrackerState): boolean {
@@ -41,24 +41,36 @@ export function canBeatGanon(state: TrackerState): boolean {
   );
 }
 
+/** The shuffle-pool entry for a Heart Container. */
+const HEART_CONTAINER_ID = 'heart';
+
 /**
  * Pool ids known to be inside a level.
  *
- * The map marks *where* a dungeon is; the location slots record *what is in
- * it*. Those are learned in either order — a hint names the contents of a level
- * you have not found, and you walk into levels whose contents you have not
- * heard about — so neither can be the place both facts live. Joining them by
- * level number lets the map show the item whichever way round it was learned.
+ * The overworld map marks *where* a dungeon is; the item locations say *what
+ * is in it*. Those are learned in either order — a hint names the contents of a
+ * level you have not found, and you walk into levels whose contents you have
+ * not heard about — so neither can be the place both facts live. Joining them
+ * by level number lets the map show the item whichever way round it was
+ * learned.
+ *
+ * Read through `deriveItemLocations`, so an item placed in one of the level's
+ * rooms shows here, and so does an older save's stored slot. Overflow counts
+ * too: it is an item placed in the level, just one beyond the default slots.
  *
  * Heart Containers are excluded on purpose. Every level has one, so drawing it
- * would put the same icon on nine screens and say nothing.
+ * would put the same icon on nine screens and say nothing. That is the item,
+ * not the slot: the boss drop can be shuffled to anything, and a Bow there is
+ * as worth showing as a Bow on the floor.
  */
 export function dungeonItems(state: TrackerState, level: number): string[] {
   if (!level) return [];
-  return deriveLocations(state.seed, state.extraFloorSlots)
-    .filter((location) => location.level === level && location.kind !== 'heart')
-    .map((location) => state.locations[location.id]?.item ?? '')
-    .filter((item): item is string => item !== '');
+  const derived = deriveItemLocations(state);
+  const slotted = derived.slots
+    .filter((slot) => slot.location.level === level)
+    .map((slot) => slot.placement?.item ?? '');
+  const spilled = (derived.overflow.get(level) ?? []).map((placement) => placement.item);
+  return [...slotted, ...spilled].filter((item) => item !== '' && item !== HEART_CONTAINER_ID);
 }
 
 /**

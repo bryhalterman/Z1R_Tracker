@@ -1344,12 +1344,10 @@
      channels the item cells use, so neither state rests on colour. */
   border: var(--z1r-border-width) dashed var(--z1r-border);
   border-radius: var(--z1r-radius);
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.z1r-loc-slot:disabled {
+  /* Display only: the slots are filled from the maps, so nothing here invites
+     a click — no pointer, no hover, no focus ring. */
   cursor: default;
+  overflow: hidden;
 }
 
 .z1r-loc-face {
@@ -1423,16 +1421,18 @@
   border-start-start-radius: 3px;
 }
 
-/* While an item is armed, the set says a click will record it and the box
-   under the pointer says which one would take it. */
-.z1r-loc-rows[data-arming="true"] .z1r-loc-slot {
-  cursor: copy;
-}
-
-.z1r-loc-rows[data-arming="true"] .z1r-loc-slot:hover {
-  border-style: solid;
-  border-color: var(--z1r-accent);
-  opacity: 1;
+/*
+ * More items placed in a level than it has slots of that kind: shown after the
+ * level's slots rather than refused, because a seed can hold more than the
+ * default quest does.
+ *
+ * A dotted edge is the channel, distinct from the dashed "not collected" and
+ * the solid "collected"; the red only reinforces it. Collected still wins the
+ * corner check below, so an overflow chip says both things at once.
+ */
+.z1r-loc-slot[data-overflow="true"] {
+  border-style: dotted;
+  border-color: var(--z1r-bad);
 }
 
 /* ----------------------------------------------------------------- controls */
@@ -1944,46 +1944,16 @@
   pointer-events: none;
 }
 
-.z1r-slot-picker {
-  position: absolute;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  inline-size: max-content;
-  max-block-size: 260px;
-  overflow-y: auto;
-  padding: var(--z1r-space-sm);
-  background: var(--z1r-panel);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
-  box-shadow: 0 6px 18px #000a;
-}
-
-.z1r-slot-picker[hidden] {
-  display: none;
-}
-
-.z1r-slot-option {
-  display: flex;
-  align-items: center;
-  gap: var(--z1r-space-sm);
-  min-block-size: var(--spectrum-component-height-75);
-  padding: 1px var(--z1r-space-sm);
-  font: inherit;
-  font-size: var(--z1r-text-md);
-  text-align: start;
-  white-space: nowrap;
-  color: var(--z1r-text);
-  background: transparent;
-  border: var(--z1r-border-width) solid transparent;
-  border-radius: var(--z1r-radius);
-  cursor: pointer;
-}
-
-.z1r-slot-option:hover {
-  background: var(--z1r-inset);
-  border-color: var(--z1r-accent);
+/*
+ * An overflow chip on the dock: a dotted ring outside the chip.
+ *
+ * Outside rather than on the border, because on a chip the border is the only
+ * thing saying collected — there is no room for a check — and the two facts
+ * have to read together.
+ */
+.z1r-compact-slot[data-overflow="true"] {
+  outline: var(--z1r-border-width) dotted var(--z1r-bad);
+  outline-offset: 1px;
 }
 
 /* The overlay is read-only and sits over gameplay: no panel chrome at all. */
@@ -2221,6 +2191,12 @@
  */
 .z1r-map[data-armed="true"] .z1r-screen {
   cursor: copy;
+}
+
+/* A palette item the overworld cannot hold — the Map, the Compass, a Triforce
+   piece — is armed: a click here places nothing, and the pointer says so. */
+.z1r-map[data-refusing="true"] .z1r-screen {
+  cursor: not-allowed;
 }
 
 /* ------------------------------------------------ dungeon numeral + badge */
@@ -2540,17 +2516,68 @@
   color: var(--z1r-muted);
 }
 
-/* ------------------------------------------------------------- place mode */
+/* ---------------------------------------------------------------- palette */
 
 /*
- * Arming an item for the dungeon room sheet.
+ * The page's Items panel: an always-on placement palette.
  *
- * Everything here is behind the Place toggle, which only an interactive mount
- * builds — the OBS overlay grows neither the control nor the extra group.
+ * One wrapping line of cells in three groups — the shuffle pool, the dungeon
+ * pickups, and the inventory items nothing ever places. A rule between groups
+ * and the last group's caption are what set them apart, not a tint. The cells
+ * keep the inventory's own treatment, so held still reads the way it always
+ * has: solid and full strength, against dashed and dimmed.
+ *
+ * Only the page builds this; the OBS dock and overlay keep the inventory grid.
  */
+.z1r-palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--z1r-space-sm) 0;
+}
 
-.z1r-items-place {
+.z1r-palette-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* A rule between groups, drawn as a border so it is a shape and not a gap. */
+.z1r-palette-group + .z1r-palette-group {
+  margin-inline-start: var(--z1r-space-md);
+  padding-inline-start: var(--z1r-space-md);
+  border-inline-start: var(--z1r-border-width) solid var(--z1r-border);
+}
+
+.z1r-palette-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.z1r-palette .z1r-item {
+  inline-size: var(--z1r-item-min, 44px);
+  block-size: var(--z1r-item-min, 44px);
+  padding: 2px;
+}
+
+/* Never armable, so the pointer does not promise a click; the right button and
+   the arrow keys are what these answer. */
+.z1r-palette .z1r-item[data-placeable="false"] {
+  cursor: default;
+}
+
+/* What the next click does, in words, at the end of the heading. */
+.z1r-palette-status {
   margin-inline-start: auto;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--z1r-muted);
+}
+
+.z1r-palette-panel[data-armed="true"] .z1r-palette-status {
+  color: var(--z1r-text);
 }
 
 /*
@@ -2606,13 +2633,6 @@
   line-height: 1;
   color: var(--z1r-accent);
   pointer-events: none;
-}
-
-/* While placing, a cell with no room item behind it is plainly out of the
-   gesture rather than quietly inert when clicked. */
-.z1r-panel[data-placing="true"] .z1r-item[data-placeable="false"] {
-  opacity: 0.25;
-  border-style: dotted;
 }
 
 /* Dungeon pickups are not inventory: nothing there can be held, so none of it
@@ -2881,16 +2901,19 @@
 /* ------------------------------------------------------------- door edges */
 
 /*
- * Each edge covers half its side and is 10px deep, which is a real target on a
- * 50px cell rather than a sliver. The drawn rule stays thin; only the hit area
- * is large.
+ * Each edge covers half its side and sits in a 10px band, so the drawn rule
+ * lands inside the cell rather than on the boundary it shares with the next.
+ *
+ * Display only. Doors are set from the compass in the detail strip, so an edge
+ * takes no pointer events: a click anywhere in a room, wall band included, is
+ * a click on the room.
  */
 .z1r-room-door {
   position: absolute;
   padding: 0;
   background: transparent;
   border: 0;
-  cursor: pointer;
+  pointer-events: none;
   z-index: 3;
 }
 
@@ -2920,11 +2943,6 @@
 
 .z1r-room-door.e {
   inset-inline-end: 0;
-}
-
-.z1r-rooms-panel[data-interactive="false"] .z1r-room-door {
-  cursor: default;
-  pointer-events: none;
 }
 
 .z1r-room-door::after {
@@ -3046,10 +3064,6 @@
   border-inline-start: 3px dotted var(--z1r-stair);
 }
 
-.z1r-room-door:hover {
-  background: color-mix(in srgb, var(--z1r-accent) 18%, transparent);
-}
-
 /* ----------------------------------------------------------- room contents */
 
 /*
@@ -3104,10 +3118,33 @@
   border-radius: var(--z1r-radius);
 }
 
+/*
+ * A collected item's corner check on the sheet.
+ *
+ * Collecting is what makes an item held, so it shows where the item is drawn
+ * and not only in the strip. A check is a shape; the green reinforces it. It
+ * carries the panel as its own ground, the way the item locations check does,
+ * rather than a dark glow that would be a hand-picked colour.
+ */
+.z1r-room-got {
+  position: absolute;
+  inset-block-end: 2px;
+  inset-inline-end: 2px;
+  z-index: 3;
+  padding-inline: 1px;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--z1r-good);
+  background: var(--z1r-panel);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 /* ----------------------------------------------------------- detail strip */
 
 /*
- * The four rows that describe the selected room.
+ * The rows that describe the selected room.
  *
  * `flex: 1 1 var(--z1r-room-aside)` is the whole side-by-side mechanism: the
  * basis is what the rows ask for, so they sit beside the sheet while the panel
@@ -3119,63 +3156,46 @@
 .z1r-room-detail {
   display: grid;
   flex: 1 1 var(--z1r-room-aside);
+  align-content: start;
   min-inline-size: 0;
   gap: 5px;
   font-size: var(--z1r-text-xs);
 }
 
-/*
- * Doors, always under both.
- *
- * It keeps the rule the whole strip used to carry, because it is the one part
- * that is still always below the sheet, so the rule still separates the sheet
- * from what follows it. The four rows above it do not: beside the sheet a
- * horizontal rule over a column would be drawing a boundary that isn't there,
- * and stacked they already have the sheet's own border above them — the rule
- * was a second line 7px under the first.
- */
-.z1r-room-doors-strip {
-  margin-block-start: 7px;
-  padding-block-start: 7px;
-  border-block-start: var(--z1r-border-width) solid var(--z1r-border);
-}
-
 .z1r-room-detail-row {
   display: flex;
   align-items: flex-start;
-  flex-wrap: wrap;
   gap: 4px;
   min-inline-size: 0;
+}
+
+/* The display above is an author declaration and would beat the user agent's
+   [hidden] rule, so the From row's hiding has to be said here. */
+.z1r-room-detail-row[hidden] {
+  display: none;
 }
 
 .z1r-room-detail-row > .z1r-room-key {
   /* flex: none, because the default shrink would squeeze a label narrower than
      its own word and clip it. */
   flex: none;
-  inline-size: 50px;
-  padding-block-start: 4px;
+  inline-size: 42px;
+  padding-block-start: 5px;
   font-size: var(--z1r-text-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--z1r-muted);
 }
 
-.z1r-room-detail select {
+/* The row's controls. A line that wraps continues here, under the controls,
+   rather than back under the key. */
+.z1r-room-detail-value {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
   min-inline-size: 0;
-  padding: 2px 4px;
-  font: inherit;
-  font-size: var(--z1r-text-xs);
-  color: var(--z1r-text);
-  background: var(--z1r-field);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
-}
-
-/* The popup is drawn by the platform against a surface we do not own, so both
-   colours are set explicitly rather than inherited. See ARCHITECTURE.md. */
-.z1r-room-detail select option {
-  color: var(--z1r-text);
-  background-color: var(--z1r-panel);
 }
 
 /* With no room selected the editable rows are plainly not in play. Their
@@ -3183,28 +3203,52 @@
    story. */
 .z1r-room-detail[data-empty="true"] .z1r-room-editable {
   /* This is the strip's state on every page load, so its labels have to stay
-     readable in it. 0.4 put the keys at 2.23:1 and the select text at 3.49:1
-     over their own composited wells; 0.8 is 4.65:1 and 9.51:1. The disabled
-     controls, not the dim, are what say the rows are out of play. */
+     readable in it. 0.4 put the keys at 2.23:1 over the panel; 0.8 is 4.65:1.
+     The disabled controls, not the dim, are what say the rows are out of
+     play. */
   opacity: 0.8;
   pointer-events: none;
 }
 
-.z1r-room-hint {
-  padding-block-start: 4px;
-  font-size: var(--z1r-text-2xs);
+/* The selected room's id, beside the two whole-room controls. */
+.z1r-room-id {
+  min-inline-size: 22px;
+  font-size: var(--z1r-text-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-text);
+}
+
+/* With nothing selected it is an instruction rather than an id, so it reads as
+   one: smaller, regular weight, muted. */
+.z1r-room-detail[data-empty="true"] .z1r-room-id {
+  font-size: var(--z1r-text-xs);
+  font-weight: 400;
   color: var(--z1r-muted);
 }
 
-/*
- * One tight line under the item grid, not a paragraph. It is the only place the
- * Items panel says which mode a click is in, so it stays — at the smallest type
- * and a single line height.
- */
-.z1r-room-item-status {
-  margin: 4px 0 0;
-  font-size: var(--z1r-text-2xs);
-  line-height: 1.2;
+/* The room's item, shown rather than chosen — it comes from the palette. */
+.z1r-room-itemcell {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 26px;
+  block-size: 26px;
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
+}
+
+/* Empty is dashed, the same "nothing here yet" edge the location slots use. */
+.z1r-room-itemcell[data-known="false"] {
+  border-style: dashed;
+}
+
+.z1r-room-item-name {
+  color: var(--z1r-text);
+}
+
+.z1r-room-item-name[data-known="false"] {
   color: var(--z1r-muted);
 }
 
@@ -3258,38 +3302,247 @@
 
 .z1r-room-pick.z1r-room-word[aria-pressed="true"] {
   color: var(--z1r-text);
+  background: var(--z1r-inset);
 }
 
-/* The room's item is shown, not chosen, here — it comes from the Items panel. */
-.z1r-room-item {
+/*
+ * Segmented controls: From, Stairs and the transport pair.
+ *
+ * Joined chips, one of which is the current answer. The pressed one is filled,
+ * ringed and underlined — the underline is the channel that is neither a hue
+ * nor a shade. Mixed case and a tighter pad than the shared chip, because the
+ * From row's four labels have to fit beside the sheet in half a page row.
+ */
+.z1r-seg {
   display: inline-flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
   min-inline-size: 0;
-  padding-block-start: 2px;
 }
 
-.z1r-room-item-name {
-  color: var(--z1r-text);
+.z1r-seg[hidden] {
+  display: none;
 }
 
-.z1r-room-doors {
+.z1r-seg > .z1r-seg-option {
+  margin-inline-start: -1px;
+  padding-inline: 6px;
+  letter-spacing: 0;
+  text-transform: none;
+  border-radius: 0;
+}
+
+.z1r-seg > .z1r-seg-option:first-child {
+  margin-inline-start: 0;
+  border-start-start-radius: var(--z1r-radius);
+  border-end-start-radius: var(--z1r-radius);
+}
+
+.z1r-seg > .z1r-seg-option:last-child {
+  border-start-end-radius: var(--z1r-radius);
+  border-end-end-radius: var(--z1r-radius);
+}
+
+.z1r-seg > .z1r-seg-option[aria-pressed="true"] {
+  position: relative;
+  z-index: 1;
+  text-decoration: underline 2px;
+  text-underline-offset: 3px;
+}
+
+/* ---------------------------------------------------------------- compass */
+
+/*
+ * The four doorways of the selected room as a cross: north above, south below,
+ * west and east to either side, the room's id in the middle.
+ */
+.z1r-room-compass {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: auto auto auto;
+  grid-template-rows: auto auto auto;
+  align-items: center;
+  justify-items: center;
   gap: 3px;
-  flex: 1 1 240px;
-  min-inline-size: 0;
+  inline-size: max-content;
 }
 
-.z1r-room-doors label {
+.z1r-compass-arm {
+  display: flex;
+  gap: 2px;
+}
+
+.z1r-compass-arm[data-axis="v"] {
+  flex-direction: column;
+}
+
+.z1r-compass-arm[data-side="n"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.z1r-compass-arm[data-side="s"] {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.z1r-compass-arm[data-side="w"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.z1r-compass-arm[data-side="e"] {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+/* The room itself, inked the way a visited room is on the sheet. */
+.z1r-compass-hub {
   display: grid;
-  gap: 1px;
-  min-inline-size: 0;
+  grid-column: 2;
+  grid-row: 2;
+  place-items: center;
+  inline-size: 88px;
+  block-size: 64px;
+  font-size: var(--z1r-text-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--z1r-text);
+  background: color-mix(in srgb, var(--z1r-text) 5%, transparent);
+  border: var(--z1r-border-width) solid var(--z1r-text);
+  border-radius: var(--z1r-radius-sm);
+}
+
+.z1r-door-pick {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 14px;
+  block-size: 14px;
+  padding: 0;
+  font: inherit;
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: 3px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.z1r-door-pick:hover {
+  border-color: var(--z1r-muted);
+}
+
+/* The side's current state: ringed and lifted. The ring is a second line, so
+   which button is current is a shape and not only the accent. */
+.z1r-door-pick[aria-pressed="true"] {
+  z-index: 1;
+  background: var(--z1r-inset);
+  border-color: var(--z1r-accent);
+  outline: var(--z1r-border-width) solid var(--z1r-accent);
+}
+
+/* Disabled with no room selected, but not dimmed further than the row is: the
+   swatches double as the legend for the sheet's lines and stay readable. */
+.z1r-door-pick:disabled {
+  cursor: default;
+}
+
+.z1r-door-unknown {
   font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  line-height: 1;
   color: var(--z1r-muted);
 }
 
-.z1r-room-doors select {
-  inline-size: 100%;
+/*
+ * The swatch is the sheet's own line for that state, at button size: nothing,
+ * gapped, solid, solid struck through, double, dotted. Laid along the arm's
+ * axis — across for north and south, upright for east and west — the way the
+ * sheet draws that side.
+ */
+.z1r-door-swatch {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.z1r-compass-arm[data-axis="h"] .z1r-door-swatch {
+  inline-size: calc(100% - 2px);
+  block-size: 0;
+}
+
+.z1r-compass-arm[data-axis="v"] .z1r-door-swatch {
+  inline-size: 0;
+  block-size: calc(100% - 2px);
+}
+
+.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="open"] .z1r-door-swatch {
+  block-size: 3px;
+  background: linear-gradient(
+    to right,
+    var(--z1r-good) 0 32%,
+    transparent 32% 68%,
+    var(--z1r-good) 68% 100%
+  );
+}
+
+.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="open"] .z1r-door-swatch {
+  inline-size: 3px;
+  background: linear-gradient(
+    to bottom,
+    var(--z1r-good) 0 32%,
+    transparent 32% 68%,
+    var(--z1r-good) 68% 100%
+  );
+}
+
+.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="wall"] .z1r-door-swatch {
+  border-block-start: 3px solid var(--z1r-text);
+}
+
+.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="wall"] .z1r-door-swatch {
+  border-inline-start: 3px solid var(--z1r-text);
+}
+
+.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="bombed"] .z1r-door-swatch {
+  border-block-start: 3px solid var(--z1r-bad);
+}
+
+.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="bombed"] .z1r-door-swatch {
+  border-inline-start: 3px solid var(--z1r-bad);
+}
+
+/* The bomb's tick across the line, on the button so it centres on the box
+   rather than on the swatch's border. */
+.z1r-door-pick[data-door="bombed"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  background: var(--z1r-bad);
+}
+
+.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="bombed"]::before {
+  inline-size: 2px;
+  block-size: 8px;
+}
+
+.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="bombed"]::before {
+  inline-size: 8px;
+  block-size: 2px;
+}
+
+.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="locked"] .z1r-door-swatch {
+  border-block-start: 3px double var(--z1r-accent);
+}
+
+.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="locked"] .z1r-door-swatch {
+  border-inline-start: 3px double var(--z1r-accent);
+}
+
+.z1r-compass-arm[data-axis="h"] .z1r-door-pick[data-door="shutter"] .z1r-door-swatch {
+  border-block-start: 3px dotted var(--z1r-stair);
+}
+
+.z1r-compass-arm[data-axis="v"] .z1r-door-pick[data-door="shutter"] .z1r-door-swatch {
+  border-inline-start: 3px dotted var(--z1r-stair);
 }

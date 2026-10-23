@@ -16,7 +16,7 @@ import {
   DUNGEON_BLOCKS,
   DUNGEON_BLOCKS_BY_ID,
   DUNGEONS,
-  deriveLocations,
+  deriveItemLocations,
   OVERWORLD_LOCATIONS,
   MARKS,
   MARKS_BY_KIND,
@@ -25,6 +25,7 @@ import {
   OVERWORLD_STAIRWAY_COUNT,
   warpRoutes,
   POOL_BY_ID,
+  ROOM_ITEMS,
   ROOM_ITEMS_BY_ID,
   REGIONS_BY_ID,
   regionForScreen,
@@ -32,6 +33,7 @@ import {
   SHOP_STOCK_BY_ID,
   SHUFFLE_POOL,
   ITEMS,
+  ITEMS_BY_ID,
   labelFor,
   maxValue,
   screenId,
@@ -51,10 +53,8 @@ import { buildLocations } from './locations.js';
 import { buildHintTracker } from './hints.js';
 import { buildTriforce } from './triforce.js';
 import {
-  UNHELD_ROOM_ITEMS,
   buildRooms,
   createPlacement,
-  roomItemForInventory,
   roomItemsForInventory,
   type PlacementChannel,
 } from './rooms.js';
@@ -288,8 +288,8 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   /*
    * Where an armed item lives while it is in the air.
    *
-   * Shared by the Items panel, which arms it, and the panels that drop it — the
-   * room sheet and the item locations panel, all built by this same call. It is
+   * Shared by the palette, which arms it, and the panels that drop it — the
+   * room sheet and the overworld map, all built by this same call. It is
    * deliberately not store state: see `createPlacement`.
    */
   const placement = createPlacement();
@@ -298,38 +298,60 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    * Which panels in this mount can receive a placement.
    *
    * Arming is view state that reaches the panels of this one mount and no
-   * others, by design — so in a window with the inventory and nothing to place
-   * onto, the toggle could arm an item that nothing could ever receive.
-   *
-   * The item locations panel takes a placement in its full form only. The
-   * compact form is the OBS dock's, where a slot opens a picker instead and
-   * which must not change; `compact` is what tells the two apart, so the dock
-   * grows no Place toggle it had no use for.
+   * others, by design — so a window with the inventory and nothing to place
+   * onto keeps the inventory it always had rather than growing a palette whose
+   * picks could land nowhere.
    */
   const placeInto = {
     rooms: sections.includes('rooms'),
-    locations: sections.includes('locations') && !compact,
+    map: sections.includes('map'),
   };
-  const placeable = interactive && (placeInto.rooms || placeInto.locations);
+  /*
+   * The Items panel is a placement palette on the page and nowhere else.
+   *
+   * The OBS dock is `compact`, and it is where the inventory gets marked held
+   * mid-stream, so its cells keep the click-to-raise they have always had. The
+   * overlay takes no clicks at all. What is left is the page — and the desktop
+   * build, which mounts the same panels the same way.
+   */
+  const palette = interactive && !compact && (placeInto.rooms || placeInto.map);
 
   const builders: Record<TrackerSection, () => HTMLElement> = {
     seed: () => buildSeedPanel(store, patches, interactive),
     items: () =>
-      buildItems(store, resolver, patches, {
-        interactive,
-        itemSize,
-        placement,
-        placeable,
-        placeInto,
-        // The browser sources keep the split; a page does not.
-        grouped: mode === 'overlay' || compact,
-      }),
+      palette
+        ? buildPalette(store, resolver, patches, { itemSize, placement, placeInto })
+        : buildItems(store, resolver, patches, {
+            interactive,
+            itemSize,
+            // The browser sources keep the split; a page does not.
+            grouped: mode === 'overlay' || compact,
+          }),
     dungeons: () => buildTriforce(store, resolver, patches, interactive),
-    locations: () => buildLocations(store, resolver, patches, interactive, compact, placement),
+    locations: () => buildLocations(store, resolver, patches, interactive, compact),
     hintlog: () => buildHintTracker(store, patches, interactive),
-    map: () => buildMap(store, resolver, patches, interactive),
+    map: () => buildMap(store, resolver, patches, interactive, placement),
     rooms: () => buildRooms(store, resolver, patches, interactive, placement),
   };
+
+  /*
+   * Escape puts the armed item down, wherever focus happens to be.
+   *
+   * On the document rather than on a panel, because the last click before it
+   * was on a room or a screen — or on nothing at all — and the key has to work
+   * from any of them. Captured, and stopped when it is spent: the map listens
+   * for Escape too, to let go of its selected screen, and one key press should
+   * not do two things. The armed item goes first because it is the state that
+   * changes what the next click does.
+   */
+  const onEscape = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || !placement.get().item) return;
+    event.stopPropagation();
+    placement.set({ item: '' });
+  };
+  if (palette && sections.includes('items')) {
+    document.addEventListener('keydown', onEscape, true);
+  }
 
   // Items and the Triforce share a row when both are shown — the triangle is
   // narrow and was leaving most of its own panel empty.
@@ -476,6 +498,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
 
   return () => {
     unsubscribe();
+    document.removeEventListener('keydown', onEscape, true);
     widthObserver.disconnect();
     root.replaceChildren();
     root.classList.remove('z1r-tracker');
@@ -484,6 +507,63 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
 
 /* -------------------------------------------------------------------- items */
 
+/**
+ * Where each room item has been recorded, as item id -> places.
+ *
+ * Every cell wants "is this spoken for, and where", and there are up to two
+ * dozen of them. Rebuilt once per pass rather than walked per cell.
+ *
+ * Three sources, because an item can be written down in three places: a room
+ * on a level map, an item screen on the overworld, and — for a save from before
+ * the maps filled the item locations — a location slot itself. All three land
+ * in one index, so a cell's corner tick means the same thing wherever the item
+ * was recorded.
+ */
+function placedIndex(state: TrackerState): Map<string, string[]> {
+  const placedAt = new Map<string, string[]>();
+  const record = (item: string, where: string) => {
+    const seen = placedAt.get(item);
+    if (seen) seen.push(where);
+    else placedAt.set(item, [where]);
+  };
+  for (const [level, rooms] of Object.entries(state.rooms)) {
+    for (const [room, note] of Object.entries(rooms)) {
+      if (note.item) record(note.item, `L${level} ${room}`);
+    }
+  }
+  for (const [screen, note] of Object.entries(state.screenNotes)) {
+    // The map draws an item only on an item screen, so only those count.
+    if (!note.item || state.marks[screen] !== 'item') continue;
+    const spot = note.spot ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label : '';
+    record(note.item, spot ? `${spot} (${screen})` : screen);
+  }
+  for (const { location, placement } of deriveItemLocations(state).slots) {
+    if (placement?.source.kind === 'stored' && placement.item) {
+      record(placement.item, location.label);
+    }
+  }
+  return placedAt;
+}
+
+/** Each place this item has been recorded in, phrased for a tooltip. */
+function placedSuffix(ids: readonly string[], placedAt: Map<string, string[]>): string {
+  const parts: string[] = [];
+  for (const id of ids) {
+    const where = placedAt.get(id);
+    if (!where?.length) continue;
+    const name = ROOM_ITEMS_BY_ID.get(id)?.name ?? id;
+    parts.push(`${name} at ${where.join(', ')}`);
+  }
+  return parts.length ? ` — placed: ${parts.join('; ')}` : '';
+}
+
+/**
+ * The inventory, as the OBS dock and overlay show it.
+ *
+ * A click raises an item and Shift+click or a right click lowers it. This is
+ * what the dock is for during a stream, so it is kept exactly as it was; the
+ * page builds `buildPalette` in its place.
+ */
 function buildItems(
   store: Store,
   resolver: SpriteResolver,
@@ -491,17 +571,11 @@ function buildItems(
   opts: {
     interactive: boolean;
     itemSize: number;
-    placement: PlacementChannel;
-    placeable: boolean;
-    /** Which panels of this mount a placement can land on. */
-    placeInto: { rooms: boolean; locations: boolean };
     /** Keep the inventory screen's always-active / B-slot split. */
     grouped: boolean;
   },
 ): HTMLElement {
-  const { placeable, placement, placeInto } = opts;
   const { root, body } = section('Items', 'z1r-item-groups');
-  const heading = root.querySelector('.z1r-panel-title');
   const cellPatches: Patch[] = [];
 
   /*
@@ -511,28 +585,8 @@ function buildItems(
    */
   root.style.setProperty('--z1r-item-min', `${opts.itemSize + 10}px`);
 
-  /*
-   * What a placement can be dropped onto, named for the panel's own prompts.
-   *
-   * The room sheet is no longer the only receiver, so the wording comes from
-   * the sections this mount actually built rather than naming a room outright.
-   */
-  const placeTarget =
-    placeInto.rooms && placeInto.locations
-      ? 'a room or an item location'
-      : placeInto.rooms
-        ? 'a room'
-        : 'an item location';
-
-  /*
-   * Where each room item has been recorded, rebuilt once per pass.
-   *
-   * Every cell wants "is this spoken for, and where", and there are eighteen of
-   * them. Eighteen walks of nine levels of rooms per state change is work this
-   * index does once.
-   */
   const placedAt = new Map<string, string[]>();
-  const cellOpts = { ...opts, placedAt, placeTarget };
+  const cellOpts = { ...opts, placedAt };
 
   /*
    * One grid on a page, two labelled groups on a stream.
@@ -574,94 +628,10 @@ function buildItems(
     body.append(wrap);
   }
 
-  /*
-   * The dungeon pickups, which are placeable but not holdable.
-   *
-   * The Map, the Compass, a Triforce piece and a Heart Container are among the
-   * things most worth writing on a dungeon map, and none of them has an
-   * inventory cell to arm from — the first three never travel, and the heart
-   * total is on the game's own HUD. They appear only while Place is on, so with
-   * it off this panel is exactly the inventory it has always been.
-   *
-   * Room sheet only. A mount that can place onto item locations and nothing
-   * else has nowhere to put a Map or a Compass, which have no pool entry and so
-   * no location slot — offering them there would be four cells that look armed
-   * and land nowhere.
-   */
-  const dungeonGroup = el('div', 'z1r-item-group z1r-item-group-dungeon');
-  if (placeable && placeInto.rooms) {
-    dungeonGroup.dataset.group = 'dungeon';
-    dungeonGroup.hidden = true;
-    dungeonGroup.append(el('span', 'z1r-item-group-label', 'Dungeon pickups'));
-    const grid = el('div', 'z1r-item-grid');
-    for (const def of UNHELD_ROOM_ITEMS) {
-      grid.append(buildRoomItemCell(resolver, def, cellPatches, cellOpts));
-    }
-    dungeonGroup.append(grid);
-    body.append(dungeonGroup);
-  }
-
-  /*
-   * One line under the grid saying what a click is about to do.
-   *
-   * It is the only place the panel says which mode it is in, so it stays — but
-   * at the smallest type, on one line, and only while Place is on. A window
-   * with nothing to place onto grows neither control, the overlay included.
-   */
-  const status = el('p', 'z1r-room-item-status');
-  if (placeable) {
-    const toggle = el('button', 'z1r-chip-button z1r-items-place', 'Place');
-    toggle.type = 'button';
-    toggle.dataset.on = 'false';
-    toggle.title =
-      `Arm an item here, then click ${placeTarget} to record where it is. Placing never collects.`;
-    toggle.setAttribute('aria-pressed', 'false');
-    toggle.addEventListener('click', () => placement.set({ placing: !placement.get().placing }));
-    heading?.append(toggle);
-
-    status.hidden = true;
-    root.append(status);
-
-    cellPatches.push(() => {
-      const { placing, item } = placement.get();
-      root.dataset.placing = String(placing);
-      toggle.dataset.on = String(placing);
-      toggle.setAttribute('aria-pressed', String(placing));
-      dungeonGroup.hidden = !placing;
-      status.hidden = !placing;
-      const armed = item ? ROOM_ITEMS_BY_ID.get(item) : undefined;
-      status.textContent = armed
-        ? `${armed.name} armed — click ${placeTarget} to record where it is.`
-        : 'Click an item to arm it. Placing records a location; it never collects.';
-    });
-  }
-
   const own: Patch[] = [
     (state) => {
       placedAt.clear();
-      const record = (item: string, where: string) => {
-        const seen = placedAt.get(item);
-        if (seen) seen.push(where);
-        else placedAt.set(item, [where]);
-      };
-      for (const [level, rooms] of Object.entries(state.rooms)) {
-        for (const [room, note] of Object.entries(rooms)) {
-          if (!note.item) continue;
-          record(note.item, `L${level} ${room}`);
-        }
-      }
-      /*
-       * Item location slots count as "spoken for" too.
-       *
-       * A pool entry id is a `ROOM_ITEMS` id, so both kinds of record land in
-       * one index and a cell's corner tick means the same thing wherever the
-       * item was written down. The slot's own label is what names the place —
-       * "L5 stair", "Coast" — so the tooltip reads as a place either way.
-       */
-      for (const location of deriveLocations(state.seed, state.extraFloorSlots)) {
-        const item = state.locations[location.id]?.item;
-        if (item) record(item, location.label);
-      }
+      for (const [item, where] of placedIndex(state)) placedAt.set(item, where);
     },
     // Per cell, not per panel: these eighteen shared one registered patch, so a
     // throw in one dropped every cell after it.
@@ -669,22 +639,7 @@ function buildItems(
   ];
 
   patches.push((state) => runPatches(own, state));
-  // Arming changes nothing in the store, so the channel drives its own redraw.
-  if (placeable) placement.watch(() => runPatches(own, store.getState()));
-
   return root;
-}
-
-/** Each place this item has been recorded in, phrased for a tooltip. */
-function placedSuffix(ids: readonly string[], placedAt: Map<string, string[]>): string {
-  const parts: string[] = [];
-  for (const id of ids) {
-    const where = placedAt.get(id);
-    if (!where?.length) continue;
-    const name = ROOM_ITEMS_BY_ID.get(id)?.name ?? id;
-    parts.push(`${name} at ${where.join(', ')}`);
-  }
-  return parts.length ? ` — placed: ${parts.join('; ')}` : '';
 }
 
 function buildItemCell(
@@ -695,13 +650,10 @@ function buildItemCell(
   opts: {
     interactive: boolean;
     itemSize: number;
-    placement: PlacementChannel;
     placedAt: Map<string, string[]>;
-    /** What a placement lands on in this mount, for the cell's own prompt. */
-    placeTarget: string;
   },
 ): HTMLElement {
-  const { placement, placedAt, placeTarget } = opts;
+  const { placedAt } = opts;
   const cell = el('button', 'z1r-item');
   cell.type = 'button';
   cell.dataset.itemId = def.id;
@@ -725,27 +677,12 @@ function buildItemCell(
   if (opts.interactive) {
     const step = (direction: 1 | -1) =>
       store.dispatch({ type: 'cycleItem', id: def.id, direction });
-    cell.addEventListener('click', (event) => {
-      if (placement.get().placing) {
-        const target = roomItemForInventory(def, store.getState().items[def.id] ?? 0);
-        if (!target) return;
-        // Arming is a toggle, so the same click both picks an item up and puts
-        // it down — there is no separate way to disarm.
-        placement.set({ item: placement.get().item === target ? '' : target });
-        return;
-      }
-      step(event.shiftKey ? -1 : 1);
-    });
+    cell.addEventListener('click', (event) => step(event.shiftKey ? -1 : 1));
     cell.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      // While placing, the remove gesture is off: a right-click here is aimed
-      // at the sheet's door cycle often enough that taking an item away on it
-      // would be a real loss.
-      if (placement.get().placing) return;
       step(-1);
     });
     cell.addEventListener('keydown', (event) => {
-      if (placement.get().placing) return;
       if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
         event.preventDefault();
         step(-1);
@@ -764,30 +701,14 @@ function buildItemCell(
     cell.dataset.owned = String(value > 0);
     // Mirrors `data-owned` under the name the room sheet's stable hooks use.
     cell.dataset.held = String(value > 0);
-
-    const { placing, item } = placement.get();
-    const target = roomItemForInventory(def, value);
-    const armed = !!target && item === target;
-    cell.dataset.armed = String(armed);
     cell.dataset.placed = String(covers.some((id) => (placedAt.get(id)?.length ?? 0) > 0));
-    // An item with no pool counterpart must not look armable, so while placing
-    // it is plainly out of the gesture rather than inert-on-click.
-    cell.disabled = !opts.interactive || (placing && !target);
 
     const held = labelFor(def, value);
     const base = def.note ? `${held} — ${def.note}` : held;
     const where = placedSuffix(covers, placedAt);
-    const placeHint = !placing
-      ? ''
-      : target
-        ? ` — click to ${armed ? 'disarm' : 'arm'} ${ROOM_ITEMS_BY_ID.get(target)?.name ?? target} for ${placeTarget}`
-        : ` — cannot be placed in ${placeTarget}`;
-    cell.title = `${base}${where}${placeHint}`;
-    cell.setAttribute('aria-pressed', String(placing ? armed : value > 0));
-    cell.setAttribute(
-      'aria-label',
-      `${held} — ${value > 0 ? 'held' : 'not held'}${where}${placeHint}`,
-    );
+    cell.title = `${base}${where}`;
+    cell.setAttribute('aria-pressed', String(value > 0));
+    cell.setAttribute('aria-label', `${held} — ${value > 0 ? 'held' : 'not held'}${where}`);
 
     if (def.kind === 'progressive' && value > 0 && maxValue(def) > 1) {
       badge.textContent = String(value);
@@ -800,48 +721,237 @@ function buildItemCell(
   return cell;
 }
 
+/* ------------------------------------------------------------------ palette */
+
 /**
- * A cell for a room item with no inventory counterpart.
+ * The Items panel on the page: an always-on placement palette.
  *
- * It has no held state at all — nothing here can be collected, and `data-held`
- * is left off rather than written as a false that would dim it like an item you
- * have not found. It arms and places exactly as an inventory cell does.
+ * A click arms an item; the next click on a room or an overworld screen puts
+ * it there. There is no mode to switch on first, and the item stays armed
+ * after it lands, so a run of placements costs one pick. Clicking the armed
+ * item again, or Escape, puts it down.
+ *
+ * One cell per thing that can be placed — the shuffle pool, then the Map, the
+ * Compass and a Triforce piece — rather than one per inventory item. A chain
+ * such as the sword is one inventory cell but two pool entries, and the White
+ * and the Magical Sword can be found in either order; a single cell could only
+ * ever offer the next one up.
+ *
+ * Held is still read from the inventory, exactly as the inventory panel reads
+ * it, and collecting a placement is what raises it. The right button is how an
+ * item with no placement becomes held — what you start with or buy: a right
+ * click raises its inventory stage by one and Shift+right click lowers it, the
+ * stage logic the left button used to carry.
+ *
+ * The five inventory items no location ever holds — Bombs, the Potion, the
+ * Magical Shield, the Bait and the Letter — follow in a captioned group of
+ * their own. They cannot be armed, so they are set apart by position and by
+ * their caption rather than by a tint, and they answer the right button only.
  */
-function buildRoomItemCell(
+function buildPalette(
+  store: Store,
   resolver: SpriteResolver,
-  def: RoomItemDef,
   patches: Patch[],
   opts: {
-    interactive: boolean;
     itemSize: number;
     placement: PlacementChannel;
-    placedAt: Map<string, string[]>;
+    /** Which panels of this mount a placement can land on. */
+    placeInto: { rooms: boolean; map: boolean };
   },
 ): HTMLElement {
-  const { placement, placedAt } = opts;
-  const cell = el('button', 'z1r-item z1r-item-dungeon');
-  cell.type = 'button';
-  cell.dataset.item = def.id;
-  cell.dataset.group = 'dungeon';
-  cell.dataset.placeable = 'true';
-  cell.dataset.armed = 'false';
-  cell.dataset.placed = 'false';
-  cell.append(createSprite(resolver, def.sprite, { size: opts.itemSize, label: '' }));
-  cell.addEventListener('click', () => {
-    placement.set({ item: placement.get().item === def.id ? '' : def.id });
-  });
+  const { placement, placeInto } = opts;
+  const { root, body } = section('Items', 'z1r-palette');
+  root.classList.add('z1r-palette-panel');
+  root.style.setProperty('--z1r-item-min', `${opts.itemSize + 10}px`);
+  const heading = root.querySelector('.z1r-panel-title');
 
-  patches.push(() => {
-    const armed = placement.get().item === def.id;
-    cell.dataset.armed = String(armed);
-    const where = placedSuffix([def.id], placedAt);
-    cell.dataset.placed = String(!!where);
-    cell.title = `${def.name}${where} — click to ${armed ? 'disarm' : 'arm'} for a room`;
-    cell.setAttribute('aria-pressed', String(armed));
-    cell.setAttribute('aria-label', cell.title);
-  });
+  /** Where an item can be dropped in this mount, in words, or '' for nowhere. */
+  const targetFor = (id: string): string => {
+    const rooms = placeInto.rooms;
+    // The overworld holds pool entries only; a Map has no business on it.
+    const map = placeInto.map && POOL_BY_ID.has(id);
+    if (rooms && map) return 'a room or an overworld screen';
+    if (rooms) return 'a room';
+    if (map) return 'an overworld screen';
+    return '';
+  };
 
-  return cell;
+  /*
+   * One line saying what the next click does.
+   *
+   * In the heading rather than under the grid, so the panel is no taller for
+   * it, and in words — the armed cell's ring is the other channel.
+   */
+  const status = el('span', 'z1r-palette-status');
+  status.setAttribute('aria-live', 'polite');
+  heading?.append(status);
+
+  const placedAt = new Map<string, string[]>();
+  const cellPatches: Patch[] = [];
+
+  const stepItem = (itemId: string, direction: 1 | -1) =>
+    store.dispatch({ type: 'cycleItem', id: itemId, direction });
+
+  /** Raise or lower from the right button, or from the arrow keys. */
+  const wireStage = (cell: HTMLElement, itemId: string | undefined) => {
+    cell.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      if (itemId) stepItem(itemId, event.shiftKey ? -1 : 1);
+    });
+    if (!itemId) return;
+    // The keyboard's way to the same two steps, since Enter and Space arm.
+    cell.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        stepItem(itemId, 1);
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        stepItem(itemId, -1);
+      }
+    });
+  };
+
+  const placeableCell = (def: RoomItemDef): HTMLElement => {
+    const pool = POOL_BY_ID.get(def.id);
+    /*
+     * The inventory item this entry raises, if any. The Heart Container's is
+     * empty — the running total is on the game's own HUD — and the Map, the
+     * Compass and a Triforce piece have no pool entry at all, so those four
+     * have no held state to show.
+     */
+    const inventory = pool?.itemId ? ITEMS_BY_ID.get(pool.itemId) : undefined;
+    const target = targetFor(def.id);
+
+    const cell = el('button', inventory ? 'z1r-item' : 'z1r-item z1r-item-dungeon');
+    cell.type = 'button';
+    cell.dataset.item = def.id;
+    cell.dataset.group = pool ? 'pool' : 'dungeon';
+    cell.dataset.placeable = String(!!target);
+    cell.dataset.armed = 'false';
+    cell.dataset.placed = 'false';
+    cell.append(createSprite(resolver, def.sprite, { size: opts.itemSize, label: '' }));
+
+    cell.addEventListener('click', () => {
+      if (!target) return;
+      // A toggle, so the same click both picks an item up and puts it down.
+      placement.set({ item: placement.get().item === def.id ? '' : def.id });
+    });
+    wireStage(cell, inventory?.id);
+
+    cellPatches.push((state) => {
+      const armed = placement.get().item === def.id;
+      cell.dataset.armed = String(armed);
+      const where = placedSuffix([def.id], placedAt);
+      cell.dataset.placed = String(!!where);
+
+      let heldText = '';
+      let stageHint = '';
+      if (inventory && pool) {
+        const value = state.items[inventory.id] ?? 0;
+        const held = value >= pool.value;
+        cell.dataset.owned = String(held);
+        cell.dataset.held = String(held);
+        heldText = held ? ' — held' : ' — not held';
+        // A chain's lower stages are not pool entries, so say which stage the
+        // inventory is at when it is not this one.
+        const stage = value > 0 ? labelFor(inventory, value) : '';
+        if (stage && stage !== def.name) heldText += ` (${inventory.name}: ${stage})`;
+        stageHint = `; right-click raises ${inventory.name}, Shift+right-click lowers it`;
+      }
+      const action = target
+        ? ` — click to ${armed ? 'put down' : `arm for ${target}`}`
+        : ' — nowhere in this window to place it';
+      cell.title = `${def.name}${heldText}${where}${action}${stageHint}`;
+      cell.setAttribute('aria-pressed', String(armed));
+      cell.setAttribute('aria-label', cell.title);
+    });
+
+    return cell;
+  };
+
+  const inventoryOnlyCell = (def: ItemDef): HTMLElement => {
+    const cell = el('button', 'z1r-item');
+    cell.type = 'button';
+    cell.dataset.itemId = def.id;
+    cell.dataset.item = def.id;
+    cell.dataset.group = 'inventory';
+    cell.dataset.placeable = 'false';
+    cell.dataset.armed = 'false';
+    const slot = el('span', 'z1r-item-sprite');
+    const badge = el('span', 'z1r-item-badge');
+    cell.append(slot, badge);
+    wireStage(cell, def.id);
+
+    let renderedSprite: string | null = null;
+    cellPatches.push((state) => {
+      const value = state.items[def.id] ?? 0;
+      const key = spriteFor(def, value);
+      renderedSprite = memoise(renderedSprite, key, () => {
+        slot.replaceChildren(createSprite(resolver, key, { size: opts.itemSize }));
+      });
+      cell.dataset.owned = String(value > 0);
+      cell.dataset.held = String(value > 0);
+      const held = labelFor(def, value);
+      cell.title =
+        `${held} — ${value > 0 ? 'held' : 'not held'} — never placed, so not armable;` +
+        ' right-click raises, Shift+right-click lowers';
+      cell.setAttribute('aria-pressed', String(value > 0));
+      cell.setAttribute('aria-label', cell.title);
+      if (def.kind === 'progressive' && value > 0 && maxValue(def) > 1) {
+        badge.textContent = String(value);
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
+    });
+
+    return cell;
+  };
+
+  const group = (name: string, caption?: string) => {
+    const wrap = el('div', 'z1r-palette-group');
+    wrap.dataset.group = name;
+    if (caption) wrap.append(el('span', 'z1r-item-group-label', caption));
+    const cells = el('div', 'z1r-palette-cells');
+    wrap.append(cells);
+    body.append(wrap);
+    return cells;
+  };
+
+  const poolCells = group('pool');
+  for (const def of ROOM_ITEMS.filter((entry) => POOL_BY_ID.has(entry.id))) {
+    poolCells.append(placeableCell(def));
+  }
+  const dungeonCells = group('dungeon');
+  for (const def of ROOM_ITEMS.filter((entry) => !POOL_BY_ID.has(entry.id))) {
+    dungeonCells.append(placeableCell(def));
+  }
+  const inventoryCells = group('inventory', 'Held only');
+  for (const def of ITEMS.filter((item) => roomItemsForInventory(item).length === 0)) {
+    inventoryCells.append(inventoryOnlyCell(def));
+  }
+
+  const own: Patch[] = [
+    (state) => {
+      placedAt.clear();
+      for (const [item, where] of placedIndex(state)) placedAt.set(item, where);
+    },
+    (state) => runPatches(cellPatches, state),
+    () => {
+      const armed = placement.get().item;
+      const def = armed ? ROOM_ITEMS_BY_ID.get(armed) : undefined;
+      root.dataset.armed = String(!!def);
+      status.textContent = def
+        ? `${def.name} armed — click ${targetFor(def.id)}. Esc puts it down.`
+        : 'Click an item to place it. Right-click marks it held.';
+    },
+  ];
+
+  patches.push((state) => runPatches(own, state));
+  // Arming changes nothing in the store, so the channel drives its own redraw.
+  placement.watch(() => runPatches(own, store.getState()));
+
+  return root;
 }
 
 /* ---------------------------------------------------------------- overworld */
@@ -851,6 +961,7 @@ function buildMap(
   resolver: SpriteResolver,
   patches: Patch[],
   interactive: boolean,
+  placement: PlacementChannel,
 ): HTMLElement {
   const { root, body } = section('Overworld', 'z1r-map');
   // The palette is positioned against this panel.
@@ -1058,8 +1169,39 @@ function buildMap(
     syncToolbar(store.getState());
   };
 
-  /** A tile click: stamp the armed marker if there is one, and edit the tile. */
+  /*
+   * A palette item dropped on a screen.
+   *
+   * The screen becomes an item screen holding that item, and is selected, so
+   * the toolbar's spot and Collected controls are already pointing at it. It
+   * fills an item location only once its spot is named, which is the toolbar's
+   * question to ask rather than this click's. The same item on the same screen
+   * again lifts it, the way a room does, and the item stays armed either way.
+   */
+  const placeOnScreen = (screen: string, item: string) => {
+    // The overworld holds shuffle-pool entries; the Map, the Compass and a
+    // Triforce piece never leave their level, so they do not land here.
+    if (!POOL_BY_ID.has(item)) return;
+    const state = store.getState();
+    const isItem = state.marks[screen] === 'item';
+    if (isItem && state.screenNotes[screen]?.item === item) {
+      store.dispatch({ type: 'setScreenNote', screen, patch: { item: '' } });
+    } else {
+      if (!isItem) store.dispatch({ type: 'setMark', screen, mark: 'item' });
+      store.dispatch({ type: 'setScreenNote', screen, patch: { item } });
+    }
+    selected = screen;
+    highlightSelection();
+    syncToolbar(store.getState());
+  };
+
+  /** A tile click: drop the armed item or stamp the armed marker, and edit the tile. */
   const touchScreen = (screen: string) => {
+    const paletteItem = placement.get().item;
+    if (paletteItem) {
+      placeOnScreen(screen, paletteItem);
+      return;
+    }
     if (!armed) {
       selectScreen(screen);
       return;
@@ -1086,13 +1228,37 @@ function buildMap(
     syncToolbar(store.getState());
   };
 
+  /*
+   * What a click on the map does, as attributes the stylesheet reads.
+   *
+   * A palette item counts as armed here too, but only one the overworld can
+   * take: a Map armed in the palette leaves the cells saying a click places
+   * nothing, which is what it does.
+   */
+  const syncArming = () => {
+    const paletteItem = placement.get().item;
+    body.dataset.armed = String(!!armed || POOL_BY_ID.has(paletteItem));
+    body.dataset.refusing = String(!!paletteItem && !POOL_BY_ID.has(paletteItem));
+  };
+
   const setArmed = (kind: MarkKind | '') => {
     armed = kind;
     if (kind !== 'dungeon') armedLevel = 0;
     if (kind !== 'stairway') armedStairway = 0;
-    body.dataset.armed = String(!!armed);
+    /*
+     * The marker brush and the palette are exclusive. Each arms what the next
+     * click on this map does, so with both armed one click would mean two
+     * things; arming either puts the other down.
+     */
+    if (kind) placement.set({ item: '' });
+    syncArming();
     syncToolbar(store.getState());
   };
+
+  placement.watch(() => {
+    if (placement.get().item && armed) setArmed('');
+    else syncArming();
+  });
 
   const patchSelected = (patch: Partial<ScreenNote>) => {
     if (!selected) return;
@@ -1196,6 +1362,19 @@ function buildMap(
     }
     if (document.activeElement !== spotSelect) spotSelect.value = note?.spot ?? '';
     if (document.activeElement !== itemSelect) itemSelect.value = note?.item ?? '';
+
+    const placed = note?.item ? POOL_BY_ID.get(note.item) : undefined;
+    const got = !!placed && !!note?.collected;
+    collectedToggle.disabled = !interactive || !selected || !placed;
+    collectedToggle.dataset.on = String(got);
+    collectedToggle.setAttribute('aria-pressed', String(got));
+    const label = got ? '✓ Collected' : 'Collected';
+    if (collectedToggle.textContent !== label) collectedToggle.textContent = label;
+    collectedToggle.title = placed
+      ? got
+        ? `Mark ${placed.name} not picked up. The inventory keeps what collecting gave it.`
+        : `Mark ${placed.name} picked up, which marks it held`
+      : 'Nothing on this screen to collect';
   };
 
   for (const mark of MARKS) {
@@ -1405,7 +1584,23 @@ function buildMap(
     itemSelect.append(option);
   }
   itemSelect.addEventListener('change', () => patchSelected({ item: itemSelect.value }));
-  itemRow.append(spotSelect, itemSelect);
+
+  /*
+   * Picked up, or only seen.
+   *
+   * The one gesture that grants a screen's item, beside the item it is about.
+   * A check mark in the label is the state's non-colour channel; the dashed
+   * ring the pressed chip also draws is a shape, not a hue.
+   */
+  const collectedToggle = el('button', 'z1r-chip-button z1r-tool-collected', 'Collected');
+  collectedToggle.type = 'button';
+  collectedToggle.addEventListener('click', () => {
+    if (!selected) return;
+    const note = store.getState().screenNotes[selected];
+    if (!note?.item) return;
+    store.dispatch({ type: 'collectScreen', screen: selected, collected: !note.collected });
+  });
+  itemRow.append(spotSelect, itemSelect, collectedToggle);
 
   // Escape lets go of the screen without having to find somewhere safe to click.
   body.addEventListener('keydown', (event) => {
@@ -1780,6 +1975,7 @@ function buildMap(
             : '';
           parts.push(spot || 'Item');
           parts.push(note?.item ? (POOL_BY_ID.get(note.item)?.name ?? '') : 'contents unknown');
+          if (note?.item) parts.push(note.collected ? 'collected' : 'not collected');
           if (isCoast) {
             parts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');
           }

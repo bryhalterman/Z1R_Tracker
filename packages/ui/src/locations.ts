@@ -6,20 +6,21 @@
  * settings rather than stored, so switching Dungeon Quest reshapes the list —
  * see `deriveLocations`.
  *
- * Items are not chosen here, for the same reason they are not chosen on the
- * room sheet: one is armed in the Items panel and dropped by clicking a slot,
- * through the channel `createPlacement` owns. Recording an item is recording
- * *where it is* and never grants it — saying you hold the thing is
- * `collectLocation`, which stays a separate gesture on the same box.
+ * Read-only on the page. Every slot is filled from a placement on a map — a
+ * room's item lands in its level's floor, stair or boss-drop slot, an overworld
+ * screen's item in the named spot it carries — through `deriveItemLocations`.
+ * Writing the same fact in two places is how the two used to disagree, so to
+ * change this panel you change the map.
  */
 
 import {
   POOL_BY_ID,
-  SHUFFLE_POOL,
   TRIFORCE_REQUIRED_FOR_L9,
   canEnterLevel9,
-  deriveLocations,
+  deriveItemLocations,
   triforceCount,
+  type ItemLocations,
+  type ItemPlacement,
   type LocationDef,
   type SpriteResolver,
   type Store,
@@ -27,7 +28,6 @@ import {
 } from '@z1r/core';
 import { createSprite } from './sprite.js';
 import { memoise, runPatches, type Patch } from './patch.js';
-import type { PlacementChannel } from './rooms.js';
 
 /**
  * What a slot shows before its item is known.
@@ -57,13 +57,79 @@ const SLOT_ART = 20;
 /** The staircase is drawn art, so it sits inside the box rather than filling it. */
 const SLOT_GLYPH_ART = 14;
 
+/** Where a slot's item was read from, phrased for a tooltip. */
+function sourceText(placement: ItemPlacement): string {
+  const source = placement.source;
+  if (source.kind === 'room') return `placed in L${source.level} ${source.room}`;
+  if (source.kind === 'screen') return `placed on overworld ${source.screen}`;
+  return 'recorded in an older save';
+}
+
+/**
+ * Toggle a filled slot's collected flag on whatever it was read from.
+ *
+ * A slot is a view of a placement, so collecting one is collecting the room or
+ * the screen behind it — `source` says which. Only a slot an older save holds
+ * directly goes through `collectLocation`, because that entry is the only place
+ * its flag lives. An empty slot has nothing to collect and does nothing.
+ */
+function toggleCollected(store: Store, location: LocationDef | null, placement: ItemPlacement | null): void {
+  if (!placement) return;
+  const collected = !placement.collected;
+  const source = placement.source;
+  if (source.kind === 'room') {
+    store.dispatch({ type: 'collectRoom', level: source.level, room: source.room, collected });
+  } else if (source.kind === 'screen') {
+    store.dispatch({ type: 'collectScreen', screen: source.screen, collected });
+  } else if (location) {
+    store.dispatch({ type: 'collectLocation', id: location.id, collected });
+  }
+}
+
+/**
+ * Which slots and overflow chips the panel draws, as one string.
+ *
+ * Overflow is part of the shape: a room item placed past its level's slots adds
+ * a chip, and the panel rebuilds for that rather than keeping spare nodes.
+ */
+function shapeOf(state: TrackerState, derived: ItemLocations): string {
+  const overflow = [...derived.overflow.entries()].map(([level, list]) => `${level}x${list.length}`);
+  return [
+    derived.slots.map((slot) => slot.location.id).join('|'),
+    overflow.join(','),
+    derived.overworldOverflow.length,
+    state.seed.shuffleMinorDrops,
+  ].join('::');
+}
+
+/** The level groups in listed order, keyed `L1`-`L9` and `OW`. */
+function groupSlots(derived: ItemLocations): Map<string, LocationDef[]> {
+  const groups = new Map<string, LocationDef[]>();
+  for (const { location } of derived.slots) {
+    const key = location.level === undefined ? 'OW' : `L${location.level}`;
+    const list = groups.get(key);
+    if (list) list.push(location);
+    else groups.set(key, [location]);
+  }
+  return groups;
+}
+
+/** Overflow chips for one group: a level's spilled room items, or the overworld's. */
+function overflowFor(derived: ItemLocations, level: number | undefined): readonly ItemPlacement[] {
+  return level === undefined ? derived.overworldOverflow : (derived.overflow.get(level) ?? []);
+}
+
+/** The slot kind an overflow chip is drawn as. */
+function overflowKind(placement: ItemPlacement): string {
+  return 'kind' in placement && typeof placement.kind === 'string' ? placement.kind : 'overworld';
+}
+
 export function buildLocations(
   store: Store,
   resolver: SpriteResolver,
   patches: Patch[],
   interactive: boolean,
   compact = false,
-  placement?: PlacementChannel,
 ): HTMLElement {
   if (compact) return buildCompactLocations(store, resolver, patches, interactive);
   const root = document.createElement('section');
@@ -79,27 +145,13 @@ export function buildLocations(
 
   const rows = document.createElement('div');
   rows.className = 'z1r-loc-rows';
-  rows.dataset.arming = 'false';
   root.append(rows);
 
-  /**
-   * The armed item, when a slot here can actually take it.
-   *
-   * The Items panel arms a `ROOM_ITEMS` id, which is the shuffle pool plus the
-   * Map, the Compass and a Triforce piece — three things generated per level
-   * that no item location stands for. A slot holds a pool entry, so anything
-   * outside the pool counts as nothing armed in this panel: the rows drop
-   * their arming cue and a click goes back to toggling collected, rather than
-   * taking a click that would record an id this panel cannot draw.
-   */
-  const armedItem = (): string => {
-    const brush = placement?.get();
-    if (!brush?.placing) return '';
-    return POOL_BY_ID.has(brush.item) ? brush.item : '';
-  };
+  /** The derivation for the pass in progress, read by every slot's patch. */
+  let derived: ItemLocations = deriveItemLocations(store.getState());
 
-  // Rebuilding is driven by the *shape* of the derived list, not by every
-  // state change — the slots themselves patch in place.
+  // Rebuilding is driven by the *shape* of what is drawn, not by every state
+  // change — the slots themselves patch in place.
   let renderedSignature = '';
   const slotPatches: Patch[] = [];
 
@@ -107,14 +159,7 @@ export function buildLocations(
     rows.replaceChildren();
     slotPatches.length = 0;
 
-    const groups = new Map<string, LocationDef[]>();
-    for (const location of deriveLocations(state.seed, state.extraFloorSlots)) {
-      const key = location.level === undefined ? 'OW' : `L${location.level}`;
-      const list = groups.get(key);
-      if (list) list.push(location);
-      else groups.set(key, [location]);
-    }
-
+    const groups = groupSlots(derived);
     for (const [name, list] of groups) {
       const block = document.createElement('div');
       block.className = 'z1r-loc-block';
@@ -129,8 +174,29 @@ export function buildLocations(
       block.append(label);
 
       for (const location of list) {
-        block.append(buildSlot(store, resolver, location, slotPatches, interactive, armedItem));
+        block.append(
+          buildSlot(resolver, location.kind, slotPatches, () => ({
+            location,
+            placement: derived.byId.get(location.id) ?? null,
+          })),
+        );
       }
+
+      /*
+       * Placements past this group's slots, after them on the same line.
+       *
+       * Shown rather than refused: the slot counts are a default quest's, and a
+       * seed can hold more. Read by index on each pass, because the shape
+       * signature above guarantees the count has not moved under them.
+       */
+      overflowFor(derived, level).forEach((first, index) => {
+        block.append(
+          buildSlot(resolver, overflowKind(first), slotPatches, () => ({
+            location: null,
+            placement: overflowFor(derived, level)[index] ?? null,
+          })),
+        );
+      });
 
       if (interactive && level !== undefined && state.seed.shuffleMinorDrops) {
         // Only reachable with Shuffle Minor Drops on, which is the flag that
@@ -175,8 +241,8 @@ export function buildLocations(
      * OW), and a setting that drops a level's only slot gives nine.
      *
      * Two columns rather than a number scaled to the width: the panel is
-     * sizing itself to sit beside two others in one row, and a third column
-     * would make it wider than both of them to save one line of height.
+     * sizing itself to sit beside the Triforce in one row, and a third column
+     * would make it wider than that to save one line of height.
      */
     // Floored at 1: `repeat(0, auto)` is not a valid track list, and an
     // invalid value here would drop the row count and lay all ten out in a
@@ -184,23 +250,15 @@ export function buildLocations(
     rows.style.setProperty('--z1r-loc-rows', String(Math.max(1, Math.ceil(groups.size / 2))));
   };
 
-  const draw: Patch = (state) => {
-    const locations = deriveLocations(state.seed, state.extraFloorSlots);
-    const signature = `${locations.map((l) => l.id).join('|')}::${state.seed.shuffleMinorDrops}`;
+  patches.push((state) => {
+    derived = deriveItemLocations(state);
+    const signature = shapeOf(state, derived);
     renderedSignature = memoise(renderedSignature, signature, () => rebuild(state)) ?? '';
-    // One attribute for the whole set rather than one per box: the cue is
-    // "a click in here records now", which is a fact about the panel.
-    rows.dataset.arming = String(!!armedItem());
     runPatches(slotPatches, state);
 
-    const collected = locations.filter((l) => state.locations[l.id]?.collected).length;
-    summary.textContent = `${collected}/${locations.length}`;
-  };
-
-  patches.push(draw);
-  // Arming changes nothing in the store, so the channel drives its own redraw —
-  // the same way the Items panel redraws its cells.
-  placement?.watch(() => draw(store.getState()));
+    const collected = derived.slots.filter((slot) => slot.placement?.collected).length;
+    summary.textContent = `${collected}/${derived.slots.length}`;
+  });
 
   return root;
 }
@@ -208,118 +266,68 @@ export function buildLocations(
 /**
  * One 24px box: what is known to be here, and whether it has been picked up.
  *
- * Both facts live on one control because they are one gesture apart, and the
- * gesture is the room sheet's — with an item armed a click records it, with
- * nothing armed a click says you have it. The row this replaces spent a
- * dropdown and a checkbox on the same two facts and ten times the width.
+ * Display only. It is a plain element rather than a button so it neither takes
+ * focus nor looks like a thing to press; the facts it shows are changed on the
+ * maps, and the whole of what it says is in its label as words.
+ *
+ * `location` is null for an overflow chip, which belongs to no listed slot.
  */
 function buildSlot(
-  store: Store,
   resolver: SpriteResolver,
-  location: LocationDef,
+  kind: string,
   patches: Patch[],
-  interactive: boolean,
-  armedItem: () => string,
+  read: () => { location: LocationDef | null; placement: ItemPlacement | null },
 ): HTMLElement {
-  const slot = document.createElement('button');
-  slot.type = 'button';
+  const { location } = read();
+  const slot = document.createElement('span');
   slot.className = 'z1r-loc-slot';
-  slot.dataset.slot = location.id;
-  slot.dataset.kind = location.kind;
+  slot.setAttribute('role', 'img');
+  if (location) slot.dataset.slot = location.id;
+  else slot.dataset.overflow = 'true';
+  slot.dataset.kind = kind;
   slot.dataset.known = 'false';
   slot.dataset.collected = 'false';
-  slot.disabled = !interactive;
 
   const face = document.createElement('span');
   face.className = 'z1r-loc-face';
   slot.append(face);
 
-  if (interactive) {
-    slot.addEventListener('click', () => {
-      const armed = armedItem();
-      const current = store.getState().locations[location.id] ?? { item: '', collected: false };
-      if (armed) {
-        /*
-         * One gesture both ways.
-         *
-         * The same armed item on the same box takes it off again, so clearing
-         * needs no second control — and this branch dispatches `setLocation`,
-         * which records where a thing is and leaves the inventory alone.
-         * Collecting is the other branch, below, and it is the only one that
-         * can grant anything.
-         */
-        store.dispatch({
-          type: 'setLocation',
-          id: location.id,
-          item: current.item === armed ? '' : armed,
-        });
-        return;
-      }
-      store.dispatch({
-        type: 'collectLocation',
-        id: location.id,
-        collected: !current.collected,
-      });
-    });
-
-    /*
-     * Delete clears what is recorded here.
-     *
-     * Enter and Space are the click, which records with an item armed and
-     * collects without one — neither takes a wrong entry back out unless you
-     * first arm that same wrong item, which the dropdown this replaces could
-     * do from the keyboard in one step. Delete restores that, and the tooltip
-     * names it rather than leaving it to be discovered.
-     */
-    slot.addEventListener('keydown', (event) => {
-      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
-      event.preventDefault();
-      store.dispatch({ type: 'setLocation', id: location.id, item: '' });
-    });
-  }
-
   let renderedFace: string | null = null;
-  patches.push((state) => {
-    const current = state.locations[location.id] ?? { item: '', collected: false };
-    const entry = current.item ? POOL_BY_ID.get(current.item) : undefined;
+  patches.push(() => {
+    const { placement } = read();
+    const entry = placement?.item ? POOL_BY_ID.get(placement.item) : undefined;
+    const collected = !!placement?.collected;
     slot.dataset.known = String(!!entry);
-    slot.dataset.collected = String(current.collected);
+    slot.dataset.collected = String(collected);
 
-    const armed = armedItem();
-    const armedName = armed ? (POOL_BY_ID.get(armed)?.name ?? armed) : '';
-    const gesture = !interactive
-      ? ''
-      : armed
-        ? current.item === armed
-          ? ` — click to clear ${armedName}`
-          : ` — click to record ${armedName} here`
-        : current.collected
-          ? ' — click to mark not picked up'
-          : ' — click to mark picked up, Delete to clear';
+    const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
+    const about = location
+      ? (location.note ?? KIND_TITLE[location.kind] ?? location.kind)
+      : 'more than this level has slots for';
     // Every state in words as well as in the border and the tick: this is what
     // a screen reader is given, and the text channel is the one that does not
     // depend on seeing the difference between a dashed and a solid edge.
     slot.title =
-      `${location.label} — ${entry ? entry.name : 'nothing recorded'}` +
-      ` — ${current.collected ? 'picked up' : 'not picked up'}` +
-      ` (${location.note ?? KIND_TITLE[location.kind] ?? location.kind})` +
-      gesture;
+      `${where} — ${entry ? entry.name : 'nothing recorded'}` +
+      ` — ${collected ? 'picked up' : 'not picked up'}` +
+      (placement ? ` — ${sourceText(placement)}` : '') +
+      ` (${about})`;
     slot.setAttribute('aria-label', slot.title);
 
-    const faceKey = entry ? `item:${entry.sprite}` : `kind:${location.kind}`;
+    const faceKey = entry ? `item:${entry.sprite}` : `kind:${kind}`;
     renderedFace = memoise(renderedFace, faceKey, () => {
       if (entry) {
         face.replaceChildren(createSprite(resolver, entry.sprite, { size: SLOT_ART, label: '' }));
         return;
       }
-      if (location.kind === 'stair') {
+      if (kind === 'stair') {
         face.replaceChildren(
           createSprite(resolver, 'mark.stairway', { size: SLOT_GLYPH_ART, label: '' }),
         );
         return;
       }
       face.replaceChildren();
-      face.textContent = KIND_GLYPH[location.kind] ?? '?';
+      face.textContent = KIND_GLYPH[kind] ?? '?';
     });
   });
 
@@ -351,8 +359,8 @@ const SPOT_CODE: Record<string, string> = {
   'ow.coast': 'CO',
 };
 
-function slotCode(location: LocationDef): string {
-  return SPOT_CODE[location.id] ?? KIND_INITIAL[location.kind] ?? '?';
+function slotCode(kind: string, location: LocationDef | null): string {
+  return (location ? SPOT_CODE[location.id] : undefined) ?? KIND_INITIAL[kind] ?? '?';
 }
 
 /**
@@ -370,6 +378,11 @@ function slotCode(location: LocationDef): string {
  * The chips still carry both facts the full layout does. A known item shows its
  * sprite; collected is a solid border against a dashed one, so the distinction
  * survives without colour and without a label.
+ *
+ * It reads the same derivation as the page, so the two never disagree about
+ * what is where. Which item is in a slot is set on the maps, not here; what a
+ * chip still does is toggle collected, on whichever room or screen it was read
+ * from.
  */
 function buildCompactLocations(
   store: Store,
@@ -411,60 +424,8 @@ function buildCompactLocations(
   body.className = 'z1r-locations-compact';
   root.append(body);
 
-  // One reused picker rather than one per slot; also acts as the legend.
-  const picker = document.createElement('div');
-  picker.className = 'z1r-slot-picker';
-  picker.hidden = true;
-  picker.setAttribute('role', 'menu');
-  let pickerSlot = '';
-
-  const closePicker = () => {
-    picker.hidden = true;
-    pickerSlot = '';
-    document.removeEventListener('pointerdown', onOutside, true);
-    document.removeEventListener('keydown', onEscape, true);
-  };
-  function onOutside(event: Event) {
-    if (!picker.contains(event.target as Node)) closePicker();
-  }
-  function onEscape(event: KeyboardEvent) {
-    if (event.key === 'Escape') closePicker();
-  }
-
-  const choose = (item: string) => {
-    store.dispatch({ type: 'setLocation', id: pickerSlot, item });
-    closePicker();
-  };
-
-  const clear = document.createElement('button');
-  clear.type = 'button';
-  clear.className = 'z1r-slot-option';
-  clear.textContent = '— clear —';
-  clear.addEventListener('click', () => choose(''));
-  picker.append(clear);
-  for (const entry of SHUFFLE_POOL) {
-    const option = document.createElement('button');
-    option.type = 'button';
-    option.className = 'z1r-slot-option';
-    option.append(createSprite(resolver, entry.sprite, { size: 16, label: entry.name }));
-    option.append(Object.assign(document.createElement('span'), { textContent: entry.name }));
-    option.addEventListener('click', () => choose(entry.id));
-    picker.append(option);
-  }
-  root.append(picker);
-
-  const openPicker = (slotId: string, anchor: HTMLElement) => {
-    if (pickerSlot === slotId && !picker.hidden) return closePicker();
-    pickerSlot = slotId;
-    picker.hidden = false;
-    const box = anchor.getBoundingClientRect();
-    const panel = root.getBoundingClientRect();
-    picker.style.insetInlineStart = `${Math.max(2, box.left - panel.left)}px`;
-    picker.style.insetBlockStart = `${box.bottom - panel.top + 2}px`;
-    document.addEventListener('pointerdown', onOutside, true);
-    document.addEventListener('keydown', onEscape, true);
-    picker.querySelector<HTMLElement>('.z1r-slot-option')?.focus();
-  };
+  /** The derivation for the pass in progress, read by every chip's patch. */
+  let derived: ItemLocations = deriveItemLocations(store.getState());
 
   let renderedSignature = '';
   const slotPatches: Patch[] = [];
@@ -492,19 +453,64 @@ function buildCompactLocations(
     );
   };
 
-  const rebuild = (state: TrackerState) => {
+  /** One chip. `read` is called on every pass, so the chip follows the maps. */
+  const buildChip = (
+    kind: string,
+    read: () => { location: LocationDef | null; placement: ItemPlacement | null },
+  ): HTMLElement => {
+    const { location } = read();
+    const slot = document.createElement('button');
+    slot.type = 'button';
+    slot.className = 'z1r-compact-slot';
+    slot.dataset.kind = kind;
+    if (!location) slot.dataset.overflow = 'true';
+    slot.disabled = !interactive;
+    if (interactive) {
+      const toggle = () => {
+        const now = read();
+        toggleCollected(store, now.location, now.placement);
+      };
+      // Either button toggles collected. The left click used to open an item
+      // picker, which is gone with item assignment here; the right click is
+      // kept because it is the gesture this chip has always had for it.
+      slot.addEventListener('click', toggle);
+      slot.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        toggle();
+      });
+    }
+
+    const face = document.createElement('span');
+    face.className = 'z1r-compact-face';
+    slot.append(face);
+
+    let renderedItem: string | null = null;
+    slotPatches.push(() => {
+      const { placement } = read();
+      const item = placement?.item ?? '';
+      const collected = !!placement?.collected;
+      slot.dataset.collected = String(collected);
+      slot.dataset.known = String(!!item);
+      const entry = item ? POOL_BY_ID.get(item) : undefined;
+      const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
+      slot.title =
+        `${where} — ${entry?.name ?? 'unknown'}` +
+        `${collected ? ' (collected)' : ''}` +
+        (placement ? '' : ' — place it on a map to record it');
+      renderedItem = memoise(renderedItem, item, () => {
+        if (entry) face.replaceChildren(createSprite(resolver, entry.sprite, { size: 16 }));
+        else face.replaceChildren(slotCode(kind, location));
+      });
+    });
+
+    return slot;
+  };
+
+  const rebuild = () => {
     body.replaceChildren();
     slotPatches.length = 0;
 
-    const grouped = new Map<string, LocationDef[]>();
-    for (const location of deriveLocations(state.seed, state.extraFloorSlots)) {
-      const key = location.level === undefined ? 'OW' : `L${location.level}`;
-      const list = grouped.get(key);
-      if (list) list.push(location);
-      else grouped.set(key, [location]);
-    }
-
-    for (const [label, list] of grouped) {
+    for (const [label, list] of groupSlots(derived)) {
       const column = document.createElement('div');
       column.className = 'z1r-compact-column';
 
@@ -559,56 +565,35 @@ function buildCompactLocations(
       }
 
       for (const location of list) {
-        const slot = document.createElement('button');
-        slot.type = 'button';
-        slot.className = 'z1r-compact-slot';
-        slot.dataset.kind = location.kind;
-        slot.disabled = !interactive;
-        if (interactive) {
-          slot.addEventListener('click', () => openPicker(location.id, slot));
-          // Right-click toggles collected — the second fact, without a second control.
-          slot.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-            const current = store.getState().locations[location.id];
-            store.dispatch({
-              type: 'collectLocation',
-              id: location.id,
-              collected: !(current?.collected ?? false),
-            });
-          });
-        }
-
-        const face = document.createElement('span');
-        face.className = 'z1r-compact-face';
-        slot.append(face);
-        column.append(slot);
-
-        let renderedItem: string | null = null;
-        slotPatches.push((s2) => {
-          const current = s2.locations[location.id] ?? { item: '', collected: false };
-          slot.dataset.collected = String(current.collected);
-          slot.dataset.known = String(!!current.item);
-          const entry = current.item ? POOL_BY_ID.get(current.item) : undefined;
-          slot.title =
-            `${location.label} — ${entry?.name ?? 'unknown'}` +
-            `${current.collected ? ' (collected)' : ''}`;
-          renderedItem = memoise(renderedItem, current.item, () => {
-            if (entry) face.replaceChildren(createSprite(resolver, entry.sprite, { size: 16 }));
-            else face.textContent = slotCode(location);
-          });
-        });
+        column.append(
+          buildChip(location.kind, () => ({
+            location,
+            placement: derived.byId.get(location.id) ?? null,
+          })),
+        );
       }
+
+      const groupLevel = list[0]?.level;
+      overflowFor(derived, groupLevel).forEach((first, index) => {
+        column.append(
+          buildChip(overflowKind(first), () => ({
+            location: null,
+            placement: overflowFor(derived, groupLevel)[index] ?? null,
+          })),
+        );
+      });
+
       body.append(column);
     }
   };
 
   patches.push((state) => {
-    const locations = deriveLocations(state.seed, state.extraFloorSlots);
-    const signature = locations.map((l) => l.id).join('|');
-    renderedSignature = memoise(renderedSignature, signature, () => rebuild(state)) ?? '';
+    derived = deriveItemLocations(state);
+    const signature = shapeOf(state, derived);
+    renderedSignature = memoise(renderedSignature, signature, rebuild) ?? '';
     runPatches(slotPatches, state);
-    const collected = locations.filter((l) => state.locations[l.id]?.collected).length;
-    summary.textContent = `${collected}/${locations.length}`;
+    const collected = derived.slots.filter((slot) => slot.placement?.collected).length;
+    summary.textContent = `${collected}/${derived.slots.length}`;
   });
 
   return root;

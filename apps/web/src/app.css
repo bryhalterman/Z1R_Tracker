@@ -47,11 +47,11 @@ body {
  *
  * Was 1100px, which is about what the single column needed. At this cap the
  * last row's two halves measure 896px each and the map draws sixteen screens
- * of 51px. The row above it has stopped using the width by then: Items, Item
- * locations and the Triforce measure 856px between them and none of the three
- * grows past that, and the room sheet is capped as well — so past here the
- * extra goes to the map and to the empty end of the Levels detail strip, and
- * the page only gets wider.
+ * of 51px. The rows above it have stopped using the width by then: the palette
+ * is one line of cells, Item locations and the Triforce stop growing well short
+ * of it, and the room sheet is capped as well — so past here the extra goes to
+ * the map and to the empty end of the Levels detail strip, and the page only
+ * gets wider.
  *
  * Still a cap, not a width. On a 1280px screen the viewport is what binds and
  * the page lays out at about 1233px.
@@ -61,8 +61,12 @@ main {
 }
 
 /*
- * Four rows: Seed; Items with Item locations and the Triforce; Hints; the
- * Overworld beside Levels.
+ * Five rows: Seed; the item palette; Item locations beside the Triforce;
+ * Hints; the Overworld beside Levels.
+ *
+ * The palette has a row to itself because it is a tool for the two maps at the
+ * bottom rather than a panel to read, and as one line of cells across the page
+ * it costs less height than it did as a block beside the locations.
  *
  * In one column the page was 1508px against an 800px viewport, and the
  * Overworld alone was a third of it. Two columns fixed that by stacking Hints,
@@ -112,45 +116,46 @@ main {
 }
 
 /*
- * The two rows that are one panel wide — and, because they are, the row breaks
- * for the rows around them.
+ * The three rows that are one panel wide — and, because they are, the row
+ * breaks for the rows around them.
  *
  * Flex has no "break here". An item whose basis is the whole line is the way
  * to say it: nothing fits beside it, so it takes a line of its own and pushes
  * what follows onto the next one.
  */
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-seed,
+#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-pair > .z1r-items-panel,
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-hint-tracker {
   flex: 1 1 100%;
 }
 
 /*
- * Three panels in the second row, out of a DOM that holds two siblings.
+ * Items and the Triforce in different rows, out of a DOM that pairs them.
  *
  * `mountTracker` wraps Items and the Triforce together in `.z1r-pair` — they
  * share a row in every build, the overlay included — and appends Item
- * locations after the pair rather than inside it. The row wanted here puts
- * Item locations between the two, and the DOM is not ours to reorder: the OBS
- * dock, the map dock and the overlay mount the same nodes.
+ * locations after the pair rather than inside it. The rows wanted here give
+ * the palette a line of its own and put Item locations ahead of the Triforce
+ * on the next, and the DOM is not ours to reorder: the OBS dock, the map dock
+ * and the overlay mount the same nodes.
  *
  * So the wrapper stands aside instead. `display: contents` drops its box and
- * promotes its two panels to flex items of the tracker, which makes the row
- * three items rather than two, and `order` below places the locations between
- * them. The pair's own flex rules still apply — they are written against the
- * wrapper as a selector, not against its box — and the pair is a row again,
- * untouched, the moment the band drops below `md`.
+ * promotes its two panels to flex items of the tracker, and `order` below
+ * places each one. The pair's own flex rules still apply — they are written
+ * against the wrapper as a selector, not against its box — and the pair is a
+ * row again, untouched, the moment the band drops below `md`.
  *
  * The cost is that visual order and DOM order disagree for one pair of
- * panels: tabbing through the row reaches the Triforce before Item locations.
- * Both are self-contained panels with their own headings rather than a
- * sequence to be read in order, so the reading is the same either way.
+ * panels: tabbing reaches the Triforce before Item locations. Both are
+ * self-contained panels with their own headings rather than a sequence to be
+ * read in order, so the reading is the same either way.
  */
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-pair {
   display: contents;
 }
 
 /*
- * The four rows, in the order they are read.
+ * The five rows, in the order they are read.
  *
  * Every panel is numbered rather than only the two that move. `order` sorts
  * the unnumbered into one group ahead of the rest, so leaving Hints, the
@@ -163,9 +168,8 @@ main {
 
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-pair > .z1r-items-panel {
   order: 2;
-  /* As wide as its items and no wider, which is what it draws at in the pair.
-     Restated because this is now a flex item of the tracker. */
-  flex: 0 1 auto;
+  /* Restated beside the full-line basis above, because the pair's own rule
+     floors this panel at its content otherwise. */
   min-inline-size: 0;
 }
 
@@ -181,7 +185,7 @@ main {
 
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-pair > .z1r-triforce-panel {
   order: 4;
-  /* The one panel in the row that takes up slack, capped by the pair's own
+  /* The one panel in its row that takes up slack, capped by the pair's own
      320px — past that the triangle is drawing in an empty box. */
   flex: 1 1 240px;
 }

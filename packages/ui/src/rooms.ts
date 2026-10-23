@@ -12,10 +12,11 @@
  * and neither should travel over the BroadcastChannel: two windows looking at
  * two different levels of the same map is a feature, not a conflict.
  *
- * Items are not chosen here. They are armed in the Items panel and dropped by
+ * Items are not chosen here. They are armed in the palette and dropped by
  * clicking a room — see `createPlacement` — so the item row reports what is in
- * the room and offers only a way to take it back off. Recording an item is
- * recording *where it is*; it never grants it.
+ * the room, whether it has been picked up, and which location slot it fills.
+ * Recording an item is recording *where it is*; only marking it collected
+ * grants it.
  */
 
 import {
@@ -24,9 +25,9 @@ import {
   DUNGEONS,
   DUNGEON_BOSSES,
   DUNGEON_BOSSES_BY_ID,
-  ITEMS_BY_ID,
+  POOL_BY_ID,
   ROOM_COLUMNS,
-  ROOM_ITEMS,
+  ROOM_FROMS,
   ROOM_ITEMS_BY_ID,
   ROOM_ROWS,
   ROOM_SIDES,
@@ -36,13 +37,15 @@ import {
   ROOM_TRANSPORT_PAIR_SIZE,
   SHUFFLE_POOL,
   bossAllowedOnLevel,
+  resolveRoomFrom,
   roomId,
   type Action,
   type DoorState,
   type ItemDef,
-  type RoomItemDef,
+  type RoomFrom,
   type RoomNote,
   type RoomSide,
+  type RoomSlotKind,
   type RoomStairKind,
   type SpriteResolver,
   type Store,
@@ -52,26 +55,27 @@ import { createSprite } from './sprite.js';
 
 /* ---------------------------------------------------------------- placement */
 
-/** What the Items panel has armed for the next room click. */
+/** What the palette has armed for the next room or overworld click. */
 export interface PlacementBrush {
-  /** True while the Items panel places instead of collecting. */
-  readonly placing: boolean;
-  /** `ROOM_ITEMS` id the next room click drops, or '' for nothing armed. */
+  /** `ROOM_ITEMS` id the next room or screen click drops, or '' for nothing armed. */
   readonly item: string;
 }
 
 /**
- * The arming channel shared by the Items panel and the room sheet.
+ * The arming channel shared by the palette and the panels it drops onto.
  *
  * View state, not store state, and deliberately so. A half-finished gesture —
  * "I have picked the Raft up and not yet said which room" — is not a fact about
  * the run: it must not be written to a save, must not be broadcast to the other
- * window, and must not survive a reload. It only has to reach the two panels
- * built in the same `mountTracker` call, which is exactly what this object is.
+ * window, and must not survive a reload. It only has to reach the panels built
+ * in the same `mountTracker` call, which is exactly what this object is.
  *
- * `watch` exists because the two panels redraw off store changes and arming is
- * not one. Listeners are never removed: the channel lives and dies with the
- * mount that created it, so there is nothing to unsubscribe from.
+ * There is no mode flag. The palette is always a placement tool, so an armed
+ * item is the whole of the state: something is in the air, or nothing is.
+ *
+ * `watch` exists because the panels redraw off store changes and arming is not
+ * one. Listeners are never removed: the channel lives and dies with the mount
+ * that created it, so there is nothing to unsubscribe from.
  */
 export interface PlacementChannel {
   get(): PlacementBrush;
@@ -80,18 +84,15 @@ export interface PlacementChannel {
 }
 
 export function createPlacement(): PlacementChannel {
-  let brush: PlacementBrush = { placing: false, item: '' };
+  let brush: PlacementBrush = { item: '' };
   const listeners = new Set<() => void>();
 
   return {
     get: () => brush,
     set(next) {
-      const merged = { ...brush, ...next };
-      // Turning Place off disarms. An armed item with no mode to explain it
-      // would make the next room click do something nothing on screen said.
-      const item = merged.placing ? merged.item : '';
-      if (merged.placing === brush.placing && item === brush.item) return;
-      brush = { placing: merged.placing, item };
+      const item = next.item ?? brush.item;
+      if (item === brush.item) return;
+      brush = { item };
       for (const listener of listeners) listener();
     },
     watch(listener) {
@@ -101,70 +102,24 @@ export function createPlacement(): PlacementChannel {
 }
 
 /**
- * Which `ROOM_ITEMS` entry an inventory cell arms, or '' when it has none.
+ * Every `ROOM_ITEMS` id an inventory item can ever stand for.
  *
- * The two lists are not the same list. The Items panel renders the *inventory* —
- * eighteen cells, several of them progressive chains — while a room records a
- * *pool entry*, and the pool is what names "White Sword" and "Magical Sword"
- * separately. `SHUFFLE_POOL` already carries the join: each entry knows the
- * inventory id it grants (`itemId`) and the stage it grants it at (`value`), so
- * the mapping is derived from that rather than retyped here, and an item added
- * to the pool is placeable the same day.
- *
- * A chain maps to the next stage you do not hold yet, which is the one you are
- * recording the location of — Sword at nothing armed White Sword, Sword at
- * White armed Magical. At the top of the chain it stays on the top entry rather
- * than going dead, so re-recording a location you already collected still works.
- *
- * Inventory cells with no pool entry at all — Bombs, the Letter, the Potion,
- * the Magical Shield, the Blue Candle's cell before it upgrades — return ''.
- * The caller must make those unplaceable: an armable-looking cell that cannot
- * be armed is worse than one that is plainly out of the game.
+ * The inventory and the pool are not the same list: the inventory is eighteen
+ * cells, several of them progressive chains, while the pool names "White Sword"
+ * and "Magical Sword" separately. `SHUFFLE_POOL` carries the join — each entry
+ * knows the inventory id it grants — so this is derived rather than retyped.
+ * Empty for the inventory items no location ever holds: Bombs, the Potion, the
+ * Magical Shield, the Bait and the Letter.
  */
-export function roomItemForInventory(def: ItemDef, held: number): string {
-  const entries = SHUFFLE_POOL.filter(
-    (entry) => entry.itemId === def.id && ROOM_ITEMS_BY_ID.has(entry.id),
-  ).sort((a, b) => a.value - b.value);
-  if (entries.length === 0) return '';
-  const next = entries.find((entry) => entry.value > held);
-  return (next ?? entries[entries.length - 1])?.id ?? '';
-}
-
-/** Every `ROOM_ITEMS` id an inventory cell can ever stand for. */
 export function roomItemsForInventory(def: ItemDef): readonly string[] {
   return SHUFFLE_POOL.filter(
     (entry) => entry.itemId === def.id && ROOM_ITEMS_BY_ID.has(entry.id),
   ).map((entry) => entry.id);
 }
 
-/**
- * Room items no inventory cell can stand for.
- *
- * The Map, the Compass and a Triforce piece are generated per level and never
- * travel, so they have no pool entry and no inventory item; the Heart Container
- * has a pool entry whose `itemId` is empty, because the running total is on the
- * game's own HUD. All four are among the things most worth writing on a dungeon
- * map, and none of them is reachable from an inventory cell — so the Items
- * panel offers them as their own group while Place is on.
- */
-export const UNHELD_ROOM_ITEMS: readonly RoomItemDef[] = ROOM_ITEMS.filter((item) => {
-  const entry = SHUFFLE_POOL.find((pool) => pool.id === item.id);
-  return !entry || !entry.itemId || !ITEMS_BY_ID.has(entry.itemId);
-});
-
 /* -------------------------------------------------------------------- panel */
 
 const LEVELS: readonly number[] = DUNGEONS.map((dungeon) => dungeon.level);
-
-/**
- * The short cycle a click on a room's edge walks.
- *
- * Unknown, open and wall are what you learn by walking into a wall, so they are
- * the three worth a click on the sheet itself. Bombed, locked and shutter are
- * rare and deliberate, so they live in the detail strip rather than costing
- * four clicks to pass on every other edge.
- */
-const QUICK_CYCLE: readonly DoorState[] = ['unknown', 'open', 'wall'];
 
 /** Edge class suffixes, matching the `.n .e .s .w` hooks OBS CSS is written against. */
 const SIDE_CLASS: Record<RoomSide, string> = {
@@ -201,6 +156,47 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function doorLabel(state: DoorState): string {
   const def = DOOR_STATES_BY_ID.get(state);
   return def ? `${def.name} (${def.tag})` : state;
+}
+
+/** The words each slot kind goes by in the From row. */
+const FROM_NAME: Record<RoomSlotKind, string> = {
+  floor: 'Floor',
+  stair: 'Stairs',
+  heart: 'Boss drop',
+};
+
+/** The stairs row's three buttons, in words short enough to sit on one line. */
+const STAIR_WORD: Record<RoomStairKind, string> = {
+  none: 'None',
+  item: 'To item',
+  transport: 'Transport',
+};
+
+/**
+ * A two-state chip whose state is spelled out, not only tinted.
+ *
+ * The check mark in front of the label is the non-colour channel: the pressed
+ * ring is an accent hue, and a hue alone is not allowed to carry state here.
+ */
+function setToggle(button: HTMLButtonElement, label: string, on: boolean): void {
+  const text = on ? `✓ ${label}` : label;
+  if (button.textContent !== text) button.textContent = text;
+  button.setAttribute('aria-pressed', String(on));
+}
+
+/** A row of joined chips, one of which is the current answer. */
+function segmented(label: string): HTMLElement {
+  const group = el('span', 'z1r-seg');
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', label);
+  return group;
+}
+
+function segButton(text: string, title: string): HTMLButtonElement {
+  const button = el('button', 'z1r-room-pick z1r-room-word z1r-seg-option', text);
+  button.type = 'button';
+  button.title = title;
+  return button;
 }
 
 export function buildRooms(
@@ -346,28 +342,14 @@ export function buildRooms(
     }
     const current = roomsOf(store.getState())[room]?.item ?? '';
     // The same item armed and the same room clicked again takes it back off, so
-    // one gesture both places and lifts.
+    // one gesture both places and lifts. The item stays armed either way: a run
+    // of drops is meant to cost one pick in the palette.
     commit(
       room,
       current === armed
         ? { type: 'setRoomItem', level, room, item: '' }
         : { type: 'setRoomNote', level, room, patch: { item: armed, visited: true } },
     );
-  };
-
-  const stepDoor = (room: string, side: RoomSide, direction: 1 | -1) => {
-    const current = roomsOf(store.getState())[room]?.doors[side] ?? 'unknown';
-    const at = QUICK_CYCLE.indexOf(current);
-    // A rare state set from the strip is not in the quick cycle, so a click on
-    // it starts the cycle over rather than appearing to do nothing.
-    const next =
-      at === -1
-        ? direction > 0
-          ? QUICK_CYCLE[1]
-          : QUICK_CYCLE[QUICK_CYCLE.length - 1]
-        : QUICK_CYCLE[(at + direction + QUICK_CYCLE.length) % QUICK_CYCLE.length];
-    if (!next) return;
-    commit(room, { type: 'setRoomDoor', level, room, side, state: next });
   };
 
   const cellPatches: Patch[] = [];
@@ -379,39 +361,37 @@ export function buildRooms(
       cell.type = 'button';
       cell.dataset.room = id;
       cell.disabled = !interactive;
-      if (interactive) {
-        cell.addEventListener('click', (event) => {
-          // The edges are spans inside this button and handle themselves.
-          if ((event.target as HTMLElement | null)?.closest('.z1r-room-door')) return;
-          touchRoom(id);
-        });
-      }
+      if (interactive) cell.addEventListener('click', () => touchRoom(id));
 
+      /*
+       * The doorways, drawn and nothing more.
+       *
+       * They used to take clicks and cycle, which put a 10px target inside a
+       * 40px one and made a click near a wall mean something different from a
+       * click in the middle of the same room. The compass in the detail strip
+       * is the one way to set a door now, so these are hidden from assistive
+       * tech as well: the cell's own label already names every known side.
+       */
       const edges = ROOM_SIDES.map((side) => {
         const edge = el('span', `z1r-room-door ${SIDE_CLASS[side]}`);
         edge.dataset.side = SIDE_CLASS[side];
         edge.dataset.door = 'unknown';
-        edge.setAttribute('role', 'button');
-        // Reachable by pointer only: the cell itself is the keyboard target,
-        // and four more tab stops per room is 256 across the sheet.
-        edge.tabIndex = -1;
-        if (interactive) {
-          edge.addEventListener('click', (event) => {
-            event.stopPropagation();
-            stepDoor(id, side, 1);
-          });
-          edge.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            stepDoor(id, side, -1);
-          });
-        }
+        edge.setAttribute('aria-hidden', 'true');
         cell.append(edge);
         return { side, edge };
       });
 
       const mark = el('span', 'z1r-room-mark');
       cell.append(mark);
+      /*
+       * A collected item carries a corner check on the sheet as well as in the
+       * strip, because collecting is the fact that makes it held — and a check
+       * is a shape, so it does not rest on the colour it is drawn in.
+       */
+      const got = el('span', 'z1r-room-got', '✓');
+      got.setAttribute('aria-hidden', 'true');
+      got.hidden = true;
+      cell.append(got);
       grid.append(cell);
 
       let bossArt: HTMLElement | null = null;
@@ -425,11 +405,12 @@ export function buildRooms(
         cell.setAttribute('aria-current', String(id === selected));
 
         for (const { side, edge } of edges) {
-          const door = note?.doors[side] ?? 'unknown';
-          edge.dataset.door = door;
-          edge.title = `${id} ${SIDE_NAME[side]} — ${doorLabel(door)}`;
-          edge.setAttribute('aria-label', edge.title);
+          edge.dataset.door = note?.doors[side] ?? 'unknown';
         }
+
+        const collected = !!note?.item && note.collected;
+        cell.dataset.collected = String(collected);
+        got.hidden = !collected;
 
         const boss = note?.boss ?? '';
         renderedBoss = memoise(renderedBoss, boss, () => {
@@ -480,7 +461,10 @@ export function buildRooms(
         const parts = [id];
         if (note) {
           parts.push(note.visited ? 'visited' : 'not visited');
-          if (item) parts.push(`holds ${ROOM_ITEMS_BY_ID.get(item)?.name ?? item}`);
+          if (item) {
+            const name = ROOM_ITEMS_BY_ID.get(item)?.name ?? item;
+            parts.push(`holds ${name}${note.collected ? ', collected' : ''}`);
+          }
           const bossDef = boss ? DUNGEON_BOSSES_BY_ID.get(boss) : undefined;
           if (bossDef) parts.push(bossDef.name);
           const stairDef = stairs === 'none' ? undefined : ROOM_STAIRS_BY_ID.get(stairs);
@@ -506,33 +490,34 @@ export function buildRooms(
   detail.dataset.empty = 'true';
   body.append(detail);
 
-  /*
-   * The door row's own strip, always the full width of the panel.
+  /**
+   * A labelled row of the strip. Every row but the first dims with nothing
+   * selected.
    *
-   * It is the one row of the five whose controls carry words — `Open (OP)`,
-   * `Locked (LK)`, `Bombed, solid (BX)` — and those words are the non-colour
-   * channel for a door's state. Beside the sheet the row gets a column narrow
-   * enough to clip them: measured, the four selects go from 129px at the full
-   * width of a 600px panel to 66px in a 272px column, which is not enough for
-   * the longest of those labels. So it keeps the full width under both and
-   * only the other four rows move.
-   *
-   * A second element rather than a `grid-column: 1 / -1` on the same one,
-   * because the strip beside the sheet is a flex item whose height must stay
-   * its own — a full-width child inside it would be inside the narrow column,
-   * not beside it.
+   * The controls go in a value box beside the key rather than straight into
+   * the row, so a line that wraps continues under the controls and not back
+   * under the key, where it would read as a row of its own.
    */
-  const doorsStrip = el('div', 'z1r-room-detail z1r-room-doors-strip');
-  doorsStrip.dataset.empty = 'true';
-  root.append(doorsStrip);
+  const detailRow = (key: string, editable = true) => {
+    const row = el('div', editable ? 'z1r-room-detail-row z1r-room-editable' : 'z1r-room-detail-row');
+    const value = el('div', 'z1r-room-detail-value');
+    row.append(el('span', 'z1r-room-key', key), value);
+    detail.append(row);
+    return { row, value };
+  };
 
-  const idRow = el('div', 'z1r-room-detail-row');
-  idRow.append(el('span', 'z1r-room-key', 'Room'));
-  const roomLabel = el('span', 'z1r-room-hint');
-  idRow.append(roomLabel, el('span', 'z1r-room-spacer'));
-  const idPicker = el('span', 'z1r-room-picker');
+  /*
+   * The room, and the two things you do to a room as a whole.
+   *
+   * Visited and Wipe sit next to the room's id rather than at the far end of
+   * the panel. They are about this room, and pushed to the other edge they
+   * read as controls for the whole sheet, a long way from the id they act on.
+   */
+  const { value: idRow } = detailRow('Room', false);
+  const roomLabel = el('span', 'z1r-room-id');
+  idRow.append(roomLabel);
 
-  const visitedToggle = el('button', 'z1r-room-pick z1r-room-word', 'visited');
+  const visitedToggle = el('button', 'z1r-room-pick z1r-room-word', 'Visited');
   visitedToggle.type = 'button';
   visitedToggle.title = 'Mark this room walked, or take the mark back off';
   visitedToggle.addEventListener('click', () => {
@@ -540,7 +525,7 @@ export function buildRooms(
     commit(selected, { type: 'toggleRoomVisited', level, room: selected });
   });
 
-  const wipe = el('button', 'z1r-room-pick z1r-room-word', 'wipe');
+  const wipe = el('button', 'z1r-room-pick z1r-room-word', 'Wipe');
   wipe.type = 'button';
   wipe.title = 'Forget everything recorded about this room';
   wipe.addEventListener('click', () => {
@@ -548,7 +533,9 @@ export function buildRooms(
     /*
      * Written as one patch of empty values rather than a dedicated action: a
      * room that carries nothing is pruned from the save by the reducer itself,
-     * so "wipe" and "never recorded" land on the same state.
+     * so "wipe" and "never recorded" land on the same state. `from` is in the
+     * patch because an overruled slot kind is something the room carries too,
+     * and leaving it would keep an otherwise empty room alive in the save.
      */
     commit(selected, {
       type: 'setRoomNote',
@@ -560,26 +547,73 @@ export function buildRooms(
         boss: '',
         stairs: 'none',
         transport: 0,
+        from: 'auto',
         doors: { north: 'unknown', east: 'unknown', south: 'unknown', west: 'unknown' },
       },
     });
   });
+  idRow.append(visitedToggle, wipe);
 
-  idPicker.append(visitedToggle, wipe);
-  idRow.append(idPicker);
-  detail.append(idRow);
+  /*
+   * What is in the room, and whether it has been picked up.
+   *
+   * The item itself comes from the palette, so this row shows it rather than
+   * offering a picker. Collected is the one gesture that grants an item, which
+   * is why it sits right beside the sprite it is about.
+   */
+  const { value: itemRow } = detailRow('Item');
+  const itemCell = el('span', 'z1r-room-itemcell');
+  const itemName = el('span', 'z1r-room-item-name');
+  const collectedToggle = el('button', 'z1r-room-pick z1r-room-word', 'Collected');
+  collectedToggle.type = 'button';
+  collectedToggle.addEventListener('click', () => {
+    if (!selected) return;
+    const note = roomsOf(store.getState())[selected];
+    if (!note?.item) return;
+    commit(selected, {
+      type: 'collectRoom',
+      level,
+      room: selected,
+      collected: !note.collected,
+    });
+  });
+  const dropItem = el('button', 'z1r-room-pick z1r-room-word', 'Clear');
+  dropItem.type = 'button';
+  dropItem.addEventListener('click', () => {
+    if (!selected) return;
+    commit(selected, { type: 'setRoomItem', level, room: selected, item: '' });
+  });
+  itemRow.append(itemCell, itemName, collectedToggle, dropItem);
 
-  const itemRow = el('div', 'z1r-room-detail-row z1r-room-editable');
-  itemRow.append(el('span', 'z1r-room-key', 'Item'));
-  const itemSlot = el('span', 'z1r-room-item');
-  itemRow.append(itemSlot);
-  detail.append(itemRow);
+  /*
+   * How the item was found, which is which location slot it fills.
+   *
+   * Auto names what it resolves to, so the default is never a guess about what
+   * the tracker decided. Hidden for a room with no item, and for the Map, the
+   * Compass and a Triforce piece, which fill no slot at all.
+   */
+  const { row: fromRow, value: fromValue } = detailRow('From');
+  const fromGroup = segmented('Which location slot this item fills');
+  fromValue.append(fromGroup);
+  const fromButtons = ROOM_FROMS.map((from) => {
+    const button = segButton(
+      from === 'auto' ? 'Auto' : FROM_NAME[from],
+      from === 'auto'
+        ? 'Read the slot off the room: a boss means its drop, item stairs mean the stair slot, anything else the floor'
+        : `This item fills the level's ${FROM_NAME[from].toLowerCase()} slot`,
+    );
+    button.dataset.from = from;
+    button.addEventListener('click', () => {
+      if (!selected) return;
+      commit(selected, { type: 'setRoomFrom', level, room: selected, from });
+    });
+    fromGroup.append(button);
+    return { from, button };
+  });
 
-  const bossRow = el('div', 'z1r-room-detail-row z1r-room-editable');
-  bossRow.append(el('span', 'z1r-room-key', 'Boss'));
+  const { value: bossRow } = detailRow('Boss');
   const bossPicker = el('span', 'z1r-room-picker');
   bossRow.append(bossPicker);
-  detail.append(bossRow);
 
   const setBoss = (boss: string) => {
     if (!selected) return;
@@ -612,14 +646,19 @@ export function buildRooms(
     return { boss, button };
   });
 
-  const stairsRow = el('div', 'z1r-room-detail-row z1r-room-editable');
-  stairsRow.append(el('span', 'z1r-room-key', 'Stairs'));
-  const stairsSelect = document.createElement('select');
-  stairsSelect.className = 'z1r-room-stairs-kind';
-  stairsSelect.title = 'What the staircase in this room is';
-  for (const stair of ROOM_STAIRS) {
-    stairsSelect.append(new Option(stair.tag ? `${stair.name} (${stair.tag})` : stair.name, stair.id));
-  }
+  /*
+   * The staircase, and for a transport which pair it is half of.
+   *
+   * Segmented buttons rather than two dropdowns: three kinds and four pair
+   * numbers are few enough to show at once, and a dropdown hid which one was
+   * current behind a click. The pair only appears for a transport, since a
+   * number means nothing on any other staircase.
+   */
+  const { value: stairsRow } = detailRow('Stairs');
+  const stairsGroup = segmented('What the staircase in this room is');
+  const pairGroup = segmented('Which transport pair this staircase is half of');
+  pairGroup.classList.add('z1r-room-pair');
+  stairsRow.append(stairsGroup, pairGroup);
 
   /** The lowest pair with room for another half, or 1 when all four are full. */
   const nextPair = (rooms: Record<string, RoomNote>): number => {
@@ -633,9 +672,8 @@ export function buildRooms(
     return 1;
   };
 
-  stairsSelect.addEventListener('change', () => {
+  const setStairs = (kind: RoomStairKind) => {
     if (!selected) return;
-    const kind = stairsSelect.value as RoomStairKind;
     if (kind !== 'transport') {
       // `none` leaves the visited mark alone — clearing a staircase is not a
       // statement about having been in the room.
@@ -653,52 +691,90 @@ export function buildRooms(
       room: selected,
       patch: { stairs: 'transport', transport, visited: true },
     });
-  });
+  };
 
-  const transportSelect = document.createElement('select');
-  transportSelect.className = 'z1r-room-transport-pair';
-  transportSelect.title = 'Which transport pair this staircase is half of';
-  transportSelect.append(new Option('pair —', '0'));
-  for (let number = 1; number <= ROOM_TRANSPORT_COUNT; number++) {
-    transportSelect.append(new Option(`pair ${number}`, String(number)));
-  }
-  transportSelect.addEventListener('change', () => {
-    if (!selected) return;
-    const number = Number(transportSelect.value);
-    commit(
-      selected,
-      number === 0
-        ? { type: 'clearRoomTransport', level, room: selected }
-        : { type: 'placeRoomTransport', level, room: selected, number },
+  const stairButtons = ROOM_STAIRS.map((stair) => {
+    const button = segButton(
+      STAIR_WORD[stair.id],
+      stair.tag ? `${stair.name} (${stair.tag})` : stair.name,
     );
+    button.dataset.stairs = stair.id;
+    button.addEventListener('click', () => setStairs(stair.id));
+    stairsGroup.append(button);
+    return { kind: stair.id, button };
   });
 
-  stairsRow.append(stairsSelect, transportSelect);
-  detail.append(stairsRow);
-
-  const doorsRow = el('div', 'z1r-room-detail-row z1r-room-editable');
-  doorsRow.append(el('span', 'z1r-room-key', 'Doors'));
-  const doors = el('span', 'z1r-room-doors');
-  doorsRow.append(doors);
-  doorsStrip.append(doorsRow);
-
-  const doorSelects = ROOM_SIDES.map((side) => {
-    const label = document.createElement('label');
-    label.append(el('span', 'z1r-room-door-side', SIDE_NAME[side]));
-    const select = document.createElement('select');
-    select.dataset.side = SIDE_CLASS[side];
-    // The four states a click cannot reach are the reason this row exists, so
-    // all six are offered rather than only the rare three.
-    for (const door of DOOR_STATES) select.append(new Option(doorLabel(door.id), door.id));
-    select.addEventListener('change', () => {
+  const pairButtons: { number: number; button: HTMLButtonElement }[] = [];
+  for (let number = 1; number <= ROOM_TRANSPORT_COUNT; number++) {
+    const button = segButton(String(number), '');
+    button.dataset.pair = String(number);
+    button.addEventListener('click', () => {
       if (!selected) return;
-      const state = select.value as DoorState;
-      commit(selected, { type: 'setRoomDoor', level, room: selected, side, state });
+      const current = roomsOf(store.getState())[selected]?.transport ?? 0;
+      // The pressed number again unpairs, which is what the old "pair —" entry
+      // did; the staircase itself stays recorded.
+      commit(
+        selected,
+        current === number
+          ? { type: 'clearRoomTransport', level, room: selected }
+          : { type: 'placeRoomTransport', level, room: selected, number },
+      );
     });
-    label.append(select);
-    doors.append(label);
-    return { side, select };
-  });
+    pairGroup.append(button);
+    pairButtons.push({ number, button });
+  }
+
+  /*
+   * The doors, as a compass around the room.
+   *
+   * North above, south below, west and east to either side, the room's id in
+   * the middle — the shape of the room itself, so which side a button sets is
+   * read off where it sits. Each arm holds all six states, so any of them is
+   * one click: no cycling, no dropdown, and every option visible at once.
+   *
+   * Each button's swatch is the line treatment the sheet draws for that state,
+   * which makes the compass the sheet's legend as well as its editor.
+   */
+  const { row: doorsLine, value: doorsRow } = detailRow('Doors');
+  doorsLine.classList.add('z1r-room-doors-row');
+  const compass = el('div', 'z1r-room-compass');
+  compass.setAttribute('role', 'group');
+  compass.setAttribute('aria-label', 'Doors');
+  doorsRow.append(compass);
+
+  const doorButtons: { side: RoomSide; door: DoorState; button: HTMLButtonElement }[] = [];
+  for (const side of ROOM_SIDES) {
+    const arm = el('div', 'z1r-compass-arm');
+    arm.dataset.side = SIDE_CLASS[side];
+    // Which way the arm runs decides which way its swatches are drawn.
+    arm.dataset.axis = side === 'east' || side === 'west' ? 'v' : 'h';
+    arm.setAttribute('role', 'group');
+    arm.setAttribute('aria-label', `${SIDE_NAME[side]} door`);
+    for (const door of DOOR_STATES) {
+      const button = el('button', 'z1r-door-pick');
+      button.type = 'button';
+      button.dataset.side = SIDE_CLASS[side];
+      button.dataset.door = door.id;
+      button.title = `${SIDE_NAME[side]}: ${doorLabel(door.id)}`;
+      button.setAttribute('aria-label', button.title);
+      // Unknown draws nothing on the sheet, so its button carries a mark of
+      // its own rather than an empty box that would look broken.
+      button.append(
+        door.id === 'unknown'
+          ? el('span', 'z1r-door-unknown', '?')
+          : el('span', 'z1r-door-swatch'),
+      );
+      button.addEventListener('click', () => {
+        if (!selected) return;
+        commit(selected, { type: 'setRoomDoor', level, room: selected, side, state: door.id });
+      });
+      arm.append(button);
+      doorButtons.push({ side, door: door.id, button });
+    }
+    compass.append(arm);
+  }
+  const hub = el('div', 'z1r-compass-hub');
+  compass.append(hub);
 
   /* ------------------------------------------------------------- the passes */
 
@@ -721,7 +797,7 @@ export function buildRooms(
 
   own.push((state) => runPatches(cellPatches, state));
 
-  let renderedItemRow: string | null = null;
+  let renderedItemCell: string | null = null;
 
   own.push((state) => {
     const brush = placement.get();
@@ -729,48 +805,53 @@ export function buildRooms(
     paper.dataset.arming = String(!!brush.item);
 
     const note = selected ? roomsOf(state)[selected] : undefined;
-    // Both strips, because the door row lives in one of its own now and the
-    // "no room selected" dim is a fact about every editable row, not about
-    // which box each one happens to sit in.
+    const off = !interactive || !selected;
     detail.dataset.empty = String(!selected);
-    doorsStrip.dataset.empty = String(!selected);
-    roomLabel.textContent = selected || 'click a room on the grid';
+    roomLabel.textContent = selected || 'click a room';
 
-    visitedToggle.disabled = !interactive || !selected;
-    visitedToggle.textContent = note?.visited ? 'visited' : 'not visited';
-    visitedToggle.setAttribute('aria-pressed', String(!!note?.visited));
+    visitedToggle.disabled = off;
+    setToggle(visitedToggle, 'Visited', !!note?.visited);
     wipe.disabled = !interactive || !note;
 
     const item = note?.item ?? '';
-    renderedItemRow = memoise(renderedItemRow, `${item}|${brush.placing}`, () => {
-      itemSlot.replaceChildren();
-      const def = item ? ROOM_ITEMS_BY_ID.get(item) : undefined;
-      if (def) {
-        const name = el('span', 'z1r-room-item-name', def.name);
-        const drop = el('button', 'z1r-room-pick z1r-room-word', 'clear');
-        drop.type = 'button';
-        drop.title = `Forget that ${def.name} is here`;
-        drop.disabled = !interactive;
-        drop.addEventListener('click', () => {
-          if (!selected) return;
-          commit(selected, { type: 'setRoomItem', level, room: selected, item: '' });
-        });
-        itemSlot.append(createSprite(resolver, def.sprite, { size: 18, label: '' }), name, drop);
-        return;
-      }
-      // Shown, not chosen: the item comes from the Items panel, so with nothing
-      // here the row says where to get one rather than offering a picker.
-      const hint = el(
-        'span',
-        'z1r-room-hint',
-        brush.placing
-          ? 'arm an item in the Items panel, then click this room'
-          : 'turn on Place in the Items panel to put one here',
-      );
-      itemSlot.append(hint);
+    const def = item ? ROOM_ITEMS_BY_ID.get(item) : undefined;
+    renderedItemCell = memoise(renderedItemCell, item, () => {
+      itemCell.replaceChildren();
+      if (def) itemCell.append(createSprite(resolver, def.sprite, { size: 18, label: '' }));
     });
+    itemCell.dataset.known = String(!!def);
+    itemCell.title = def ? def.name : 'Nothing placed — arm an item in the palette and click this room';
+    // The name is the text channel for which item this is; the sprite alone
+    // would ask you to recognise the art.
+    itemName.textContent = def ? def.name : 'none';
+    itemName.dataset.known = String(!!def);
+    collectedToggle.disabled = off || !def;
+    setToggle(collectedToggle, 'Collected', !!def && !!note?.collected);
+    collectedToggle.title = def
+      ? note?.collected
+        ? `Mark ${def.name} not picked up. The inventory keeps what collecting gave it.`
+        : `Mark ${def.name} picked up, which marks it held`
+      : 'Nothing here to collect';
+    dropItem.hidden = !def;
+    dropItem.disabled = off || !def;
+    dropItem.title = def ? `Forget that ${def.name} is here` : '';
 
-    noneBoss.disabled = !interactive || !selected;
+    // Only a pool entry fills a slot, so only a pool entry is asked how it
+    // was found.
+    const slotted = !!note && POOL_BY_ID.has(item);
+    fromRow.hidden = !slotted;
+    const auto = note ? resolveRoomFrom({ ...note, from: 'auto' }) : 'floor';
+    const from: RoomFrom = note?.from ?? 'auto';
+    for (const { from: value, button } of fromButtons) {
+      button.disabled = off || !slotted;
+      button.setAttribute('aria-pressed', String(slotted && from === value));
+      if (value === 'auto') {
+        const text = `Auto · ${FROM_NAME[auto]}`;
+        if (button.textContent !== text) button.textContent = text;
+      }
+    }
+
+    noneBoss.disabled = off;
     noneBoss.setAttribute('aria-pressed', String(!!note && note.boss === ''));
     for (const { boss, button } of bossButtons) {
       /*
@@ -785,27 +866,37 @@ export function buildRooms(
        */
       const allowed = bossAllowedOnLevel(boss.id, level);
       button.hidden = !allowed;
-      button.disabled = !interactive || !selected || !allowed;
+      button.disabled = off || !allowed;
       button.dataset.allowed = String(allowed);
       button.setAttribute('aria-pressed', String(note?.boss === boss.id));
     }
 
-    stairsSelect.disabled = !interactive || !selected;
-    if (document.activeElement !== stairsSelect) stairsSelect.value = note?.stairs ?? 'none';
-    transportSelect.disabled = !interactive || !selected;
-    if (document.activeElement !== transportSelect) {
-      transportSelect.value = String(note?.transport ?? 0);
+    const stairs = note?.stairs ?? 'none';
+    for (const { kind, button } of stairButtons) {
+      button.disabled = off;
+      button.setAttribute('aria-pressed', String(!!selected && stairs === kind));
     }
     /*
      * Hidden, not disabled. A pair number means nothing on a staircase that is
      * not a transport, and a disabled control still asks to be read and
      * wondered about; a missing one does not.
      */
-    transportSelect.hidden = note?.stairs !== 'transport';
+    pairGroup.hidden = stairs !== 'transport';
+    const transport = note?.transport ?? 0;
+    for (const { number, button } of pairButtons) {
+      button.disabled = off;
+      button.setAttribute('aria-pressed', String(transport === number));
+      button.title =
+        transport === number
+          ? `Transport pair ${number} — click again to unpair`
+          : `Transport pair ${number}`;
+    }
 
-    for (const { side, select } of doorSelects) {
-      select.disabled = !interactive || !selected;
-      if (document.activeElement !== select) select.value = note?.doors[side] ?? 'unknown';
+    hub.textContent = selected;
+    for (const { side, door, button } of doorButtons) {
+      button.disabled = off;
+      const current = note?.doors[side] ?? 'unknown';
+      button.setAttribute('aria-pressed', String(!!selected && current === door));
     }
   });
 

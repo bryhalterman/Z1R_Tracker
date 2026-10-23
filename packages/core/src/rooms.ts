@@ -12,9 +12,9 @@
  * and what each of its four doorways turned out to be. The map behind it never
  * changes shape, so nothing here describes terrain.
  *
- * Recording an item here says *where the item is*. It never grants it — the
- * inventory and the location list stay the only things that say what is in
- * hand.
+ * Recording an item here says *where the item is*. It never grants it on its
+ * own: an item becomes held only when the room is marked collected, which is a
+ * separate gesture from placing it.
  */
 
 import { DUNGEONS_BY_LEVEL } from './dungeons.js';
@@ -242,6 +242,46 @@ export const ROOM_ITEMS_BY_ID: ReadonlyMap<string, RoomItemDef> = new Map(
 );
 
 /**
+ * How a room's item was found, which decides the location slot it fills.
+ *
+ * The slot cannot be read off the item. Randomizer flags shuffle any item into
+ * the boss drop, so a Bow can be the "heart container" of a level and a Heart
+ * Container can sit on the floor. What the room looked like is what says which
+ * slot it was, so that is what the room records.
+ *
+ * `auto` is the default and reads the room itself — see `resolveRoomFrom`. The
+ * other three are the player overruling it, for the room the rule gets wrong.
+ */
+export type RoomFrom = 'auto' | 'floor' | 'stair' | 'heart';
+
+/** The slot kind a room's item resolves to once `auto` has been decided. */
+export type RoomSlotKind = Exclude<RoomFrom, 'auto'>;
+
+export const ROOM_FROMS: readonly RoomFrom[] = ['auto', 'floor', 'stair', 'heart'];
+
+const ROOM_FROM_SET: ReadonlySet<string> = new Set<string>(ROOM_FROMS);
+
+/** True for one of the four values; the reducer and `migrate` both gate on it. */
+export function isRoomFrom(value: unknown): value is RoomFrom {
+  return typeof value === 'string' && ROOM_FROM_SET.has(value);
+}
+
+/**
+ * Which slot kind a room's item fills.
+ *
+ * Under `auto`, a boss means the item is its drop, which is the level's heart
+ * container slot. Otherwise item stairs mean the stair slot, and anything else
+ * is a floor item. A room with both a boss and item stairs reads as the boss
+ * drop; when that is the wrong reading, an explicit `from` overrules it.
+ */
+export function resolveRoomFrom(room: Pick<RoomNote, 'from' | 'boss' | 'stairs'>): RoomSlotKind {
+  if (room.from !== 'auto') return room.from;
+  if (room.boss !== '') return 'heart';
+  if (room.stairs === 'item') return 'stair';
+  return 'floor';
+}
+
+/**
  * What is known about one room of one level.
  *
  * Flat rather than a union, for the same reason `ScreenNote` is: every field is
@@ -273,6 +313,15 @@ export interface RoomNote {
    */
   transportSeq: number;
   doors: RoomDoors;
+  /**
+   * Whether the item here has been picked up, as opposed to merely seen.
+   *
+   * Always about the current `item`: changing or clearing the item drops it
+   * back to false, because a pickup of one item says nothing about another.
+   */
+  collected: boolean;
+  /** How the item was found, and so which location slot it fills. */
+  from: RoomFrom;
 }
 
 /**
@@ -293,6 +342,8 @@ export function emptyRoom(): RoomNote {
     transport: 0,
     transportSeq: 0,
     doors: { north: 'unknown', east: 'unknown', south: 'unknown', west: 'unknown' },
+    collected: false,
+    from: 'auto',
   };
 }
 
@@ -304,6 +355,8 @@ export function roomIsBare(room: RoomNote): boolean {
     room.boss === '' &&
     room.stairs === 'none' &&
     room.transport === 0 &&
+    !room.collected &&
+    room.from === 'auto' &&
     ROOM_SIDES.every((side) => room.doors[side] === 'unknown')
   );
 }

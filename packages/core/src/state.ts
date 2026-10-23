@@ -15,6 +15,7 @@ import {
   bossAllowedOnLevel,
   DOOR_STATES_BY_ID,
   emptyRoom,
+  isRoomFrom,
   isRoomId,
   isRoomLevel,
   isRoomSide,
@@ -24,13 +25,14 @@ import {
   ROOM_TRANSPORT_COUNT,
   ROOM_TRANSPORT_PAIR_SIZE,
   type DoorState,
+  type RoomFrom,
   type RoomNote,
   type RoomNotePatch,
   type RoomSide,
   type RoomStairKind,
 } from './rooms.js';
 
-export const STATE_VERSION = 11;
+export const STATE_VERSION = 12;
 
 /** Upper bound on manual extra floor slots. Shared with `migrate` on purpose. */
 export const MAX_EXTRA_FLOOR_SLOTS = 8;
@@ -108,6 +110,11 @@ export interface ScreenNote {
   spot: string;
   /** Shuffle-pool entry id sitting on this screen. */
   item: string;
+  /**
+   * Whether `item` has been picked up. Same rule as a room's flag: it is about
+   * the current item only, so changing or clearing the item drops it.
+   */
+  collected: boolean;
 }
 
 export interface TrackerState {
@@ -142,6 +149,10 @@ export interface TrackerState {
   seed: SeedSettings;
   /**
    * Location id -> what's there. Sparse: absent means untouched.
+   *
+   * No longer what the item locations show. Those are derived from rooms and
+   * screens by `deriveItemLocations`, which reads this only for a slot the
+   * maps leave empty — the slots an older save recorded here directly.
    *
    * Keyed by id rather than by position so changing the Dungeon Quest reshapes
    * the location list without discarding what was already recorded — switch
@@ -187,12 +198,28 @@ export type Action =
   | { type: 'placeStairway'; screen: string; number: number }
   /** Wipe every overworld mark, leaving items and Triforce alone. */
   | { type: 'clearMap' }
+  /**
+   * Mark a screen's item picked up. Same grant and same refusal as
+   * `collectRoom`: there has to be an item on the screen to collect.
+   */
+  | { type: 'collectScreen'; screen: string; collected: boolean }
   /** Been in this room, or not. */
   | { type: 'toggleRoomVisited'; level: number; room: string }
   /** What one of a room's four doorways turned out to be. */
   | { type: 'setRoomDoor'; level: number; room: string; side: RoomSide; state: DoorState }
-  /** Record which item sits in a room. Does not touch inventory. */
+  /**
+   * Record which item sits in a room. Does not touch inventory, and a changed
+   * or cleared item drops the room's collected flag.
+   */
   | { type: 'setRoomItem'; level: number; room: string; item: string }
+  /**
+   * Mark a room's item picked up. Collecting grants it the way
+   * `collectLocation` does; unchecking never revokes. Refused on a room with
+   * no item, since there is nothing to have collected.
+   */
+  | { type: 'collectRoom'; level: number; room: string; collected: boolean }
+  /** How a room's item was found, which picks the location slot it fills. */
+  | { type: 'setRoomFrom'; level: number; room: string; from: RoomFrom }
   /** Which boss is in a room. '' clears it. Ganon and Zelda only on Level 9. */
   | { type: 'setRoomBoss'; level: number; room: string; boss: string }
   /** Anything but `transport` also drops the pair number. */
@@ -206,7 +233,10 @@ export type Action =
   | { type: 'placeRoomTransport'; level: number; room: string; number: number }
   /** Unpair a room, leaving the staircase itself recorded. */
   | { type: 'clearRoomTransport'; level: number; room: string }
-  /** Write several room facts at once. Every field is validated as above. */
+  /**
+   * Write several room facts at once. Every field is validated as above, and
+   * `collected: true` in a patch grants the item exactly as `collectRoom` does.
+   */
   | { type: 'setRoomNote'; level: number; room: string; patch: RoomNotePatch }
   /** Wipe one level's room map, leaving the other levels alone. */
   | { type: 'clearRooms'; level: number }
@@ -234,7 +264,16 @@ function emptyDungeon(): DungeonState {
 }
 
 function emptyNote(): ScreenNote {
-  return { dungeon: 0, stairway: 0, shop: [], shopPrices: {}, blocks: [], spot: '', item: '' };
+  return {
+    dungeon: 0,
+    stairway: 0,
+    shop: [],
+    shopPrices: {},
+    blocks: [],
+    spot: '',
+    item: '',
+    collected: false,
+  };
 }
 
 /** True once a note carries nothing worth keeping. */
@@ -248,7 +287,8 @@ function noteIsBare(note: ScreenNote): boolean {
     Object.keys(note.shopPrices).length === 0 &&
     note.blocks.length === 0 &&
     note.spot === '' &&
-    note.item === ''
+    note.item === '' &&
+    !note.collected
   );
 }
 
@@ -399,6 +439,50 @@ function clampItem(id: string, value: number): number {
   return Math.min(Math.max(value, 0), maxValue(def));
 }
 
+/**
+ * The inventory after picking up one shuffle-pool entry.
+ *
+ * The single place a pickup turns into inventory, shared by every collect
+ * gesture — a location slot, a room, a screen — so the three cannot drift.
+ * Raises and never lowers: collecting the White Sword while the Magical
+ * Sword is held changes nothing.
+ *
+ * A pool entry with no `itemId` — a Heart Container — and an id that is not a
+ * pool entry at all, such as a Map, return the inventory untouched; hearts
+ * aren't tracked there and the dungeon-only pickups have no inventory item.
+ * Returns the same object when nothing rises, so callers can tell.
+ */
+function grantPoolEntry(items: Record<string, number>, poolId: string): Record<string, number> {
+  const entry = POOL_BY_ID.get(poolId);
+  if (!entry) return items;
+  const def = ITEMS_BY_ID.get(entry.itemId);
+  if (!def) return items;
+  const held = items[entry.itemId] ?? 0;
+  const raised = Math.max(held, Math.min(entry.value, maxValue(def)));
+  if (raised === held) return items;
+  return { ...items, [entry.itemId]: raised };
+}
+
+/**
+ * The collected flag after an edit that may also have changed the item.
+ *
+ * A flag is about one item, so a changed or cleared item drops it unless the
+ * same edit says otherwise, and an empty slot is never collected. `picked` is
+ * true only when this edit is the one that collected it — granting on every
+ * later edit would re-raise an inventory slot the player had since lowered by
+ * hand, from a click that had nothing to do with it.
+ */
+function settleCollected(
+  before: { item: string; collected: boolean },
+  item: string,
+  requested: boolean | undefined,
+): { collected: boolean; picked: boolean } {
+  const sameItem = before.item === item;
+  const collected =
+    item !== '' && (requested !== undefined ? requested : sameItem && before.collected);
+  return { collected, picked: collected && !(sameItem && before.collected) };
+}
+
 export function reduce(state: TrackerState, action: Action, now = Date.now()): TrackerState {
   /** Applies a change and advances the sync counter. Every local edit goes through here. */
   const bump = (patch: Partial<TrackerState>): TrackerState => ({
@@ -443,7 +527,8 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       return bump(writeMark(state, action.screen, action.mark));
 
     case 'setScreenNote': {
-      const next = { ...emptyNote(), ...state.screenNotes[action.screen], ...action.patch };
+      const current = { ...emptyNote(), ...state.screenNotes[action.screen] };
+      const next = { ...current, ...action.patch };
       if (typeof next.dungeon === 'number') {
         // 0 means "found but not yet identified", which is a real state.
         next.dungeon = Number.isInteger(next.dungeon) ? Math.min(Math.max(next.dungeon, 0), 9) : 0;
@@ -455,7 +540,15 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
           ? Math.min(Math.max(next.stairway, 0), OVERWORLD_STAIRWAY_COUNT)
           : 0;
       }
-      return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
+      // Coerced rather than refused, like the two numbers above: anything but
+      // a literal `true` is not collected.
+      const requested =
+        action.patch.collected === undefined ? undefined : action.patch.collected === true;
+      const settled = settleCollected(current, next.item, requested);
+      next.collected = settled.collected;
+      const screenNotes = pruneNote(state.screenNotes, action.screen, next);
+      if (!settled.picked) return bump({ screenNotes });
+      return bump({ screenNotes, items: grantPoolEntry(state.items, next.item) });
     }
 
     case 'placeDungeon': {
@@ -543,6 +636,21 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       }
       return bump({ marks: {}, screenNotes: {} });
 
+    case 'collectScreen': {
+      const current = state.screenNotes[action.screen];
+      // Checked rather than trusted from the type: this arrives over a
+      // BroadcastChannel too, where nothing has been through the compiler.
+      if (typeof action.collected !== 'boolean') return state;
+      // Nothing on the screen means nothing to have picked up. Storing the
+      // flag anyway would outlive the item it was about the moment one is set.
+      if (!current || current.item === '') return state;
+      if (current.collected === action.collected) return state;
+      const next: ScreenNote = { ...current, collected: action.collected };
+      const screenNotes = pruneNote(state.screenNotes, action.screen, next);
+      if (!action.collected) return bump({ screenNotes });
+      return bump({ screenNotes, items: grantPoolEntry(state.items, current.item) });
+    }
+
     case 'toggleShopStock': {
       const current = state.screenNotes[action.screen] ?? emptyNote();
       const held = current.shop.includes(action.stock);
@@ -612,10 +720,40 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       /*
        * Where the item is, not that you have it. Granting it here would make a
        * map note silently fill in the inventory, and un-noting it could not
-       * take the grant back — collecting is `collectLocation`'s business and
-       * stays there.
+       * take the grant back — collecting is `collectRoom`'s business and stays
+       * there. The collected flag goes with the old item: it was about that
+       * item, and a pickup of one says nothing about the next.
        */
-      const next: RoomNote = { ...target.current, item: action.item };
+      const next: RoomNote = { ...target.current, item: action.item, collected: false };
+      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
+      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
+    }
+
+    case 'collectRoom': {
+      const target = roomTarget(state, action.level, action.room);
+      if (!target) return state;
+      if (typeof action.collected !== 'boolean') return state;
+      // An empty room has nothing to have picked up, and a flag stored on one
+      // would be about whichever item was placed there next.
+      if (target.current.item === '') return state;
+      if (target.current.collected === action.collected) return state;
+      const next: RoomNote = { ...target.current, collected: action.collected };
+      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
+      const rooms = writeRooms(state.rooms, target.level, levelRooms);
+      // Un-collecting never revokes, the same promise `collectLocation` makes:
+      // the inventory may have been raised by other means since.
+      if (!action.collected) return bump({ rooms });
+      return bump({ rooms, items: grantPoolEntry(state.items, target.current.item) });
+    }
+
+    case 'setRoomFrom': {
+      const target = roomTarget(state, action.level, action.room);
+      if (!target) return state;
+      // Refused, not defaulted: an unknown value is a caller bug, and reading
+      // it as `auto` would move the item to a slot nobody chose.
+      if (!isRoomFrom(action.from)) return state;
+      if (target.current.from === action.from) return state;
+      const next: RoomNote = { ...target.current, from: action.from };
       const levelRooms = { ...state.rooms[target.level], [action.room]: next };
       return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
     }
@@ -710,6 +848,12 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         if (!Number.isInteger(patch.transport)) return state;
         if (patch.transport < 0 || patch.transport > ROOM_TRANSPORT_COUNT) return state;
       }
+      if (patch.from !== undefined && !isRoomFrom(patch.from)) return state;
+      if (patch.collected !== undefined && typeof patch.collected !== 'boolean') return state;
+      // Same refusal as `collectRoom`: collecting an empty room is not a fact.
+      const item = patch.item ?? target.current.item;
+      if (patch.collected === true && item === '') return state;
+      const settled = settleCollected(target.current, item, patch.collected);
 
       const merged: RoomNote = {
         ...target.current,
@@ -718,6 +862,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         // Bookkeeping for the eviction order, not a fact about the room, so it
         // is never taken from a caller — `pairTransport` is what stamps it.
         transportSeq: target.current.transportSeq,
+        collected: settled.collected,
       };
       // Same two rules the single-field actions enforce, so a patch cannot
       // reach a state a sequence of clicks could not.
@@ -731,7 +876,9 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         merged.transport !== 0 && merged.transport !== target.current.transport
           ? pairTransport(existing, action.room, merged, merged.transport)
           : { ...existing, [action.room]: merged };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
+      const rooms = writeRooms(state.rooms, target.level, levelRooms);
+      if (!settled.picked) return bump({ rooms });
+      return bump({ rooms, items: grantPoolEntry(state.items, merged.item) });
     }
 
     case 'clearRooms': {
@@ -779,17 +926,10 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         [action.id]: { ...current, collected: action.collected },
       };
 
-      const entry = POOL_BY_ID.get(current.item);
-      if (!action.collected || !entry) return bump({ locations });
-
-      // A pool entry with no `itemId` — a Heart Container — records where it
-      // was without touching inventory, since hearts aren't tracked there.
-      const def = ITEMS_BY_ID.get(entry.itemId);
-      if (!def) return bump({ locations });
-
-      const held = state.items[entry.itemId] ?? 0;
-      const raised = Math.max(held, Math.min(entry.value, maxValue(def)));
-      return bump({ locations, items: { ...state.items, [entry.itemId]: raised } });
+      if (!action.collected) return bump({ locations });
+      // A Heart Container records where it was without touching inventory —
+      // see `grantPoolEntry`, which every collect gesture shares.
+      return bump({ locations, items: grantPoolEntry(state.items, current.item) });
     }
 
     case 'addFloorSlot': {

@@ -23,6 +23,7 @@ import {
   bossAllowedOnLevel,
   DOOR_STATES_BY_ID,
   emptyRoom,
+  isRoomFrom,
   isRoomId,
   isRoomLevel,
   roomIsBare,
@@ -184,6 +185,10 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
       typeof note.spot === 'string' && OVERWORLD_LOCATIONS.some((l) => l.id === note.spot)
         ? note.spot
         : '';
+    // New in v12, so absent from every earlier save, which reads as not
+    // collected. Strictly true, and never without an item: a flag with nothing
+    // to be about would attach itself to whatever item is placed next.
+    const collected = note.collected === true && item !== '';
 
     if (
       dungeon === 0 &&
@@ -195,7 +200,7 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
     ) {
       continue;
     }
-    out[screen] = { dungeon, stairway, shop, shopPrices, blocks, spot, item };
+    out[screen] = { dungeon, stairway, shop, shopPrices, blocks, spot, item, collected };
   }
   return out;
 }
@@ -265,7 +270,7 @@ function conformPairs(rooms: Record<string, RoomNote>): Record<string, RoomNote>
 }
 
 /**
- * Per-level room maps, new in v11.
+ * Per-level room maps, new in v11; `collected` and `from` joined in v12.
  *
  * Absent in every earlier save, which is simply no rooms recorded. Everything
  * below is checked against the tables rather than merged, for the same reason
@@ -315,8 +320,23 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
       const seq = Number(note.transportSeq);
       const transportSeq = transport !== 0 && Number.isInteger(seq) && seq > 0 ? seq : 0;
       const doors = conformDoors(note.doors);
+      // Both new in v12. An earlier room loads as uncollected and `auto`, which
+      // is what a room recorded before either existed meant. Collected follows
+      // the reducer's rule that an empty room cannot be.
+      const collected = note.collected === true && item !== '';
+      const from = isRoomFrom(note.from) ? note.from : 'auto';
 
-      const conformed: RoomNote = { visited, item, boss, stairs, transport, transportSeq, doors };
+      const conformed: RoomNote = {
+        visited,
+        item,
+        boss,
+        stairs,
+        transport,
+        transportSeq,
+        doors,
+        collected,
+        from,
+      };
       // Absence is the empty state, so a room that conformed down to nothing
       // must not be written back out as sixty-four unknown doors.
       if (roomIsBare(conformed)) continue;

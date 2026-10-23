@@ -8,6 +8,7 @@ export * from './seed.js';
 export * from './rooms.js';
 export * from './state.js';
 export * from './logic.js';
+export * from './placements.js';
 export * from './persistence.js';
 export * from './sprites/loader.js';
 export * from './sprites/vectors.js';
