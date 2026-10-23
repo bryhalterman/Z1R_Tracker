@@ -311,3 +311,29 @@ export const SHUFFLE_POOL: readonly PoolEntry[] = [
 export const POOL_BY_ID: ReadonlyMap<string, PoolEntry> = new Map(
   SHUFFLE_POOL.map((entry) => [entry.id, entry]),
 );
+
+/**
+ * Items found on the overworld that are not in the shuffle pool.
+ *
+ * https://z1r.wiki/wiki/Items says each of these is "Not included in the item
+ * shuffle", and each still turns up on an overworld screen: the Blue Candle in
+ * Blue Candle Shops (and, under Extra Candles, the Wood Sword and Take Any
+ * caves), the potions from Potion Sellers and Take Any caves, the Wooden Sword
+ * in its own cave, the Letter in its own cave. Kept apart from the pool
+ * because the hints and the dungeon rooms only ever name pool items; the
+ * overworld takes both.
+ */
+export const OVERWORLD_EXTRAS: readonly PoolEntry[] = [
+  { id: 'woodSword', name: 'Wooden Sword', itemId: 'sword', value: 1, sprite: 'item.sword.wood' },
+  { id: 'blueCandle', name: 'Blue Candle', itemId: 'candle', value: 1, sprite: 'item.candle.blue' },
+  { id: 'bluePotion', name: 'Blue Potion', itemId: 'potion', value: 1, sprite: 'item.potion.blue' },
+  { id: 'redPotion', name: 'Red Potion', itemId: 'potion', value: 2, sprite: 'item.potion.red' },
+  { id: 'letter', name: 'Letter', itemId: 'letter', value: 1, sprite: 'item.letter' },
+];
+
+/** Everything an overworld screen can hold: the pool, then the extras. */
+export const SCREEN_ITEMS: readonly PoolEntry[] = [...SHUFFLE_POOL, ...OVERWORLD_EXTRAS];
+
+export const SCREEN_ITEMS_BY_ID: ReadonlyMap<string, PoolEntry> = new Map(
+  SCREEN_ITEMS.map((entry) => [entry.id, entry]),
+);

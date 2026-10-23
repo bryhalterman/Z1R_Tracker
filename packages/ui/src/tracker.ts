@@ -22,6 +22,7 @@ import {
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
+  OVERWORLD_EXTRAS,
   OVERWORLD_STAIRWAY_COUNT,
   warpRoutes,
   POOL_BY_ID,
@@ -31,7 +32,8 @@ import {
   regionForScreen,
   SHOP_STOCK,
   SHOP_STOCK_BY_ID,
-  SHUFFLE_POOL,
+  SCREEN_ITEMS,
+  SCREEN_ITEMS_BY_ID,
   ITEMS,
   ITEMS_BY_ID,
   labelFor,
@@ -732,7 +734,8 @@ function buildItemCell(
  * item again, or Escape, puts it down.
  *
  * One cell per thing that can be placed — the shuffle pool, then the Map, the
- * Compass and a Triforce piece — rather than one per inventory item. A chain
+ * Compass and a Triforce piece, then the five overworld-only items — rather
+ * than one per inventory item. A chain
  * such as the sword is one inventory cell but two pool entries, and the White
  * and the Magical Sword can be found in either order; a single cell could only
  * ever offer the next one up.
@@ -743,9 +746,12 @@ function buildItemCell(
  * click raises its inventory stage by one and Shift+right click lowers it, the
  * stage logic the left button used to carry.
  *
- * The five inventory items no location ever holds — Bombs, the Potion, the
- * Magical Shield, the Bait and the Letter — follow in a captioned group of
- * their own. They cannot be armed, so they are set apart by position and by
+ * The overworld-only items — the Wooden Sword, the Blue Candle, both potions
+ * and the Letter — are never in the shuffle, so they land on a screen and not
+ * in a room, and their caption says so.
+ *
+ * The three inventory items nothing ever places — Bombs, the Magical Shield
+ * and the Bait — follow in a captioned group of their own. They cannot be armed, so they are set apart by position and by
  * their caption rather than by a tint, and they answer the right button only.
  */
 function buildPalette(
@@ -767,9 +773,11 @@ function buildPalette(
 
   /** Where an item can be dropped in this mount, in words, or '' for nowhere. */
   const targetFor = (id: string): string => {
-    const rooms = placeInto.rooms;
-    // The overworld holds pool entries only; a Map has no business on it.
-    const map = placeInto.map && POOL_BY_ID.has(id);
+    // Rooms hold the pool and the dungeon pickups; the overworld holds the pool
+    // and the overworld-only items. A Map has no business on a screen, and a
+    // Letter none in a dungeon.
+    const rooms = placeInto.rooms && ROOM_ITEMS_BY_ID.has(id);
+    const map = placeInto.map && SCREEN_ITEMS_BY_ID.has(id);
     if (rooms && map) return 'a room or an overworld screen';
     if (rooms) return 'a room';
     if (map) return 'an overworld screen';
@@ -812,7 +820,7 @@ function buildPalette(
   };
 
   const placeableCell = (def: RoomItemDef): HTMLElement => {
-    const pool = POOL_BY_ID.get(def.id);
+    const pool = SCREEN_ITEMS_BY_ID.get(def.id);
     /*
      * The inventory item this entry raises, if any. The Heart Container's is
      * empty — the running total is on the game's own HUD — and the Map, the
@@ -926,8 +934,14 @@ function buildPalette(
   for (const def of ROOM_ITEMS.filter((entry) => !POOL_BY_ID.has(entry.id))) {
     dungeonCells.append(placeableCell(def));
   }
+  const overworldCells = group('overworld', 'Overworld only');
+  for (const def of OVERWORLD_EXTRAS) {
+    overworldCells.append(placeableCell(def));
+  }
   const inventoryCells = group('inventory', 'Held only');
-  for (const def of ITEMS.filter((item) => roomItemsForInventory(item).length === 0)) {
+  const placedSomewhere = (item: ItemDef) =>
+    roomItemsForInventory(item).length > 0 || OVERWORLD_EXTRAS.some((e) => e.itemId === item.id);
+  for (const def of ITEMS.filter((item) => !placedSomewhere(item))) {
     inventoryCells.append(inventoryOnlyCell(def));
   }
 
@@ -1179,9 +1193,9 @@ function buildMap(
    * again lifts it, the way a room does, and the item stays armed either way.
    */
   const placeOnScreen = (screen: string, item: string) => {
-    // The overworld holds shuffle-pool entries; the Map, the Compass and a
-    // Triforce piece never leave their level, so they do not land here.
-    if (!POOL_BY_ID.has(item)) return;
+    // The overworld holds shuffle-pool entries and the overworld-only items;
+    // the Map, the Compass and a Triforce piece never leave their level.
+    if (!SCREEN_ITEMS_BY_ID.has(item)) return;
     const state = store.getState();
     const isItem = state.marks[screen] === 'item';
     if (isItem && state.screenNotes[screen]?.item === item) {
@@ -1237,8 +1251,8 @@ function buildMap(
    */
   const syncArming = () => {
     const paletteItem = placement.get().item;
-    body.dataset.armed = String(!!armed || POOL_BY_ID.has(paletteItem));
-    body.dataset.refusing = String(!!paletteItem && !POOL_BY_ID.has(paletteItem));
+    body.dataset.armed = String(!!armed || SCREEN_ITEMS_BY_ID.has(paletteItem));
+    body.dataset.refusing = String(!!paletteItem && !SCREEN_ITEMS_BY_ID.has(paletteItem));
   };
 
   const setArmed = (kind: MarkKind | '') => {
@@ -1363,7 +1377,7 @@ function buildMap(
     if (document.activeElement !== spotSelect) spotSelect.value = note?.spot ?? '';
     if (document.activeElement !== itemSelect) itemSelect.value = note?.item ?? '';
 
-    const placed = note?.item ? POOL_BY_ID.get(note.item) : undefined;
+    const placed = note?.item ? SCREEN_ITEMS_BY_ID.get(note.item) : undefined;
     const got = !!placed && !!note?.collected;
     collectedToggle.disabled = !interactive || !selected || !placed;
     collectedToggle.dataset.on = String(got);
@@ -1577,7 +1591,7 @@ function buildMap(
   unknownItem.value = '';
   unknownItem.textContent = 'Item unknown';
   itemSelect.append(unknownItem);
-  for (const entry of SHUFFLE_POOL) {
+  for (const entry of SCREEN_ITEMS) {
     const option = document.createElement('option');
     option.value = entry.id;
     option.textContent = entry.name;
@@ -1749,7 +1763,7 @@ function buildMap(
          * you did not already know from the screen being marked at all — and
          * the map is read at a glance, where a sword reads faster than "SW".
          */
-        const held = mark === 'item' && note?.item ? POOL_BY_ID.get(note.item) : undefined;
+        const held = mark === 'item' && note?.item ? SCREEN_ITEMS_BY_ID.get(note.item) : undefined;
         /*
          * Whatever the location slots say is in this level. Learned from a hint
          * before the dungeon is found, or from walking in without one — either
@@ -1927,7 +1941,7 @@ function buildMap(
             const spot = note?.spot
               ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label
               : '';
-            const itemName = note?.item ? POOL_BY_ID.get(note.item)?.name : '';
+            const itemName = note?.item ? SCREEN_ITEMS_BY_ID.get(note.item)?.name : '';
             detail.textContent = shortCode(spot) || shortCode(itemName) || '?';
           } else {
             // `visited` says everything in its icon — a screen with nothing on
@@ -1974,7 +1988,7 @@ function buildMap(
             ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label
             : '';
           parts.push(spot || 'Item');
-          parts.push(note?.item ? (POOL_BY_ID.get(note.item)?.name ?? '') : 'contents unknown');
+          parts.push(note?.item ? (SCREEN_ITEMS_BY_ID.get(note.item)?.name ?? '') : 'contents unknown');
           if (note?.item) parts.push(note.collected ? 'collected' : 'not collected');
           if (isCoast) {
             parts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');

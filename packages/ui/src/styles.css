@@ -2839,6 +2839,11 @@
   cursor: copy;
 }
 
+/* An overworld-only item armed: a click here places nothing, as on the map. */
+.z1r-room-paper[data-refusing="true"] .z1r-room {
+  cursor: not-allowed;
+}
+
 .z1r-room-grid {
   display: grid;
   /*

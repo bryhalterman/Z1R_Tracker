@@ -19,7 +19,7 @@
 import { DUNGEONS } from './dungeons.js';
 import { allScreenIds } from './overworld.js';
 import { allRoomIds, resolveRoomFrom, type RoomSlotKind } from './rooms.js';
-import { deriveLocations, OVERWORLD_LOCATIONS, POOL_BY_ID, type LocationDef } from './seed.js';
+import { deriveLocations, OVERWORLD_LOCATIONS, POOL_BY_ID, SCREEN_ITEMS_BY_ID, type LocationDef } from './seed.js';
 import type { TrackerState } from './state.js';
 
 /** Where a filled slot's item was read from — and so where to collect it. */
@@ -146,7 +146,7 @@ export function deriveItemLocations(state: TrackerState): ItemLocations {
     const note = state.screenNotes[screen];
     // A screen with an item but no named spot is a note on the map, not one
     // of the three slots, so it fills nothing.
-    if (!note || !OVERWORLD_SPOT_IDS.has(note.spot) || !POOL_BY_ID.has(note.item)) continue;
+    if (!note || !OVERWORLD_SPOT_IDS.has(note.spot) || !SCREEN_ITEMS_BY_ID.has(note.item)) continue;
     const placement: ItemPlacement = {
       item: note.item,
       collected: note.collected,

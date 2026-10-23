@@ -468,3 +468,54 @@ test('corrupt collected and from values are coerced away on load', () => {
   assert.equal(state.screenNotes['B2']?.collected, false);
   assert.equal(state.screenNotes['B3']?.collected, true);
 });
+
+/* ---------------------------------------------------- overworld-only items */
+
+test('collecting an overworld-only item raises the inventory it stands for', () => {
+  let state = createInitialState();
+  for (const [screen, item] of [
+    ['A1', 'letter'],
+    ['A2', 'redPotion'],
+    ['A3', 'blueCandle'],
+    ['A4', 'woodSword'],
+  ] as const) {
+    state = reduce(state, { type: 'setScreenNote', screen, patch: { item } });
+    state = reduce(state, { type: 'collectScreen', screen, collected: true });
+  }
+  assert.equal(state.items['letter'], 1);
+  assert.equal(state.items['potion'], 2);
+  assert.equal(state.items['candle'], 1);
+  assert.equal(state.items['sword'], 1);
+});
+
+test('a Blue Potion collected after a Red one leaves the Red one held', () => {
+  let state = reduce(createInitialState(), { type: 'setItem', id: 'potion', value: 2 });
+  state = reduce(state, { type: 'setScreenNote', screen: 'B1', patch: { item: 'bluePotion' } });
+  state = reduce(state, { type: 'collectScreen', screen: 'B1', collected: true });
+  assert.equal(state.items['potion'], 2);
+});
+
+test('overworld-only items survive a save and load', () => {
+  const save = preV12Save();
+  save.screenNotes = {
+    B1: { spot: '', item: 'letter', collected: true },
+    B2: { spot: 'ow.armos', item: 'woodSword', collected: false },
+    B3: { spot: '', item: 'notAnItem', collected: false },
+  };
+  const state = migrate(save);
+  assert.ok(state);
+  assert.equal(state.screenNotes['B1']?.item, 'letter');
+  assert.equal(state.screenNotes['B1']?.collected, true);
+  assert.equal(state.screenNotes['B2']?.item, 'woodSword');
+  assert.equal(state.screenNotes['B3']?.item ?? '', '');
+});
+
+test('an overworld-only item on a named spot fills that slot', () => {
+  let state = createInitialState();
+  state = reduce(state, {
+    type: 'setScreenNote',
+    screen: 'C2',
+    patch: { spot: 'ow.armos', item: 'blueCandle' },
+  });
+  assert.equal(slot(state, 'ow.armos')?.item, 'blueCandle');
+});

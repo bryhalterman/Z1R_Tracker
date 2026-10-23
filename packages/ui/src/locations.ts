@@ -14,7 +14,7 @@
  */
 
 import {
-  POOL_BY_ID,
+  SCREEN_ITEMS_BY_ID,
   TRIFORCE_REQUIRED_FOR_L9,
   canEnterLevel9,
   deriveItemLocations,
@@ -295,7 +295,7 @@ function buildSlot(
   let renderedFace: string | null = null;
   patches.push(() => {
     const { placement } = read();
-    const entry = placement?.item ? POOL_BY_ID.get(placement.item) : undefined;
+    const entry = placement?.item ? SCREEN_ITEMS_BY_ID.get(placement.item) : undefined;
     const collected = !!placement?.collected;
     slot.dataset.known = String(!!entry);
     slot.dataset.collected = String(collected);
@@ -491,7 +491,7 @@ function buildCompactLocations(
       const collected = !!placement?.collected;
       slot.dataset.collected = String(collected);
       slot.dataset.known = String(!!item);
-      const entry = item ? POOL_BY_ID.get(item) : undefined;
+      const entry = item ? SCREEN_ITEMS_BY_ID.get(item) : undefined;
       const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
       slot.title =
         `${where} — ${entry?.name ?? 'unknown'}` +

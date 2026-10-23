@@ -330,6 +330,10 @@ export function buildRooms(
   /** A room click: drop the armed item, or mark the room walked. */
   const touchRoom = (room: string) => {
     const armed = placement.get().item;
+    // An overworld-only item armed — the Letter, say — never lands in a room,
+    // and the click does nothing rather than mark the room walked: the sheet's
+    // cursor already says nothing will happen.
+    if (armed && !ROOM_ITEMS_BY_ID.has(armed)) return;
     if (!armed) {
       /*
        * Selecting and marking visited are one click, because mapping a dungeon
@@ -802,7 +806,8 @@ export function buildRooms(
   own.push((state) => {
     const brush = placement.get();
     // While something is armed, the whole sheet says what a click will do.
-    paper.dataset.arming = String(!!brush.item);
+    paper.dataset.arming = String(ROOM_ITEMS_BY_ID.has(brush.item));
+    paper.dataset.refusing = String(!!brush.item && !ROOM_ITEMS_BY_ID.has(brush.item));
 
     const note = selected ? roomsOf(state)[selected] : undefined;
     const off = !interactive || !selected;

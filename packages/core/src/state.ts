@@ -10,7 +10,7 @@
 import { ITEMS, ITEMS_BY_ID, maxValue } from './items.js';
 import { DUNGEONS, holdsTriforcePiece } from './dungeons.js';
 import { cycleMark, OVERWORLD_STAIRWAY_COUNT, type MarkKind } from './overworld.js';
-import { POOL_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
+import { SCREEN_ITEMS_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 import {
   bossAllowedOnLevel,
   DOOR_STATES_BY_ID,
@@ -453,7 +453,7 @@ function clampItem(id: string, value: number): number {
  * Returns the same object when nothing rises, so callers can tell.
  */
 function grantPoolEntry(items: Record<string, number>, poolId: string): Record<string, number> {
-  const entry = POOL_BY_ID.get(poolId);
+  const entry = SCREEN_ITEMS_BY_ID.get(poolId);
   if (!entry) return items;
   const def = ITEMS_BY_ID.get(entry.itemId);
   if (!def) return items;
