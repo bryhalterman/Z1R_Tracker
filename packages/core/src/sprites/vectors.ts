@@ -139,4 +139,23 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
   'mark.empty': V(
     `<path d="M4 8 L12 8" stroke="#5a5a5a" stroke-width="2" stroke-linecap="round" fill="none"/>`,
   ),
+  // A door with a crack through it. Nothing else in the mark row is a plain
+  // upright rectangle: the dungeon is an arch, the shop an awning.
+  'mark.doorRepair': V(
+    `<rect x="3.5" y="2" width="9" height="12.5" rx="1" fill="#b8763a" stroke="#4a2c12" stroke-width="1"/>` +
+      `<path d="M7.2 2.6 L9.1 5.4 L6.6 8 L9.4 10.6 L7.6 14" stroke="#2a1708" stroke-width="1.3" fill="none" stroke-linejoin="round"/>` +
+      `<circle cx="11" cy="8.6" r=".8" fill="#2a1708"/>`,
+  ),
+  // A coin purse with a rupee on it. A bare rupee is the gambling mark, so the
+  // silhouette here is the bag.
+  'mark.rupeeSecret': V(
+    `<path d="M5.4 3.2 L10.6 3.2 L9.4 5.2 C12.6 6.4 14 9 14 11 C14 13.4 11.4 14.6 8 14.6 C4.6 14.6 2 13.4 2 11 C2 9 3.4 6.4 6.6 5.2 Z" fill="#4fa3e0" stroke="#173e5c" stroke-width="1" stroke-linejoin="round"/>` +
+      `<path d="M8 7.4 L9.6 8.7 L9.6 10.9 L8 12.2 L6.4 10.9 L6.4 8.7 Z" fill="#dff1ff"/>`,
+  ),
+  // The start pennant: one per map, drawn in a corner over whatever else the
+  // screen or room carries.
+  'mark.start': V(
+    `<path d="M3 1.5 L3 15" stroke="#f2f2f2" stroke-width="1.6" stroke-linecap="round"/>` +
+      `<path d="M3.6 2 L13.5 4.8 L3.6 7.8 Z" fill="#da9f00" stroke="#5a4100" stroke-width=".8" stroke-linejoin="round"/>`,
+  ),
 };

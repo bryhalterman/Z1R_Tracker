@@ -21,7 +21,7 @@ function marked(screen: string, mark: MarkKind): TrackerState {
 test('the mark kinds are the ones the toolbar offers', () => {
   assert.deepEqual(
     [...MARKS_BY_KIND.keys()].sort(),
-    ['dungeon', 'gamble', 'hintroom', 'item', 'none', 'shop', 'stairway', 'visited'],
+    ['doorRepair', 'dungeon', 'gamble', 'hintroom', 'item', 'none', 'rupeeSecret', 'shop', 'stairway', 'visited'],
   );
 });
 
@@ -464,4 +464,73 @@ test('migrate rejects a malformed stairway number', () => {
     'clamped to the top of the range',
   );
   assert.equal('A4' in state.screenNotes, false, 'negative clamps to 0 and drops the note');
+});
+
+/* ------------------------------------------------- rupee secrets and start */
+
+test('a rupee secret records its size, and an unknown size reads as unknown', () => {
+  let state = marked('C5', 'rupeeSecret');
+  state = reduce(state, { type: 'setScreenNote', screen: 'C5', patch: { secret: 'large' } });
+  assert.equal(state.screenNotes['C5']?.secret, 'large');
+  state = reduce(state, {
+    type: 'setScreenNote',
+    screen: 'C5',
+    patch: { secret: 'huge' as never },
+  });
+  assert.equal(state.screenNotes['C5'], undefined, 'nothing left worth keeping');
+});
+
+test('there is one start screen: placing it again moves it, the same screen lifts it', () => {
+  let state = reduce(createInitialState(), { type: 'setStartScreen', screen: 'H8' });
+  assert.equal(state.startScreen, 'H8');
+  state = reduce(state, { type: 'setStartScreen', screen: 'G3' });
+  assert.equal(state.startScreen, 'G3');
+  state = reduce(state, { type: 'setStartScreen', screen: 'G3' });
+  assert.equal(state.startScreen, '');
+  assert.equal(reduce(state, { type: 'setStartScreen', screen: 'Z99' }), state);
+});
+
+test('the start screen sits beside a mark rather than replacing it, and Clear takes both', () => {
+  let state = marked('H8', 'item');
+  state = reduce(state, { type: 'setStartScreen', screen: 'H8' });
+  assert.equal(state.marks['H8'], 'item');
+  state = reduce(state, { type: 'clearMap' });
+  assert.equal(state.startScreen, '');
+  assert.deepEqual(state.marks, {});
+});
+
+test('each level has one entrance room, cleared with that level only', () => {
+  let state = reduce(createInitialState(), { type: 'setLevelStart', level: 3, room: 'H4' });
+  state = reduce(state, { type: 'setLevelStart', level: 3, room: 'H5' });
+  state = reduce(state, { type: 'setLevelStart', level: 4, room: 'H2' });
+  assert.deepEqual(state.levelStarts, { '3': 'H5', '4': 'H2' });
+  assert.equal(reduce(state, { type: 'setLevelStart', level: 10, room: 'H1' }), state);
+  state = reduce(state, { type: 'clearRooms', level: 3 });
+  assert.deepEqual(state.levelStarts, { '4': 'H2' });
+});
+
+test('the new fields survive a save, and bad values are dropped on load', () => {
+  let state = marked('C5', 'rupeeSecret');
+  state = reduce(state, { type: 'setScreenNote', screen: 'C5', patch: { secret: 'small' } });
+  state = reduce(state, { type: 'setStartScreen', screen: 'H8' });
+  state = reduce(state, { type: 'setLevelStart', level: 2, room: 'H3' });
+  const loaded = migrate(JSON.parse(JSON.stringify(state)));
+  assert.ok(loaded);
+  assert.equal(loaded.screenNotes['C5']?.secret, 'small');
+  assert.equal(loaded.startScreen, 'H8');
+  assert.deepEqual(loaded.levelStarts, { '2': 'H3' });
+
+  const bad = migrate({
+    ...JSON.parse(JSON.stringify(state)),
+    startScreen: 'Q1',
+    levelStarts: { '2': 'Z9', '12': 'A1', '5': 'B2' },
+  });
+  assert.ok(bad);
+  assert.equal(bad.startScreen, '');
+  assert.deepEqual(bad.levelStarts, { '5': 'B2' });
+});
+
+test('every mark and the start pennant have drawn art', () => {
+  for (const mark of MARKS) if (mark.sprite) assert.ok(VECTORS[mark.sprite], mark.sprite);
+  assert.ok(VECTORS['mark.start']);
 });

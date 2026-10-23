@@ -19,6 +19,13 @@ export function screenId(col: number, row: number): string {
   return `${label}${col}`;
 }
 
+const SCREEN_ID_SET: ReadonlySet<string> = new Set(allScreenIds());
+
+/** True for the 128 screens that exist. */
+export function isScreenId(id: string): boolean {
+  return SCREEN_ID_SET.has(id);
+}
+
 export function allScreenIds(): string[] {
   const ids: string[] = [];
   for (let row = 1; row <= OVERWORLD_ROWS; row++) {
@@ -41,6 +48,8 @@ export type MarkKind =
   | 'item'
   | 'gamble'
   | 'hintroom'
+  | 'doorRepair'
+  | 'rupeeSecret'
   | 'stairway'
   | 'visited';
 
@@ -73,6 +82,11 @@ export const MARKS: readonly MarkDef[] = [
   // forgotten what it said — and neither is an item, a shop or a dead end.
   { kind: 'gamble', name: 'Gambling', sprite: 'mark.gamble', color: '#4bb572' },
   { kind: 'hintroom', name: 'Hint room', sprite: 'mark.hintroom', color: '#9b7fd4' },
+  // The two money caves, from bryhalterman/Z1R_Tracker#1. A door repair is
+  // worth marking so you do not walk into it twice; a rupee secret so you can
+  // come back for it when broke, and it carries its size — see `SECRET_SIZES`.
+  { kind: 'doorRepair', name: 'Door repair', sprite: 'mark.doorRepair', color: '#b8763a' },
+  { kind: 'rupeeSecret', name: 'Rupee secret', sprite: 'mark.rupeeSecret', color: '#4fa3e0' },
   // The four warp staircases. Each carries its number, 1-4, because the four
   // look alike and the number is the only thing that says which one you just
   // came out of — so this mark has a detail row like a dungeon's.
@@ -92,6 +106,33 @@ export const MARKS: readonly MarkDef[] = [
  * it when wrong.
  */
 export const OVERWORLD_STAIRWAY_COUNT = 4;
+
+/**
+ * How big a rupee secret is.
+ *
+ * The three tiers https://z1r.wiki/wiki/Secrets uses. The amounts themselves
+ * are randomized per seed under Shuffle Shop Items, so the tier is what can be
+ * recorded; `range` is the wiki's randomized range, for the tooltip.
+ */
+export type SecretSize = '' | 'small' | 'medium' | 'large';
+
+export interface SecretSizeDef {
+  readonly id: Exclude<SecretSize, ''>;
+  readonly name: string;
+  /** One letter, drawn on the map cell under the mark. */
+  readonly code: string;
+  readonly range: string;
+}
+
+export const SECRET_SIZES: readonly SecretSizeDef[] = [
+  { id: 'small', name: 'Small', code: 'S', range: '1–20' },
+  { id: 'medium', name: 'Medium', code: 'M', range: '25–40' },
+  { id: 'large', name: 'Large', code: 'L', range: '50–150' },
+];
+
+export const SECRET_SIZES_BY_ID: ReadonlyMap<string, SecretSizeDef> = new Map(
+  SECRET_SIZES.map((entry) => [entry.id, entry]),
+);
 
 /**
  * Shop stock worth remembering.
@@ -119,6 +160,8 @@ export const SHOP_STOCK: readonly ShopStockDef[] = [
   { id: 'bait', name: 'Meat', sprite: 'item.bait', code: 'MT' },
   { id: 'heart', name: 'Heart Container', sprite: 'item.heart', code: 'HC' },
   { id: 'magicalShield', name: 'Magical Shield', sprite: 'item.shield.magical', code: 'MS' },
+  // Sold in the Blue Candle Shop by default (https://z1r.wiki/wiki/Shops).
+  { id: 'blueCandle', name: 'Blue Candle', sprite: 'item.candle.blue', code: 'BC' },
 ];
 
 export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = new Map(

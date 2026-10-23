@@ -9,7 +9,14 @@
 
 import { ITEMS, ITEMS_BY_ID, maxValue } from './items.js';
 import { DUNGEONS, holdsTriforcePiece } from './dungeons.js';
-import { cycleMark, OVERWORLD_STAIRWAY_COUNT, type MarkKind } from './overworld.js';
+import {
+  cycleMark,
+  isScreenId,
+  OVERWORLD_STAIRWAY_COUNT,
+  SECRET_SIZES_BY_ID,
+  type MarkKind,
+  type SecretSize,
+} from './overworld.js';
 import { SCREEN_ITEMS_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 import {
   bossAllowedOnLevel,
@@ -32,7 +39,7 @@ import {
   type RoomStairKind,
 } from './rooms.js';
 
-export const STATE_VERSION = 12;
+export const STATE_VERSION = 13;
 
 /** Upper bound on manual extra floor slots. Shared with `migrate` on purpose. */
 export const MAX_EXTRA_FLOOR_SLOTS = 8;
@@ -115,6 +122,8 @@ export interface ScreenNote {
    * the current item only, so changing or clearing the item drops it.
    */
   collected: boolean;
+  /** How big a rupee secret is. '' while unknown, and on every other mark. */
+  secret: SecretSize;
 }
 
 export interface TrackerState {
@@ -167,6 +176,14 @@ export interface TrackerState {
   hintSeq: number;
   /** Region highlighted on the overworld grid, or '' for none. */
   focusRegion: string;
+  /**
+   * The screen the run started on, or '' for not recorded. One per map, so it
+   * is a field rather than a mark: the start screen usually has a cave of its
+   * own, and the pennant sits on top of whatever that screen is marked as.
+   */
+  startScreen: string;
+  /** level number (as string) -> the room that level is entered by. */
+  levelStarts: Record<string, string>;
   startedAt: number;
   /** Wall clock, for display only. Never compare two of these to order edits. */
   updatedAt: number;
@@ -198,6 +215,13 @@ export type Action =
   | { type: 'placeStairway'; screen: string; number: number }
   /** Wipe every overworld mark, leaving items and Triforce alone. */
   | { type: 'clearMap' }
+  /**
+   * Put the start pennant on a screen. There is one, so this moves it; the
+   * screen that already has it takes it off, and so does ''.
+   */
+  | { type: 'setStartScreen'; screen: string }
+  /** The same for one level's entrance room. */
+  | { type: 'setLevelStart'; level: number; room: string }
   /**
    * Mark a screen's item picked up. Same grant and same refusal as
    * `collectRoom`: there has to be an item on the screen to collect.
@@ -273,6 +297,7 @@ function emptyNote(): ScreenNote {
     spot: '',
     item: '',
     collected: false,
+    secret: '',
   };
 }
 
@@ -288,7 +313,8 @@ function noteIsBare(note: ScreenNote): boolean {
     note.blocks.length === 0 &&
     note.spot === '' &&
     note.item === '' &&
-    !note.collected
+    !note.collected &&
+    note.secret === ''
   );
 }
 
@@ -428,6 +454,8 @@ export function createInitialState(now = Date.now()): TrackerState {
     hints: [],
     hintSeq: 0,
     focusRegion: '',
+    startScreen: '',
+    levelStarts: {},
     startedAt: now,
     updatedAt: now,
   };
@@ -540,6 +568,8 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
           ? Math.min(Math.max(next.stairway, 0), OVERWORLD_STAIRWAY_COUNT)
           : 0;
       }
+      // An unknown size reads as unknown rather than refusing the whole patch.
+      if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
       // Coerced rather than refused, like the two numbers above: anything but
       // a literal `true` is not collected.
       const requested =
@@ -631,10 +661,35 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
        * Triforce have their own controls — wiping those here would make this a
        * second Reset wearing a friendlier label.
        */
-      if (Object.keys(state.marks).length === 0 && Object.keys(state.screenNotes).length === 0) {
+      if (
+        Object.keys(state.marks).length === 0 &&
+        Object.keys(state.screenNotes).length === 0 &&
+        state.startScreen === ''
+      ) {
         return state;
       }
-      return bump({ marks: {}, screenNotes: {} });
+      // The start pennant is on the map, so it goes with it.
+      return bump({ marks: {}, screenNotes: {}, startScreen: '' });
+
+    case 'setStartScreen': {
+      if (action.screen !== '' && !isScreenId(action.screen)) return state;
+      const startScreen = action.screen === state.startScreen ? '' : action.screen;
+      if (startScreen === state.startScreen) return state;
+      return bump({ startScreen });
+    }
+
+    case 'setLevelStart': {
+      if (!isRoomLevel(action.level)) return state;
+      if (action.room !== '' && !isRoomId(action.room)) return state;
+      const key = String(action.level);
+      const current = state.levelStarts[key] ?? '';
+      const room = action.room === current ? '' : action.room;
+      if (room === current) return state;
+      const levelStarts = { ...state.levelStarts };
+      if (room) levelStarts[key] = room;
+      else delete levelStarts[key];
+      return bump({ levelStarts });
+    }
 
     case 'collectScreen': {
       const current = state.screenNotes[action.screen];
@@ -883,7 +938,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
 
     case 'clearRooms': {
       const key = String(action.level);
-      if (!(key in state.rooms)) return state;
+      if (!(key in state.rooms) && !(key in state.levelStarts)) return state;
       /*
        * One level, not all nine. The room map is the thing you redraw when you
        * realise you mapped a level wrong, and losing the other eight to that
@@ -891,7 +946,10 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
        */
       const rooms = { ...state.rooms };
       delete rooms[key];
-      return bump({ rooms });
+      // The entrance is drawn on the sheet, so clearing the sheet clears it.
+      const levelStarts = { ...state.levelStarts };
+      delete levelStarts[key];
+      return bump({ rooms, levelStarts });
     }
 
     case 'setSeed': {

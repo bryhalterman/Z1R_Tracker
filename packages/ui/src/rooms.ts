@@ -396,16 +396,31 @@ export function buildRooms(
       got.setAttribute('aria-hidden', 'true');
       got.hidden = true;
       cell.append(got);
+      /*
+       * The level's entrance: the same start pennant the overworld uses for
+       * the start screen, in the room's top-left corner. One per level.
+       */
+      const entrance = el('span', 'z1r-room-start');
+      cell.append(entrance);
       grid.append(cell);
 
       let bossArt: HTMLElement | null = null;
       let renderedBoss: string | null = null;
       let renderedMark: string | null = null;
       let renderedTitle: string | null = null;
+      let renderedEntrance: boolean | null = null;
 
       cellPatches.push((state) => {
         const note = roomsOf(state)[id];
         cell.dataset.visited = String(!!note?.visited);
+
+        const isEntrance = state.levelStarts[String(level)] === id;
+        renderedEntrance = memoise(renderedEntrance, isEntrance, () => {
+          cell.dataset.start = String(isEntrance);
+          if (isEntrance) {
+            entrance.replaceChildren(createSprite(resolver, 'mark.start', { size: 14, label: '' }));
+          } else entrance.replaceChildren();
+        });
         cell.setAttribute('aria-current', String(id === selected));
 
         for (const { side, edge } of edges) {
@@ -463,6 +478,7 @@ export function buildRooms(
         });
 
         const parts = [id];
+        if (isEntrance) parts.push('entrance');
         if (note) {
           parts.push(note.visited ? 'visited' : 'not visited');
           if (item) {
@@ -529,6 +545,14 @@ export function buildRooms(
     commit(selected, { type: 'toggleRoomVisited', level, room: selected });
   });
 
+  const entranceToggle = el('button', 'z1r-room-pick z1r-room-word', 'Entrance');
+  entranceToggle.type = 'button';
+  entranceToggle.title = 'Make this the room the level is entered by. One per level.';
+  entranceToggle.addEventListener('click', () => {
+    if (!selected) return;
+    commit(selected, { type: 'setLevelStart', level, room: selected });
+  });
+
   const wipe = el('button', 'z1r-room-pick z1r-room-word', 'Wipe');
   wipe.type = 'button';
   wipe.title = 'Forget everything recorded about this room';
@@ -556,7 +580,7 @@ export function buildRooms(
       },
     });
   });
-  idRow.append(visitedToggle, wipe);
+  idRow.append(visitedToggle, entranceToggle, wipe);
 
   /*
    * What is in the room, and whether it has been picked up.
@@ -816,6 +840,8 @@ export function buildRooms(
 
     visitedToggle.disabled = off;
     setToggle(visitedToggle, 'Visited', !!note?.visited);
+    entranceToggle.disabled = off;
+    setToggle(entranceToggle, 'Entrance', !!selected && state.levelStarts[String(level)] === selected);
     wipe.disabled = !interactive || !note;
 
     const item = note?.item ?? '';

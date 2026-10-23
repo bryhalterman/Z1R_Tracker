@@ -425,7 +425,7 @@ test('a pre-v12 save conforms rooms and screens to the new fields', () => {
   const state = migrate(preV12Save());
   assert.ok(state);
   assert.equal(state.version, STATE_VERSION);
-  assert.equal(STATE_VERSION, 12);
+  assert.equal(STATE_VERSION, 13);
   const a1 = state.rooms['1']?.A1;
   assert.ok(a1);
   assert.equal(a1.collected, false);

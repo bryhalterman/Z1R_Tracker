@@ -337,8 +337,8 @@ function preRoomsSave(): Record<string, unknown> {
 test('a save written before rooms existed loads with none', () => {
   const state = migrate(preRoomsSave());
   assert.ok(state);
-  assert.equal(STATE_VERSION, 12);
-  assert.equal(state.version, 12);
+  assert.equal(STATE_VERSION, 13);
+  assert.equal(state.version, 13);
   assert.deepEqual(state.rooms, {});
   // And the rest of the save still arrives intact.
   assert.equal(state.dungeons['1']?.triforce, true);

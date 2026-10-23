@@ -40,10 +40,13 @@ import {
 
 import {
   DUNGEON_BLOCKS_BY_ID,
+  isScreenId,
   MARKS_BY_KIND,
+  SECRET_SIZES_BY_ID,
   OVERWORLD_STAIRWAY_COUNT,
   SHOP_STOCK_BY_ID,
   type MarkKind,
+  type SecretSize,
 } from './overworld.js';
 import { OVERWORLD_LOCATIONS, SCREEN_ITEMS_BY_ID, type SeedSettings } from './seed.js';
 
@@ -189,6 +192,11 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
     // collected. Strictly true, and never without an item: a flag with nothing
     // to be about would attach itself to whatever item is placed next.
     const collected = note.collected === true && item !== '';
+    // New in v13; absent reads as unknown.
+    const secret =
+      typeof note.secret === 'string' && SECRET_SIZES_BY_ID.has(note.secret)
+        ? (note.secret as SecretSize)
+        : '';
 
     if (
       dungeon === 0 &&
@@ -196,11 +204,12 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
       shop.length === 0 &&
       blocks.length === 0 &&
       spot === '' &&
-      item === ''
+      item === '' &&
+      secret === ''
     ) {
       continue;
     }
-    out[screen] = { dungeon, stairway, shop, shopPrices, blocks, spot, item, collected };
+    out[screen] = { dungeon, stairway, shop, shopPrices, blocks, spot, item, collected, secret };
   }
   return out;
 }
@@ -349,6 +358,16 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
   return out;
 }
 
+function conformLevelStarts(saved: unknown): Record<string, string> {
+  if (!saved || typeof saved !== 'object') return {};
+  const out: Record<string, string> = {};
+  for (const [level, room] of Object.entries(saved as Record<string, unknown>)) {
+    if (!isRoomLevel(Number(level)) || typeof room !== 'string' || !isRoomId(room)) continue;
+    out[String(Number(level))] = room;
+  }
+  return out;
+}
+
 function conformHints(saved: unknown): HintEntry[] {
   if (!Array.isArray(saved)) return [];
   const blank: HintEntry = { id: '', subject: '', region: '', screen: '', note: '' };
@@ -433,6 +452,13 @@ export function migrate(raw: unknown): TrackerState | null {
     // removed the lot.
     hintSeq: hintSeqFrom(candidate.hintSeq, conformHints(candidate.hints)),
     focusRegion: typeof candidate.focusRegion === 'string' ? candidate.focusRegion : '',
+    // Both new in v13. A screen or room that does not exist would draw nowhere
+    // and outlive every Clear, so it is dropped.
+    startScreen:
+      typeof candidate.startScreen === 'string' && isScreenId(candidate.startScreen)
+        ? candidate.startScreen
+        : '',
+    levelStarts: conformLevelStarts(candidate.levelStarts),
   };
 }
 

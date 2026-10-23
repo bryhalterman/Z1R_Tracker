@@ -640,6 +640,42 @@
   display: none;
 }
 
+/*
+ * The start pennant: top-left, over whatever the screen is marked as.
+ *
+ * Sized from the cell like the warp staircase, so it tracks the map's zoom.
+ * The shape is the channel, not its colour — nothing else on the map is a
+ * flag. The region code shares this corner, so it steps right while the
+ * pennant is there rather than being drawn underneath it.
+ */
+.z1r-screen-start {
+  position: absolute;
+  z-index: 4;
+  inset-block-start: 1px;
+  inset-inline-start: 1px;
+  display: flex;
+  pointer-events: none;
+}
+
+.z1r-screen-start:empty {
+  display: none;
+}
+
+.z1r-screen-start > .z1r-sprite {
+  inline-size: calc(var(--map-cell-height, 34px) * 0.45);
+  block-size: calc(var(--map-cell-height, 34px) * 0.45);
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+}
+
+.z1r-screen[data-start="true"] .z1r-screen-region {
+  inset-inline-start: calc(var(--map-cell-height, 34px) * 0.45 + 2px);
+}
+
+/* Set apart from the marks it follows, since it is not one of them. */
+.z1r-tool-start {
+  margin-inline-start: var(--z1r-space-sm);
+}
+
 /* A focused hint labels its own region even with the codes switched off —
    that is the moment the label is worth the space. */
 .z1r-map[data-regions="false"] .z1r-screen[data-focused="true"] .z1r-screen-region {
@@ -3131,6 +3167,30 @@
  * carries the panel as its own ground, the way the item locations check does,
  * rather than a dark glow that would be a hand-picked colour.
  */
+/* The level's entrance: the overworld's start pennant, in the top-left corner. */
+.z1r-room-start {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  z-index: 3;
+  display: flex;
+  /* A share of the room, so it scales with the sheet the way the room's own
+     art does. */
+  inline-size: 38%;
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+
+.z1r-room-start:empty {
+  display: none;
+}
+
+.z1r-room-start > .z1r-sprite {
+  inline-size: 100%;
+  block-size: 100%;
+  filter: drop-shadow(0 0 1px var(--z1r-bg)) drop-shadow(0 0 1px var(--z1r-bg));
+}
+
 .z1r-room-got {
   position: absolute;
   inset-block-end: 2px;

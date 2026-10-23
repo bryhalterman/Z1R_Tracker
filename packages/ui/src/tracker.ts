@@ -30,6 +30,8 @@ import {
   ROOM_ITEMS_BY_ID,
   REGIONS_BY_ID,
   regionForScreen,
+  SECRET_SIZES,
+  SECRET_SIZES_BY_ID,
   SHOP_STOCK,
   SHOP_STOCK_BY_ID,
   SCREEN_ITEMS,
@@ -44,6 +46,7 @@ import {
   type MarkKind,
   type RoomItemDef,
   type ScreenNote,
+  type SecretSize,
   type SpriteResolver,
   type Store,
   type TrackerState,
@@ -1163,11 +1166,14 @@ function buildMap(
    * level and blockers are right there. That is what makes the two modes one
    * flow rather than a switch: stamp, refine, stamp the next.
    */
-  let armed: MarkKind | '' = '';
+  /** A mark, or the start pennant, which is one per map rather than a mark. */
+  let armed: MarkKind | 'start' | '' = '';
   /** Which level the armed Dungeon marker will place. 0 means none chosen. */
   let armedLevel = 0;
   /** Which of the four the armed Stairway marker will place. 0 means none. */
   let armedStairway = 0;
+  /** The size the armed Rupee secret marker stamps. Optional, unlike the two above. */
+  let armedSecret: SecretSize = '';
 
   const highlightSelection = () => {
     for (const cell of body.querySelectorAll<HTMLElement>('.z1r-screen')) {
@@ -1232,8 +1238,14 @@ function buildMap(
       store.dispatch({ type: 'placeDungeon', screen, level: armedLevel });
     } else if (armed === 'stairway') {
       store.dispatch({ type: 'placeStairway', screen, number: armedStairway });
+    } else if (armed === 'start') {
+      // One per map: this moves the pennant, and leaves the screen's mark alone.
+      store.dispatch({ type: 'setStartScreen', screen });
     } else {
       store.dispatch({ type: 'setMark', screen, mark: armed });
+      if (armed === 'rupeeSecret' && armedSecret) {
+        store.dispatch({ type: 'setScreenNote', screen, patch: { secret: armedSecret } });
+      }
     }
     // Selected, not toggled — clicking an already-selected tile while armed
     // should re-stamp it, not drop the selection out from under the detail rows.
@@ -1255,10 +1267,11 @@ function buildMap(
     body.dataset.refusing = String(!!paletteItem && !SCREEN_ITEMS_BY_ID.has(paletteItem));
   };
 
-  const setArmed = (kind: MarkKind | '') => {
+  const setArmed = (kind: MarkKind | 'start' | '') => {
     armed = kind;
     if (kind !== 'dungeon') armedLevel = 0;
     if (kind !== 'stairway') armedStairway = 0;
+    if (kind !== 'rupeeSecret') armedSecret = '';
     /*
      * The marker brush and the palette are exclusive. Each arms what the next
      * click on this map does, so with both armed one click would mean two
@@ -1305,7 +1318,8 @@ function buildMap(
     const note = selected ? state.screenNotes[selected] : undefined;
 
     toolbar.dataset.active = String(!!selected || !!armed);
-    const armedName = armed ? MARKS_BY_KIND.get(armed)?.name : '';
+    const armedName =
+      armed === 'start' ? 'the start' : armed ? MARKS_BY_KIND.get(armed)?.name : '';
     // Two markers are placed by number and neither can be stamped without one.
     const needsLevel = armed === 'dungeon' && !armedLevel;
     const needsStairway = armed === 'stairway' && !armedStairway;
@@ -1314,7 +1328,9 @@ function buildMap(
         ? `Level ${armedLevel}`
         : armed === 'stairway'
           ? `Warp ${armedStairway}`
-          : armedName;
+          : armed === 'rupeeSecret' && armedSecret
+            ? `${SECRET_SIZES_BY_ID.get(armedSecret)?.name ?? ''} rupee secret`
+            : armedName;
     // Says what the next click does, in the order the toolbar reads: pick the
     // marker, pick the number, then place it.
     target.textContent = needsLevel
@@ -1325,6 +1341,14 @@ function buildMap(
           ? `Placing ${placing}`
           : selected || 'Pick a screen';
     toolbar.dataset.waiting = String(needsLevel || needsStairway);
+
+    // The pennant is not a mark, so "already this" means "is the start".
+    startButton.dataset.active = String(!!selected && state.startScreen === selected);
+    startButton.dataset.armed = String(armed === 'start');
+    startButton.setAttribute(
+      'aria-pressed',
+      String(armed === 'start' || (!!selected && state.startScreen === selected)),
+    );
 
     for (const button of kindButtons) {
       const kind = button.dataset.mark as MarkKind;
@@ -1357,6 +1381,10 @@ function buildMap(
     for (const button of stairwayButtons) {
       const shown = armed === 'stairway' ? armedStairway : (note?.stairway ?? 0);
       button.dataset.active = String(Number(button.dataset.stairway) === shown);
+    }
+    for (const button of secretButtons) {
+      const shown = armed === 'rupeeSecret' ? armedSecret : (note?.secret ?? '');
+      button.dataset.active = String(button.dataset.secret === shown);
     }
     for (const button of stockButtons) {
       button.dataset.active = String(!!note?.shop.includes(button.dataset.stock ?? ''));
@@ -1423,6 +1451,22 @@ function buildMap(
     kindButtons.push(button);
     kindRow.append(button);
   }
+
+  /*
+   * The start pennant, after the marks and set apart from them.
+   *
+   * Not a mark: there is one per map, and the screen it goes on usually has a
+   * cave of its own that still wants marking. So it arms like a marker but
+   * draws in a corner of the tile, over whatever the screen already is.
+   */
+  const startButton = el('button', 'z1r-tool-mark z1r-tool-start');
+  startButton.type = 'button';
+  startButton.dataset.mark = 'start';
+  startButton.append(createSprite(resolver, 'mark.start', { size: 18, label: 'Start' }));
+  startButton.title = 'Place the start screen. One per map. Click again to stop.';
+  startButton.setAttribute('aria-label', startButton.title);
+  startButton.addEventListener('click', () => setArmed(armed === 'start' ? '' : 'start'));
+  kindRow.append(startButton);
 
   /*
    * Which level this is. 1-9 only.
@@ -1506,6 +1550,35 @@ function buildMap(
     });
     stairwayButtons.push(button);
     stairwayRow.append(button);
+  }
+
+  /*
+   * How big a rupee secret is.
+   *
+   * Optional, unlike a level or a warp number: the mark alone already says
+   * "money here", and the size is only known once you have walked in. A
+   * second click on the active size takes it back off.
+   */
+  const secretRow = detailRow('rupeeSecret', 'Size');
+  const secretButtons: HTMLButtonElement[] = [];
+  for (const size of SECRET_SIZES) {
+    const button = el('button', 'z1r-mark-level', size.code);
+    button.type = 'button';
+    button.dataset.secret = size.id;
+    button.title = `${size.name} — ${size.range} rupees when shop items are shuffled`;
+    button.setAttribute('aria-label', button.title);
+    button.addEventListener('click', () => {
+      if (armed === 'rupeeSecret') {
+        armedSecret = armedSecret === size.id ? '' : size.id;
+        syncToolbar(store.getState());
+        return;
+      }
+      if (!selected) return;
+      const current = store.getState().screenNotes[selected]?.secret ?? '';
+      patchSelected({ secret: current === size.id ? '' : size.id });
+    });
+    secretButtons.push(button);
+    secretRow.append(button);
   }
 
   /*
@@ -1734,7 +1807,23 @@ function buildMap(
       const stockIcons = el('span', 'z1r-screen-stock');
       /** How many stocked items did not fit — see `MAX_SHOP_ICONS`. */
       const stockMore = el('span', 'z1r-screen-stock-more');
-      cell.append(terrain, code, slot, numeral, warp, badge, stockIcons, stockMore, detail);
+      /*
+       * The start pennant, in the top-left corner over whatever the screen is
+       * marked as. The region code moves over to make room while it is there.
+       */
+      const pennant = el('span', 'z1r-screen-start');
+      cell.append(terrain, code, slot, numeral, warp, badge, stockIcons, stockMore, detail, pennant);
+
+      let renderedStart: boolean | null = null;
+      patches.push((state) => {
+        renderedStart = memoise(renderedStart, state.startScreen === id, () => {
+          const isStart = state.startScreen === id;
+          cell.dataset.start = String(isStart);
+          if (isStart) {
+            pennant.replaceChildren(createSprite(resolver, 'mark.start', { size: 14, label: 'Start' }));
+          } else pennant.replaceChildren();
+        });
+      });
 
       let renderedMap: string | null = null;
       patches.push(() => {
@@ -1880,6 +1969,7 @@ function buildMap(
           prices.join(','),
           note?.spot ?? '',
           note?.item ?? '',
+          note?.secret ?? '',
           isCoast,
           coastReady,
           level9Ready,
@@ -1943,6 +2033,9 @@ function buildMap(
               : '';
             const itemName = note?.item ? SCREEN_ITEMS_BY_ID.get(note.item)?.name : '';
             detail.textContent = shortCode(spot) || shortCode(itemName) || '?';
+          } else if (mark === 'rupeeSecret') {
+            // The size as one letter, the text channel for it; blank until known.
+            detail.textContent = note?.secret ? (SECRET_SIZES_BY_ID.get(note.secret)?.code ?? '') : '';
           } else {
             // `visited` says everything in its icon — a screen with nothing on
             // it needs no label, and the map is mostly these by the end.
@@ -1995,9 +2088,13 @@ function buildMap(
           }
         } else if (mark === 'stairway') {
           parts.push(note?.stairway ? `Warp ${note.stairway}` : 'Warp (unnumbered)');
+        } else if (mark === 'rupeeSecret') {
+          const size = note?.secret ? SECRET_SIZES_BY_ID.get(note.secret) : undefined;
+          parts.push(size ? `${size.name} rupee secret` : 'Rupee secret (size unknown)');
         } else if (def && mark !== 'none') {
           parts.push(def.name);
         }
+        if (state.startScreen === id) parts.push('start screen');
         cell.title = parts.join(' — ');
       });
 
