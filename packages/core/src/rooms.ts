@@ -251,40 +251,37 @@ export const ROOM_ITEMS_BY_ID: ReadonlyMap<string, RoomItemDef> = new Map(
  * slot it was, so that is what the room records.
  *
  * `auto` is the default and reads the room itself — see `resolveRoomFrom`. The
- * other three are the player overruling it, for the room the rule gets wrong.
+ * other two are the player overruling it, for the room the rule gets wrong.
+ *
+ * Two kinds, not three. A dungeon item is on the floor or down a staircase;
+ * the level's heart spot is one of its floor spots, which a shuffled item can
+ * take as easily as a heart. Which floor spot an item fills is worked out when
+ * the slots are filled — see `deriveItemLocations`. Saves that recorded the
+ * old third value, `heart`, load it as `floor`.
  */
-export type RoomFrom = 'auto' | 'floor' | 'stair' | 'heart';
+export type RoomFrom = 'auto' | 'floor' | 'stair';
 
 /** The slot kind a room's item resolves to once `auto` has been decided. */
 export type RoomSlotKind = Exclude<RoomFrom, 'auto'>;
 
-export const ROOM_FROMS: readonly RoomFrom[] = ['auto', 'floor', 'stair', 'heart'];
+export const ROOM_FROMS: readonly RoomFrom[] = ['auto', 'floor', 'stair'];
 
 const ROOM_FROM_SET: ReadonlySet<string> = new Set<string>(ROOM_FROMS);
 
-/** True for one of the four values; the reducer and `migrate` both gate on it. */
+/** True for one of the three values; the reducer and `migrate` both gate on it. */
 export function isRoomFrom(value: unknown): value is RoomFrom {
   return typeof value === 'string' && ROOM_FROM_SET.has(value);
 }
 
 /**
- * Which slot kind a room's item fills.
+ * Whether a room's item is a floor item or a stair item.
  *
- * Under `auto`, a boss means the item is its drop, which is the level's heart
- * container slot, and so does a Heart Container on its own: the boss may have
- * been killed before the room was marked, or never recorded at all, and the
- * heart slot is where a heart belongs far more often than a floor slot.
- * Otherwise item stairs mean the stair slot, and anything else is a floor
- * item. A room with both a boss and item stairs reads as the boss drop; when
- * any of these is the wrong reading, an explicit `from` overrules it.
+ * Under `auto`, item stairs mean the stair slot and anything else is on the
+ * floor. An explicit `from` overrules it.
  */
-export function resolveRoomFrom(
-  room: Pick<RoomNote, 'from' | 'boss' | 'stairs'> & Partial<Pick<RoomNote, 'item'>>,
-): RoomSlotKind {
+export function resolveRoomFrom(room: Pick<RoomNote, 'from' | 'stairs'>): RoomSlotKind {
   if (room.from !== 'auto') return room.from;
-  if (room.boss !== '' || room.item === 'heart') return 'heart';
-  if (room.stairs === 'item') return 'stair';
-  return 'floor';
+  return room.stairs === 'item' ? 'stair' : 'floor';
 }
 
 /**

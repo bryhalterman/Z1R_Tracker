@@ -18,7 +18,7 @@
 
 import { DUNGEONS } from './dungeons.js';
 import { allScreenIds } from './overworld.js';
-import { allRoomIds, resolveRoomFrom, type RoomSlotKind } from './rooms.js';
+import { allRoomIds, resolveRoomFrom, type RoomNote, type RoomSlotKind } from './rooms.js';
 import { deriveLocations, OVERWORLD_LOCATIONS, POOL_BY_ID, SCREEN_ITEMS_BY_ID, type LocationDef } from './seed.js';
 import type { TrackerState } from './state.js';
 
@@ -98,11 +98,18 @@ function storedPlacement(state: TrackerState, id: string): ItemPlacement | null 
 /**
  * What each item location holds, read off the maps.
  *
- * Rooms are walked level by level in grid order, A1 to H8, and each fills the
- * next free slot of its kind in the order `deriveLocations` lists them. The
- * order is fixed so the same state always puts the same room in the same slot,
- * whatever order the rooms were recorded in. Screens are walked in overworld
- * grid order for the same reason.
+ * Rooms are walked level by level in grid order, A1 to H8, so the same state
+ * always puts the same room in the same slot whatever order the rooms were
+ * recorded in. A stair item fills the next free stair slot.
+ *
+ * A floor item fills one of the level's floor spots, and the heart spot is one
+ * of them: randomizer flags put any item there, and a Heart Container can lie
+ * in a plain floor spot. It goes in two passes. First each takes the spot it
+ * most likely is — a Heart Container the heart spot, anything else a floor
+ * slot — and then whatever found its first choice taken takes any floor spot
+ * left. Only when every floor spot in the level is full does it overflow.
+ *
+ * Screens are walked in overworld grid order for the same reason as rooms.
  */
 export function deriveItemLocations(state: TrackerState): ItemLocations {
   const locations = deriveLocations(state.seed, state.extraFloorSlots);
@@ -123,21 +130,46 @@ export function deriveItemLocations(state: TrackerState): ItemLocations {
   for (const { level } of DUNGEONS) {
     const levelRooms = state.rooms[String(level)];
     if (!levelRooms) continue;
+    const take = (kind: LocationDef['kind']) => free.get(slotKey(level, kind))?.shift();
+    const place = (slot: LocationDef, note: RoomNote, room: string) =>
+      byId.set(slot.id, {
+        item: note.item,
+        collected: note.collected,
+        source: { kind: 'room', level, room },
+      });
+    const spill = (note: RoomNote, room: string, kind: RoomSlotKind) => {
+      const spilled = overflow.get(level) ?? [];
+      spilled.push({
+        item: note.item,
+        collected: note.collected,
+        source: { kind: 'room', level, room },
+        kind,
+      });
+      overflow.set(level, spilled);
+    };
+
+    const deferred: { note: RoomNote; room: string }[] = [];
     for (const room of allRoomIds()) {
       const note = levelRooms[room];
       // Pool entries only. This is what leaves the Map, Compass and Triforce
       // out: they have no pool entry because they never move.
       if (!note || !POOL_BY_ID.has(note.item)) continue;
-      const kind = resolveRoomFrom(note);
-      const source = { kind: 'room', level, room } as const;
-      const slot = free.get(slotKey(level, kind))?.shift();
-      if (slot) {
-        byId.set(slot.id, { item: note.item, collected: note.collected, source });
+      if (resolveRoomFrom(note) === 'stair') {
+        const slot = take('stair');
+        if (slot) place(slot, note, room);
+        else spill(note, room, 'stair');
         continue;
       }
-      const spilled = overflow.get(level) ?? [];
-      spilled.push({ item: note.item, collected: note.collected, source, kind });
-      overflow.set(level, spilled);
+      const slot = take(note.item === 'heart' ? 'heart' : 'floor');
+      if (slot) place(slot, note, room);
+      else deferred.push({ note, room });
+    }
+
+    // Second pass: any floor spot still free, plain or heart.
+    for (const { note, room } of deferred) {
+      const slot = take('floor') ?? take('heart');
+      if (slot) place(slot, note, room);
+      else spill(note, room, 'floor');
     }
   }
 

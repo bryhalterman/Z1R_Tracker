@@ -161,7 +161,6 @@ function doorLabel(state: DoorState): string {
 const FROM_NAME: Record<RoomSlotKind, string> = {
   floor: 'Floor',
   stair: 'Stairs',
-  heart: 'Boss drop',
 };
 
 /** The stairs row's three buttons, in words short enough to sit on one line. */
@@ -626,8 +625,10 @@ export function buildRooms(
     const button = segButton(
       from === 'auto' ? 'Auto' : FROM_NAME[from],
       from === 'auto'
-        ? 'Read the slot off the room: a boss means its drop, item stairs mean the stair slot, anything else the floor'
-        : `This item fills the level's ${FROM_NAME[from].toLowerCase()} slot`,
+        ? 'Read it off the room: item stairs mean a stair item, anything else a floor item'
+        : from === 'floor'
+          ? 'A floor item: fills one of the level\'s floor spots, the heart spot included'
+          : 'A stair item: fills one of the level\'s stair slots',
     );
     button.dataset.from = from;
     button.addEventListener('click', () => {

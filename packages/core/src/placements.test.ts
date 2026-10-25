@@ -30,22 +30,22 @@ function slot(state: TrackerState, id: string) {
 
 /* ---------------------------------------------------------------- from rule */
 
-test('auto reads the room: boss is the heart slot, item stairs the stair, else the floor', () => {
+test('auto reads the room: item stairs are a stair item, anything else the floor', () => {
   const base = { ...emptyRoom(), item: 'bow' };
-  assert.equal(resolveRoomFrom({ ...base, boss: 'dodongo' }), 'heart');
   assert.equal(resolveRoomFrom({ ...base, stairs: 'item' }), 'stair');
   assert.equal(resolveRoomFrom(base), 'floor');
   // Transport stairs go somewhere else in the level; they hold nothing.
   assert.equal(resolveRoomFrom({ ...base, stairs: 'transport' }), 'floor');
-  // A boss beats item stairs.
-  assert.equal(resolveRoomFrom({ ...base, boss: 'dodongo', stairs: 'item' }), 'heart');
+  // A boss changes nothing.
+  const withBoss = { ...base, boss: 'dodongo' };
+  assert.equal(resolveRoomFrom(withBoss), 'floor');
 });
 
-test('auto fills the slot of the kind the room resolves to', () => {
+test('floor items: a heart takes the heart spot, anything else a floor slot', () => {
   let state = createInitialState();
   state = placeRoom(state, 1, 'A1', 'bow');
   state = placeRoom(state, 1, 'B1', 'raft', { stairs: 'item' });
-  state = placeRoom(state, 1, 'C1', 'heart', { boss: 'aquamentus' });
+  state = placeRoom(state, 1, 'C1', 'heart');
   assert.equal(slot(state, 'd1.floor.0')?.item, 'bow');
   assert.equal(slot(state, 'd1.stair.0')?.item, 'raft');
   assert.equal(slot(state, 'd1.heart')?.item, 'heart');
@@ -54,20 +54,20 @@ test('auto fills the slot of the kind the room resolves to', () => {
 
 test('an explicit from overrides what the room looks like', () => {
   let state = createInitialState();
-  // A boss room whose item was actually down its staircase.
-  state = placeRoom(state, 1, 'D4', 'ladder', { boss: 'dodongo', stairs: 'item', from: 'stair' });
-  assert.equal(slot(state, 'd1.stair.0')?.item, 'ladder');
-  assert.equal(slot(state, 'd1.heart'), undefined);
+  // A room with item stairs whose item was actually on the floor.
+  state = placeRoom(state, 1, 'D4', 'ladder', { stairs: 'item', from: 'floor' });
+  assert.equal(slot(state, 'd1.floor.0')?.item, 'ladder');
+  assert.equal(slot(state, 'd1.stair.0'), undefined);
 
   // And back to auto puts it where the rule says.
   state = reduce(state, { type: 'setRoomFrom', level: 1, room: 'D4', from: 'auto' });
-  assert.equal(slot(state, 'd1.heart')?.item, 'ladder');
-  assert.equal(slot(state, 'd1.stair.0'), undefined);
+  assert.equal(slot(state, 'd1.stair.0')?.item, 'ladder');
+  assert.equal(slot(state, 'd1.floor.0'), undefined);
 });
 
-test('setRoomFrom refuses anything but the four values', () => {
+test('setRoomFrom refuses anything but the three values', () => {
   const base = placeRoom(createInitialState(), 1, 'A1', 'bow');
-  for (const from of ['boss', '', 'AUTO', 3, null]) {
+  for (const from of ['boss', 'heart', '', 'AUTO', 3, null]) {
     const state = reduce(base, {
       type: 'setRoomFrom',
       level: 1,
@@ -85,15 +85,42 @@ test('setRoomFrom refuses anything but the four values', () => {
   assert.equal(patched, base);
 });
 
-test('a shuffled non-heart item can be the boss drop', () => {
-  // Flags can put any item in the heart container's place; the room says so.
+test('a second floor item takes the heart spot once the floor slots are full', () => {
+  // Flags can put any item in the heart spot. Level 3 has no floor slot at
+  // all, so a floor item there goes straight to it.
   let state = createInitialState();
-  state = placeRoom(state, 5, 'B6', 'whiteSword', { boss: 'gleeok' });
-  assert.equal(slot(state, 'd5.heart')?.item, 'whiteSword');
-  // And the Heart Container that would have been there can sit on a floor,
-  // which takes saying so: on its own a heart reads as the boss drop.
-  state = placeRoom(state, 2, 'A1', 'heart', { from: 'floor' });
+  state = placeRoom(state, 3, 'B6', 'whiteSword');
+  assert.equal(slot(state, 'd3.heart')?.item, 'whiteSword');
+  // Level 2 has one floor slot and the heart spot: two non-hearts fill both.
+  state = placeRoom(state, 2, 'A1', 'bow');
+  state = placeRoom(state, 2, 'A2', 'raft');
+  assert.equal(slot(state, 'd2.floor.0')?.item, 'bow');
+  assert.equal(slot(state, 'd2.heart')?.item, 'raft');
+});
+
+test('a heart takes a plain floor slot when another item already has the heart spot', () => {
+  // The heart is the later room, but the first pass gives each item its first
+  // choice before anything settles for second best, so the Raft — which would
+  // rather have a floor slot — does not take the heart spot from it.
+  let state = createInitialState();
+  state = placeRoom(state, 2, 'A1', 'raft');
+  state = placeRoom(state, 2, 'H8', 'heart');
+  assert.equal(slot(state, 'd2.floor.0')?.item, 'raft');
+  assert.equal(slot(state, 'd2.heart')?.item, 'heart');
+  // Two hearts in a level: one in the heart spot, one on the floor.
+  state = placeRoom(createInitialState(), 2, 'A1', 'heart');
+  state = placeRoom(state, 2, 'A2', 'heart');
+  assert.equal(slot(state, 'd2.heart')?.item, 'heart');
   assert.equal(slot(state, 'd2.floor.0')?.item, 'heart');
+});
+
+test('a save that recorded from as heart loads it as floor', () => {
+  const save = preV12Save();
+  save.rooms = { '3': { B5: { item: 'heart', from: 'heart' } } };
+  const state = migrate(save);
+  assert.ok(state);
+  assert.equal(state.rooms['3']?.B5?.from, 'floor');
+  assert.equal(deriveItemLocations(state).byId.get('d3.heart')?.item, 'heart');
 });
 
 test('Map, Compass and Triforce fill no slot', () => {
@@ -113,30 +140,28 @@ test('Map, Compass and Triforce fill no slot', () => {
 
 test('items beyond a level\'s slots of one kind overflow rather than vanish', () => {
   let state = createInitialState();
-  // Level 2 has one floor slot.
+  // Level 2 has one floor slot and the heart spot: two floor spots in all.
   state = placeRoom(state, 2, 'A1', 'bow');
   state = placeRoom(state, 2, 'A2', 'raft');
   state = placeRoom(state, 2, 'B1', 'book');
   const derived = deriveItemLocations(state);
   assert.equal(derived.byId.get('d2.floor.0')?.item, 'bow');
+  assert.equal(derived.byId.get('d2.heart')?.item, 'raft');
   const overflow = derived.overflow.get(2) ?? [];
   assert.deepEqual(
     overflow.map((p) => [p.item, p.kind, p.source.room]),
-    [
-      ['raft', 'floor', 'A2'],
-      ['book', 'floor', 'B1'],
-    ],
+    [['book', 'floor', 'B1']],
   );
   // Running out of one kind does not touch the others.
   assert.equal(derived.overflow.has(1), false);
 });
 
-test('a Level 9 boss room overflows, since Level 9 has no heart slot', () => {
+test('Level 9 has no floor spot and no heart spot, so a floor item there overflows', () => {
   const state = placeRoom(createInitialState(), 9, 'A1', 'bow', { boss: 'ganon' });
   const derived = deriveItemLocations(state);
   assert.deepEqual(
     (derived.overflow.get(9) ?? []).map((p) => [p.item, p.kind]),
-    [['bow', 'heart']],
+    [['bow', 'floor']],
   );
 });
 
@@ -463,7 +488,8 @@ test('corrupt collected and from values are coerced away on load', () => {
   assert.equal(rooms['A2']?.collected, false);
   assert.equal(rooms['A2']?.from, 'auto');
   assert.equal(rooms['A3']?.collected, true);
-  assert.equal(rooms['A3']?.from, 'heart');
+  // `heart` is no longer a From value; it loads as the floor it always was.
+  assert.equal(rooms['A3']?.from, 'floor');
   assert.equal('A4' in rooms, false);
   assert.equal(state.screenNotes['B1']?.collected, false);
   assert.equal(state.screenNotes['B2']?.collected, false);
@@ -523,15 +549,14 @@ test('an overworld-only item on a named spot fills that slot', () => {
 
 /* -------------------------------------------- hearts, shield, bombs, meat */
 
-test('a Heart Container with no boss recorded still fills the heart slot', () => {
-  // Level 3 in 1st Quest has a stair slot and a heart slot, and no floor slot,
-  // so reading this as a floor item sent it to overflow.
-  const state = placeRoom(createInitialState(), 3, 'B5', 'heart');
-  assert.equal(slot(state, 'd3.heart')?.item, 'heart');
-  assert.deepEqual(deriveItemLocations(state).overflow.get(3) ?? [], []);
-  // An explicit From still overrules it.
-  const floor = placeRoom(createInitialState(), 1, 'B5', 'heart', { from: 'floor' });
-  assert.equal(slot(floor, 'd1.floor.0')?.item, 'heart');
+test('a Heart Container on the floor fills the heart spot, auto or Floor', () => {
+  // Level 3 in 1st Quest has a stair slot and a heart spot, and no plain
+  // floor slot; marking the heart Floor used to send it to overflow.
+  for (const from of ['auto', 'floor'] as const) {
+    const state = placeRoom(createInitialState(), 3, 'B5', 'heart', { from });
+    assert.equal(slot(state, 'd3.heart')?.item, 'heart', from);
+    assert.deepEqual(deriveItemLocations(state).overflow.get(3) ?? [], [], from);
+  }
 });
 
 test('the Magical Shield is placeable in a room and fills a slot', () => {

@@ -333,7 +333,9 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
       // is what a room recorded before either existed meant. Collected follows
       // the reducer's rule that an empty room cannot be.
       const collected = note.collected === true && item !== '';
-      const from = isRoomFrom(note.from) ? note.from : 'auto';
+      // `heart` was a third value until it folded into `floor`: the heart spot
+      // is one of a level's floor spots.
+      const from = isRoomFrom(note.from) ? note.from : note.from === 'heart' ? 'floor' : 'auto';
 
       const conformed: RoomNote = {
         visited,
