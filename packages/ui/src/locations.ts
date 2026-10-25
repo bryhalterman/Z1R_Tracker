@@ -165,6 +165,8 @@ export function buildLocations(
       block.className = 'z1r-loc-block';
 
       const level = list[0]?.level;
+      // The overworld's tile spans the row under the nine levels.
+      block.dataset.overworld = String(level === undefined);
       const label = document.createElement('span');
       label.className = 'z1r-loc-level';
       label.textContent = name;
@@ -230,24 +232,6 @@ export function buildLocations(
 
       rows.append(block);
     }
-
-    /*
-     * How tall the first column runs before the next one starts.
-     *
-     * The layout is two columns filled downwards, and CSS can only fill a grid
-     * column-first against an explicit row count — there is no `auto-fill` in
-     * the block direction. The count has to come from here because the groups
-     * are derived from the seed settings: a default seed gives ten (L1-L9 and
-     * OW), and a setting that drops a level's only slot gives nine.
-     *
-     * Two columns rather than a number scaled to the width: the panel is
-     * sizing itself to sit beside the Triforce in one row, and a third column
-     * would make it wider than that to save one line of height.
-     */
-    // Floored at 1: `repeat(0, auto)` is not a valid track list, and an
-    // invalid value here would drop the row count and lay all ten out in a
-    // single row.
-    rows.style.setProperty('--z1r-loc-rows', String(Math.max(1, Math.ceil(groups.size / 2))));
   };
 
   patches.push((state) => {

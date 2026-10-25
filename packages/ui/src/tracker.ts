@@ -22,6 +22,7 @@ import {
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
+  MINOR_DROPS,
   OVERWORLD_EXTRAS,
   OVERWORLD_STAIRWAY_COUNT,
   warpRoutes,
@@ -368,10 +369,35 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   }
   const items = built.get('items');
   const triforce = built.get('dungeons');
-  if (items && triforce) items.classList.add('z1r-items-panel');
+  const locations = built.get('locations');
+
+  /*
+   * On the page, the palette's card also holds Item locations and the
+   * Triforce: the palette wraps on the left, the other two sit to its right.
+   *
+   * They are what the palette's placements fill in, so they read as one tool
+   * rather than three panels. Each keeps its own heading and fold; folding
+   * Items folds the lot, because the card is one child of the Items panel and
+   * a folded panel hides everything but its title.
+   */
+  const card = palette && items ? [locations, triforce].filter((n): n is HTMLElement => !!n) : [];
+  if (items && card.length) {
+    const body = items.querySelector<HTMLElement>('.z1r-palette');
+    const row = el('div', 'z1r-items-card');
+    if (body) row.append(body);
+    for (const node of card) {
+      node.dataset.nested = 'true';
+      row.append(node);
+    }
+    items.append(row);
+  }
+
+  if (items && triforce && !card.length) items.classList.add('z1r-items-panel');
   for (const [name, node] of built) {
-    if (name === 'dungeons' && items && triforce) continue;
-    if (name === 'items' && items && triforce) {
+    if (card.includes(node)) continue;
+    const paired = !!items && !!triforce && !card.includes(triforce);
+    if (name === 'dungeons' && paired) continue;
+    if (name === 'items' && paired) {
       const pair = el('div', 'z1r-pair');
       pair.append(items, triforce);
       root.append(pair);
@@ -728,6 +754,9 @@ function buildItemCell(
 
 /* ------------------------------------------------------------------ palette */
 
+/** The palette's Held group, in this order. */
+const HELD_GROUP: readonly string[] = ['book', 'magicalShield', 'ladder', 'raft', 'bracelet'];
+
 /**
  * The Items panel on the page: an always-on placement palette.
  *
@@ -749,13 +778,13 @@ function buildItemCell(
  * click raises its inventory stage by one and Shift+right click lowers it, the
  * stage logic the left button used to carry.
  *
- * The overworld-only items — the Wooden Sword, the Blue Candle, both potions
- * and the Letter — are never in the shuffle, so they land on a screen and not
- * in a room, and their caption says so.
+ * The passive items you carry — Book, Shield, Ladder, Raft, Power Bracelet —
+ * have a captioned group of their own. Bombs close the first group: a minor
+ * drop, placeable in a room or on a screen but filling no location slot.
  *
- * The three inventory items nothing ever places — Bombs, the Magical Shield
- * and the Bait — follow in a captioned group of their own. They cannot be armed, so they are set apart by position and by
- * their caption rather than by a tint, and they answer the right button only.
+ * The overworld-only items — the Wooden Sword, the Blue Candle, both potions,
+ * the Letter and Meat — are never in the shuffle, so they land on a screen and
+ * not in a room, and their caption says so.
  */
 function buildPalette(
   store: Store,
@@ -930,23 +959,104 @@ function buildPalette(
   };
 
   const poolCells = group('pool');
-  for (const def of ROOM_ITEMS.filter((entry) => POOL_BY_ID.has(entry.id))) {
+  for (const def of ROOM_ITEMS.filter(
+    (e) => POOL_BY_ID.has(e.id) && !HELD_GROUP.includes(e.id) && e.id !== 'heart',
+  )) {
     poolCells.append(placeableCell(def));
   }
+  for (const def of MINOR_DROPS) poolCells.append(placeableCell(def));
+  const heldCells = group('held', 'Held');
+  for (const id of HELD_GROUP) {
+    const def = ROOM_ITEMS_BY_ID.get(id);
+    if (def) heldCells.append(placeableCell(def));
+  }
+  // The Heart Container leads the dungeon pickups: it is a level's own drop far
+  // more often than anything else, and four here split evenly into two rows.
   const dungeonCells = group('dungeon');
-  for (const def of ROOM_ITEMS.filter((entry) => !POOL_BY_ID.has(entry.id))) {
+  const heartDef = ROOM_ITEMS_BY_ID.get('heart');
+  if (heartDef) dungeonCells.append(placeableCell(heartDef));
+  for (const def of ROOM_ITEMS.filter((entry) => !SCREEN_ITEMS_BY_ID.has(entry.id))) {
     dungeonCells.append(placeableCell(def));
   }
   const overworldCells = group('overworld', 'Overworld only');
   for (const def of OVERWORLD_EXTRAS) {
     overworldCells.append(placeableCell(def));
   }
-  const inventoryCells = group('inventory', 'Held only');
-  const placedSomewhere = (item: ItemDef) =>
-    roomItemsForInventory(item).length > 0 || OVERWORLD_EXTRAS.some((e) => e.itemId === item.id);
-  for (const def of ITEMS.filter((item) => !placedSomewhere(item))) {
-    inventoryCells.append(inventoryOnlyCell(def));
+  // Every inventory item can be placed now, so this group is normally absent;
+  // it stays for any item added to the inventory before it has a placement.
+  const placedSomewhere = (item: ItemDef) => SCREEN_ITEMS.some((e) => e.itemId === item.id);
+  const unplaced = ITEMS.filter((item) => !placedSomewhere(item));
+  if (unplaced.length) {
+    const inventoryCells = group('inventory', 'Mark held');
+    for (const def of unplaced) inventoryCells.append(inventoryOnlyCell(def));
   }
+
+  /*
+   * Wrap evenly, never lopsided.
+   *
+   * Every group takes the same number of rows — the fewest that keep all of
+   * them on one line at this width — and each row of a group is the same
+   * length, so a short last row is centered under the others rather than
+   * hanging off the left. `--cols` sizes each group's box to whole cells; the
+   * stylesheet centers what does not fill it.
+   */
+  const cellGroups = [...body.querySelectorAll<HTMLElement>('.z1r-palette-cells')];
+  const setRows = (rows: number) => {
+    for (const cells of cellGroups) {
+      cells.style.setProperty('--cols', String(Math.max(1, Math.ceil(cells.childElementCount / rows))));
+    }
+  };
+  setRows(1);
+  let balancedWidth = -1;
+
+  /*
+   * The width a given row count needs, worked out rather than measured.
+   *
+   * Laying the groups out at each count and reading back where they landed
+   * proved unreliable on the first pass, before the card had settled. The
+   * sizes involved are all fixed — a cell, the gap between cells, the rule
+   * between groups, and a caption no group may be narrower than — so the sum
+   * is exact and needs no layout.
+   */
+  const widthFor = (rows: number): number => {
+    const cell = body.querySelector<HTMLElement>('.z1r-item')?.offsetWidth ?? 0;
+    let total = 0;
+    for (const cells of cellGroups) {
+      const group = cells.parentElement;
+      if (!group) continue;
+      const cols = Math.max(1, Math.ceil(cells.childElementCount / rows));
+      const gap = parseFloat(getComputedStyle(cells).columnGap) || 0;
+      const caption = group.querySelector<HTMLElement>('.z1r-item-group-label')?.scrollWidth ?? 0;
+      const style = getComputedStyle(group);
+      total +=
+        Math.max(cols * cell + (cols - 1) * gap, caption) +
+        (parseFloat(style.marginInlineStart) || 0) +
+        (parseFloat(style.paddingInlineStart) || 0) +
+        (parseFloat(style.borderInlineStartWidth) || 0);
+    }
+    return total;
+  };
+
+  const balance = () => {
+    const width = body.clientWidth;
+    // Folded away, or not laid out yet; and a height-only change is the
+    // balancing itself settling, which needs no second pass.
+    if (!width || width === balancedWidth) return;
+    balancedWidth = width;
+    const most = Math.max(...cellGroups.map((cells) => cells.childElementCount));
+    let rows = 1;
+    while (rows < most && widthFor(rows) > width) rows++;
+    setRows(rows);
+  };
+  /*
+   * Held by the patch list below rather than created and dropped: an observer
+   * nothing references can be collected, and then the palette quietly stops
+   * re-wrapping when the window changes size.
+   */
+  const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(balance) : null;
+  observer?.observe(body);
+  // The first pass, once the card has put this where it will live.
+  requestAnimationFrame(balance);
 
   const own: Patch[] = [
     (state) => {
@@ -956,11 +1066,17 @@ function buildPalette(
     (state) => runPatches(cellPatches, state),
     () => {
       const armed = placement.get().item;
-      const def = armed ? ROOM_ITEMS_BY_ID.get(armed) : undefined;
+      // Either list: the overworld-only items are not room items.
+      const def = armed ? (ROOM_ITEMS_BY_ID.get(armed) ?? SCREEN_ITEMS_BY_ID.get(armed)) : undefined;
       root.dataset.armed = String(!!def);
       status.textContent = def
         ? `${def.name} armed — click ${targetFor(def.id)}. Esc puts it down.`
         : 'Click an item to place it. Right-click marks it held.';
+    },
+    // Without ResizeObserver, re-wrap on each redraw instead; with one, this is
+    // also what keeps the observer referenced.
+    () => {
+      if (!observer) balance();
     },
   ];
 

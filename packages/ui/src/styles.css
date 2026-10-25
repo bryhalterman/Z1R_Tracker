@@ -1272,42 +1272,44 @@
 }
 
 /*
- * Ten short lines in two columns, not ten stacked.
+ * Nine level tiles, three by three, and the overworld's tile under them.
  *
- * One per line cost 303px of panel height for a panel 171px wide, which is the
- * shape of a column that has run out of things to put in it. The levels are
- * about to share a row with Items and the Triforce, both of which are under
- * 181px tall, and the row is as tall as its tallest panel — so the height was
- * being paid by the whole row rather than by this panel.
- *
- * Filled down the first column and then across, which is `grid-auto-flow:
- * column` over an explicit row count — L1 to L5, then L6 to OW. Row-major
- * would be cheaper (no row count to set) and reads worse: L1 L2 / L3 L4 makes
- * "which line is L7 on" a calculation, where a column keeps the run of
- * numerals that the stack had.
- *
- * `--z1r-loc-rows` is set by `buildLocations` from the number of blocks it
- * built, because the groups come from the seed settings rather than from a
- * fixed list. The fallback of 5 is the count for a default seed, so a missing
- * property lays out rather than collapsing to one row.
+ * Every tile is the same width whatever its slot count — the columns are
+ * `1fr` in a grid sized to its content, so they all take the widest tile's
+ * width — and the slots are centered in each, so levels with two slots and
+ * levels with three line up on the same center line rather than leaving a
+ * ragged right edge. Row-major: L1 L2 L3 across the top, the way the level
+ * pills on the dungeon map read.
  */
 .z1r-loc-rows {
   display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(var(--z1r-loc-rows, 5), auto);
-  /* max-content, so a column is as wide as its widest line and no wider: the
-     lines differ by slot count and a 1fr track would pad every short one out
-     to the longest. */
-  grid-auto-columns: max-content;
-  justify-items: start;
-  align-items: center;
-  gap: 3px var(--z1r-space-lg);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  inline-size: max-content;
+  max-inline-size: 100%;
+  gap: 4px;
 }
 
 .z1r-loc-block {
   display: flex;
   align-items: center;
   gap: 3px;
+  padding: 3px 5px 3px 3px;
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius-sm);
+}
+
+/* The slots, and any overflow or extra-floor controls after them, centered in
+   the space after the label as one run: auto margins either side of it. */
+.z1r-loc-level + * {
+  margin-inline-start: auto;
+}
+
+.z1r-loc-block > :last-child {
+  margin-inline-end: auto;
+}
+
+.z1r-loc-block[data-overworld="true"] {
+  grid-column: 1 / -1;
 }
 
 /*
@@ -2568,6 +2570,9 @@
 .z1r-palette {
   display: flex;
   flex-wrap: wrap;
+  /* Centered, so the balanced groups below sit in the middle of the space the
+     card gives them rather than against one edge of it. */
+  justify-content: center;
   align-items: flex-end;
   gap: var(--z1r-space-sm) 0;
 }
@@ -2575,6 +2580,7 @@
 .z1r-palette-group {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 2px;
 }
 
@@ -2585,10 +2591,75 @@
   border-inline-start: var(--z1r-border-width) solid var(--z1r-border);
 }
 
+/*
+ * A group's cells, in rows of `--cols` whole cells.
+ *
+ * `--cols` is set by `buildPalette` so every group takes the same number of
+ * rows; the box is exactly that many cells wide, and a short last row is
+ * centered under the full ones.
+ */
 .z1r-palette-cells {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 3px;
+  inline-size: calc(
+    var(--cols, 1) * var(--z1r-item-min, 44px) + (var(--cols, 1) - 1) * 3px
+  );
+}
+
+/*
+ * The Items card: the palette on the left, Item locations and the Triforce to
+ * its right, as one panel.
+ *
+ * The palette takes whatever width the other two leave and wraps into it; the
+ * two on the right keep their own size. Below the `md` band there is not room
+ * for three across, so the card stacks: palette, then the other two.
+ */
+.z1r-items-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--z1r-space-md);
+}
+
+.z1r-items-card > .z1r-palette {
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+
+/* The two nested panels lose their own card and keep a rule on their left,
+   the same divider the palette's groups use. */
+.z1r-items-card > .z1r-panel {
+  flex: none;
+  margin: 0;
+  padding: 0 0 0 var(--z1r-space-md);
+  background: none;
+  border: 0;
+  border-inline-start: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.z1r-items-card > .z1r-triforce-panel {
+  inline-size: 240px;
+}
+
+.z1r-tracker[data-width="xs"] .z1r-items-card,
+.z1r-tracker[data-width="sm"] .z1r-items-card {
+  flex-wrap: wrap;
+}
+
+.z1r-tracker[data-width="xs"] .z1r-items-card > .z1r-palette,
+.z1r-tracker[data-width="sm"] .z1r-items-card > .z1r-palette {
+  flex-basis: 100%;
+}
+
+/* Stacked, the divider runs above each nested panel instead of beside it. */
+.z1r-tracker[data-width="xs"] .z1r-items-card > .z1r-panel,
+.z1r-tracker[data-width="sm"] .z1r-items-card > .z1r-panel {
+  padding: var(--z1r-space-sm) 0 0;
+  border-inline-start: 0;
+  border-block-start: var(--z1r-border-width) solid var(--z1r-border);
 }
 
 .z1r-palette .z1r-item {
