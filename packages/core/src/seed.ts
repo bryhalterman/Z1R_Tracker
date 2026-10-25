@@ -268,7 +268,7 @@ export interface PoolEntry {
 }
 
 /**
- * The 15-item shuffle pool, verbatim from the Dungeon Items flags page.
+ * The shuffle pool: the Dungeon Items flags page's list, plus the Magical Shield.
  * https://z1r.wiki/wiki/Dungeon_Items_(Flags)
  */
 export const SHUFFLE_POOL: readonly PoolEntry[] = [
@@ -287,6 +287,16 @@ export const SHUFFLE_POOL: readonly PoolEntry[] = [
     sprite: 'item.boomerang.magical',
   },
   { id: 'magicalKey', name: 'Magical Key', itemId: 'magicalKey', value: 1, sprite: 'item.key.magical' },
+  // Not on the flags page's list, but https://z1r.wiki/wiki/Items says "the
+  // Shield is included in the item shuffle" under Misc > Replace Book Fire
+  // with Explosion, and is then sold in place of the Book.
+  {
+    id: 'magicalShield',
+    name: 'Magical Shield',
+    itemId: 'shield',
+    value: 1,
+    sprite: 'item.shield.magical',
+  },
   // Stage 3 of the progressive sword, above the White Sword at stage 2. It was
   // missing from the pool entirely, so the one item most worth recording the
   // location of could not be recorded at all.
@@ -329,10 +339,28 @@ export const OVERWORLD_EXTRAS: readonly PoolEntry[] = [
   { id: 'bluePotion', name: 'Blue Potion', itemId: 'potion', value: 1, sprite: 'item.potion.blue' },
   { id: 'redPotion', name: 'Red Potion', itemId: 'potion', value: 2, sprite: 'item.potion.red' },
   { id: 'letter', name: 'Letter', itemId: 'letter', value: 1, sprite: 'item.letter' },
+  // Sold, never shuffled; the shops are the only source the wiki lists.
+  { id: 'meat', name: 'Meat', itemId: 'bait', value: 1, sprite: 'item.bait' },
 ];
 
-/** Everything an overworld screen can hold: the pool, then the extras. */
-export const SCREEN_ITEMS: readonly PoolEntry[] = [...SHUFFLE_POOL, ...OVERWORLD_EXTRAS];
+/**
+ * Pickups found in a dungeon or on a screen that are not in the pool.
+ *
+ * https://z1r.wiki/wiki/Dungeon_Items_(Flags), Shuffle Minor Dungeon Drops:
+ * "Bomb/five rupee/key drops will be added to the item shuffle." They fill no
+ * item location slot — those are counted from the pool — but a room or a
+ * screen can still say a bomb was found there.
+ */
+export const MINOR_DROPS: readonly PoolEntry[] = [
+  { id: 'bombs', name: 'Bombs', itemId: 'bomb', value: 1, sprite: 'item.bomb' },
+];
+
+/** Everything an overworld screen can hold: the pool, the minor drops, the extras. */
+export const SCREEN_ITEMS: readonly PoolEntry[] = [
+  ...SHUFFLE_POOL,
+  ...MINOR_DROPS,
+  ...OVERWORLD_EXTRAS,
+];
 
 export const SCREEN_ITEMS_BY_ID: ReadonlyMap<string, PoolEntry> = new Map(
   SCREEN_ITEMS.map((entry) => [entry.id, entry]),

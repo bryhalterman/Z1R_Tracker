@@ -245,7 +245,7 @@ test('the room item set is the shuffle pool plus map, compass and Triforce', () 
   const base = createInitialState();
   // An id outside the set is refused rather than stored, or the room would
   // carry a reference that renders as nothing and never goes away.
-  const state = reduce(base, { type: 'setRoomItem', level: 1, room: 'A1', item: 'bombs' });
+  const state = reduce(base, { type: 'setRoomItem', level: 1, room: 'A1', item: 'notAnItem' });
   assert.equal(state, base);
 });
 
@@ -422,7 +422,7 @@ test('unknown door states, stairs, bosses and items are dropped on load', () => 
       '1': {
         A1: {
           visited: 'yes',
-          item: 'bombs',
+          item: 'notAnItem',
           boss: 'goriya',
           stairs: 'basement',
           transport: 2,

@@ -90,8 +90,9 @@ test('a shuffled non-heart item can be the boss drop', () => {
   let state = createInitialState();
   state = placeRoom(state, 5, 'B6', 'whiteSword', { boss: 'gleeok' });
   assert.equal(slot(state, 'd5.heart')?.item, 'whiteSword');
-  // And the Heart Container that would have been there can sit on a floor.
-  state = placeRoom(state, 2, 'A1', 'heart');
+  // And the Heart Container that would have been there can sit on a floor,
+  // which takes saying so: on its own a heart reads as the boss drop.
+  state = placeRoom(state, 2, 'A1', 'heart', { from: 'floor' });
   assert.equal(slot(state, 'd2.floor.0')?.item, 'heart');
 });
 
@@ -518,4 +519,39 @@ test('an overworld-only item on a named spot fills that slot', () => {
     patch: { spot: 'ow.armos', item: 'blueCandle' },
   });
   assert.equal(slot(state, 'ow.armos')?.item, 'blueCandle');
+});
+
+/* -------------------------------------------- hearts, shield, bombs, meat */
+
+test('a Heart Container with no boss recorded still fills the heart slot', () => {
+  // Level 3 in 1st Quest has a stair slot and a heart slot, and no floor slot,
+  // so reading this as a floor item sent it to overflow.
+  const state = placeRoom(createInitialState(), 3, 'B5', 'heart');
+  assert.equal(slot(state, 'd3.heart')?.item, 'heart');
+  assert.deepEqual(deriveItemLocations(state).overflow.get(3) ?? [], []);
+  // An explicit From still overrules it.
+  const floor = placeRoom(createInitialState(), 1, 'B5', 'heart', { from: 'floor' });
+  assert.equal(slot(floor, 'd1.floor.0')?.item, 'heart');
+});
+
+test('the Magical Shield is placeable in a room and fills a slot', () => {
+  let state = placeRoom(createInitialState(), 2, 'C3', 'magicalShield');
+  assert.equal(slot(state, 'd2.floor.0')?.item, 'magicalShield');
+  state = reduce(state, { type: 'collectRoom', level: 2, room: 'C3', collected: true });
+  assert.equal(state.items['shield'], 1);
+});
+
+test('Bombs in a room fill no slot, and collecting them marks them held', () => {
+  let state = placeRoom(createInitialState(), 2, 'C3', 'bombs');
+  assert.equal(state.rooms['2']?.C3?.item, 'bombs');
+  assert.equal(slot(state, 'd2.floor.0'), undefined);
+  state = reduce(state, { type: 'collectRoom', level: 2, room: 'C3', collected: true });
+  assert.equal(state.items['bomb'], 1);
+});
+
+test('Meat goes on a screen but not in a room', () => {
+  let state = reduce(createInitialState(), { type: 'setScreenNote', screen: 'E4', patch: { item: 'meat' } });
+  state = reduce(state, { type: 'collectScreen', screen: 'E4', collected: true });
+  assert.equal(state.items['bait'], 1);
+  assert.equal(reduce(state, { type: 'setRoomItem', level: 1, room: 'A1', item: 'meat' }), state);
 });

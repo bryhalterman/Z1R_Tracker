@@ -18,7 +18,7 @@
  */
 
 import { DUNGEONS_BY_LEVEL } from './dungeons.js';
-import { SHUFFLE_POOL } from './seed.js';
+import { MINOR_DROPS, SHUFFLE_POOL } from './seed.js';
 
 export const ROOM_COLUMNS = 8;
 export const ROOM_ROWS = 8;
@@ -234,6 +234,7 @@ export const DUNGEON_ONLY_ITEMS: readonly RoomItemDef[] = [
  */
 export const ROOM_ITEMS: readonly RoomItemDef[] = [
   ...SHUFFLE_POOL.map(({ id, name, sprite }) => ({ id, name, sprite })),
+  ...MINOR_DROPS.map(({ id, name, sprite }) => ({ id, name, sprite })),
   ...DUNGEON_ONLY_ITEMS,
 ];
 
@@ -270,13 +271,18 @@ export function isRoomFrom(value: unknown): value is RoomFrom {
  * Which slot kind a room's item fills.
  *
  * Under `auto`, a boss means the item is its drop, which is the level's heart
- * container slot. Otherwise item stairs mean the stair slot, and anything else
- * is a floor item. A room with both a boss and item stairs reads as the boss
- * drop; when that is the wrong reading, an explicit `from` overrules it.
+ * container slot, and so does a Heart Container on its own: the boss may have
+ * been killed before the room was marked, or never recorded at all, and the
+ * heart slot is where a heart belongs far more often than a floor slot.
+ * Otherwise item stairs mean the stair slot, and anything else is a floor
+ * item. A room with both a boss and item stairs reads as the boss drop; when
+ * any of these is the wrong reading, an explicit `from` overrules it.
  */
-export function resolveRoomFrom(room: Pick<RoomNote, 'from' | 'boss' | 'stairs'>): RoomSlotKind {
+export function resolveRoomFrom(
+  room: Pick<RoomNote, 'from' | 'boss' | 'stairs'> & Partial<Pick<RoomNote, 'item'>>,
+): RoomSlotKind {
   if (room.from !== 'auto') return room.from;
-  if (room.boss !== '') return 'heart';
+  if (room.boss !== '' || room.item === 'heart') return 'heart';
   if (room.stairs === 'item') return 'stair';
   return 'floor';
 }
