@@ -343,15 +343,15 @@ export function buildRooms(
       return;
     }
     const current = roomsOf(store.getState())[room]?.item ?? '';
-    // The same item armed and the same room clicked again takes it back off, so
-    // one gesture both places and lifts. The item stays armed either way: a run
-    // of drops is meant to cost one pick in the palette.
+    // The same item clicked onto the same room takes it back off. Either way
+    // the item is put down once it has landed: one find, one placement.
     commit(
       room,
       current === armed
         ? { type: 'setRoomItem', level, room, item: '' }
         : { type: 'setRoomNote', level, room, patch: { item: armed, visited: true } },
     );
+    placement.set({ item: '' });
   };
 
   const cellPatches: Patch[] = [];
@@ -758,8 +758,8 @@ export function buildRooms(
    * The compass this replaces put all six states on every side — twenty-four
    * buttons of 14px, which in a fast game is a lot of small targets to land
    * on. Now there are six state buttons, each with its word, and four walls
-   * that are the length of their side. The state stays armed like the item
-   * palette's, so a room of four open doors is five clicks. Clicking a wall
+   * that are the length of their side. The state stays armed until another
+   * is picked, so a room of four open doors is five clicks. Clicking a wall
    * that already shows the armed state takes it back to unknown, and the right
    * button always does. Keys 1-6 arm a state, outside text fields.
    *

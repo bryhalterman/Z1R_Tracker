@@ -2674,6 +2674,93 @@
   cursor: default;
 }
 
+/*
+ * A chain cell — one item that upgrades — carries a small corner mark, the
+ * sign that a click opens a choice rather than arming straight away.
+ */
+.z1r-palette .z1r-item[data-chain="true"]::after {
+  content: "";
+  position: absolute;
+  inset-block-end: 2px;
+  inset-inline-end: 2px;
+  inline-size: 5px;
+  block-size: 5px;
+  border-inline-end: 2px solid var(--z1r-muted);
+  border-block-end: 2px solid var(--z1r-muted);
+  pointer-events: none;
+}
+
+.z1r-palette .z1r-item[data-open="true"] {
+  outline: var(--z1r-border-width-thick) dashed var(--z1r-accent);
+  outline-offset: 1px;
+}
+
+/* The panel anchors the tier popover. */
+.z1r-palette-panel {
+  position: relative;
+}
+
+/*
+ * The tier popover: the tiers of the chain just clicked, under its cell.
+ * Each tier is its sprite and its name, so which one you are picking never
+ * rests on recognising the art.
+ */
+.z1r-tier-popover {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  background: var(--z1r-inset);
+  border: var(--z1r-border-width) solid var(--z1r-accent);
+  border-radius: var(--z1r-radius-sm);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.5);
+}
+
+.z1r-tier-popover[hidden] {
+  display: none;
+}
+
+.z1r-tier-popover::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -6px;
+  inset-inline-start: var(--tip, 12px);
+  border: 6px solid transparent;
+  border-block-start: 0;
+  border-block-end-color: var(--z1r-accent);
+}
+
+.z1r-tier {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-inline-size: 64px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 600;
+  color: var(--z1r-text);
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius-sm);
+  cursor: pointer;
+}
+
+.z1r-tier:hover:not(:disabled),
+.z1r-tier:focus-visible {
+  border-color: var(--z1r-accent);
+}
+
+.z1r-tier:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.z1r-tier-name {
+  white-space: nowrap;
+}
+
 /* What the next click does, in words, at the end of the heading. */
 .z1r-palette-status {
   margin-inline-start: auto;

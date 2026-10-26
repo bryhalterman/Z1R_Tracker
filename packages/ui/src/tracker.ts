@@ -22,8 +22,6 @@ import {
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
   OVERWORLD_ROWS,
-  MINOR_DROPS,
-  OVERWORLD_EXTRAS,
   OVERWORLD_STAIRWAY_COUNT,
   warpRoutes,
   POOL_BY_ID,
@@ -582,7 +580,7 @@ function placedSuffix(ids: readonly string[], placedAt: Map<string, string[]>): 
   for (const id of ids) {
     const where = placedAt.get(id);
     if (!where?.length) continue;
-    const name = ROOM_ITEMS_BY_ID.get(id)?.name ?? id;
+    const name = SCREEN_ITEMS_BY_ID.get(id)?.name ?? ROOM_ITEMS_BY_ID.get(id)?.name ?? id;
     parts.push(`${name} at ${where.join(', ')}`);
   }
   return parts.length ? ` — placed: ${parts.join('; ')}` : '';
@@ -754,23 +752,61 @@ function buildItemCell(
 
 /* ------------------------------------------------------------------ palette */
 
-/** The palette's Held group, in this order. */
-const HELD_GROUP: readonly string[] = ['book', 'magicalShield', 'ladder', 'raft', 'bracelet'];
+/**
+ * An item that upgrades: one inventory entry, several things to find.
+ *
+ * `tiers` are the placeable ones, lowest first. The Wooden Arrow and the Blue
+ * Ring are shop stock rather than finds, so their chains hold one tier each.
+ */
+interface PaletteChain {
+  readonly inventory: string;
+  readonly name: string;
+  readonly tiers: readonly string[];
+}
+
+const PALETTE_CHAINS: readonly PaletteChain[] = [
+  { inventory: 'sword', name: 'Sword', tiers: ['woodSword', 'whiteSword', 'magicalSword'] },
+  { inventory: 'boomerang', name: 'Boomerang', tiers: ['boomerang', 'magicalBoomerang'] },
+  { inventory: 'arrow', name: 'Arrow', tiers: ['silverArrow'] },
+  { inventory: 'candle', name: 'Candle', tiers: ['blueCandle', 'redCandle'] },
+  { inventory: 'ring', name: 'Ring', tiers: ['redRing'] },
+  { inventory: 'potion', name: 'Potion', tiers: ['bluePotion', 'redPotion'] },
+];
+
+/**
+ * The palette, group by group. An entry is a chain's inventory id or a single
+ * placeable item's id.
+ */
+const PALETTE_GROUPS: readonly { name: string; caption?: string; entries: readonly string[] }[] = [
+  {
+    name: 'pool',
+    entries: [
+      'sword', 'boomerang', 'bow', 'arrow', 'candle', 'ring',
+      'recorder', 'wand', 'magicalKey', 'bombs', 'potion',
+    ],
+  },
+  {
+    name: 'held',
+    caption: 'Held',
+    entries: ['book', 'magicalShield', 'ladder', 'raft', 'bracelet', 'meat', 'letter'],
+  },
+  // The Heart Container leads the dungeon pickups: a level's own drop far more
+  // often than anything else.
+  { name: 'dungeon', entries: ['heart', 'map', 'compass', 'triforce'] },
+];
 
 /**
  * The Items panel on the page: an always-on placement palette.
  *
  * A click arms an item; the next click on a room or an overworld screen puts
- * it there. There is no mode to switch on first, and the item stays armed
- * after it lands, so a run of placements costs one pick. Clicking the armed
- * item again, or Escape, puts it down.
+ * it there, and puts it down: one find, one placement. Clicking the armed
+ * item again, or Escape, puts it down without placing it.
  *
- * One cell per thing that can be placed — the shuffle pool, then the Map, the
- * Compass and a Triforce piece, then the five overworld-only items — rather
- * than one per inventory item. A chain
- * such as the sword is one inventory cell but two pool entries, and the White
- * and the Magical Sword can be found in either order; a single cell could only
- * ever offer the next one up.
+ * One cell per inventory item. An item that upgrades — the sword, the
+ * boomerang, the candle, the potion and so on — is one cell drawing the tier
+ * you hold, and clicking it opens a popover of its placeable tiers, because
+ * the White and the Magical Sword can be found in either order and which one
+ * you just found is the thing to ask. See `PALETTE_CHAINS`.
  *
  * Held is still read from the inventory, exactly as the inventory panel reads
  * it, and collecting a placement is what raises it. The right button is how an
@@ -958,30 +994,162 @@ function buildPalette(
     return cells;
   };
 
-  const poolCells = group('pool');
-  for (const def of ROOM_ITEMS.filter(
-    (e) => POOL_BY_ID.has(e.id) && !HELD_GROUP.includes(e.id) && e.id !== 'heart',
-  )) {
-    poolCells.append(placeableCell(def));
+  /*
+   * A chain: one cell for an item that upgrades, with a tier picker.
+   *
+   * The cell draws what you hold, the way the inventory does, and the right
+   * button steps that up or down. The left button opens a popover of the tiers
+   * that can be placed, under the cell, and picking one arms it — the sword is
+   * one thing in your inventory but three things you might find, and which one
+   * you just found is the question the popover asks. A chain with a single
+   * placeable tier arms it straight away.
+   */
+  const popover = el('div', 'z1r-tier-popover');
+  popover.setAttribute('role', 'group');
+  popover.hidden = true;
+  root.append(popover);
+  let openChain: HTMLElement | null = null;
+
+  const closePopover = () => {
+    if (!openChain) return;
+    openChain.dataset.open = 'false';
+    openChain.setAttribute('aria-expanded', 'false');
+    openChain = null;
+    popover.hidden = true;
+    popover.replaceChildren();
+  };
+
+  // Outside the popover and its cell, a click closes it; so does Escape.
+  document.addEventListener('pointerdown', (event) => {
+    const target = event.target as Node | null;
+    if (!openChain || !target) return;
+    if (popover.contains(target) || openChain.contains(target)) return;
+    closePopover();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !openChain) return;
+    const cell = openChain;
+    closePopover();
+    cell.focus();
+  });
+
+  const showPopover = (cell: HTMLElement, chain: PaletteChain) => {
+    if (openChain === cell) {
+      closePopover();
+      return;
+    }
+    closePopover();
+    openChain = cell;
+    cell.dataset.open = 'true';
+    cell.setAttribute('aria-expanded', 'true');
+    popover.setAttribute('aria-label', `Which ${chain.name.toLowerCase()} you found`);
+    for (const id of chain.tiers) {
+      const def = SCREEN_ITEMS_BY_ID.get(id) ?? ROOM_ITEMS_BY_ID.get(id);
+      if (!def) continue;
+      const target = targetFor(id);
+      const tier = el('button', 'z1r-tier');
+      tier.type = 'button';
+      tier.dataset.item = id;
+      tier.disabled = !target;
+      tier.title = target ? `${def.name} — arm for ${target}` : `${def.name} — nowhere in this window to place it`;
+      tier.setAttribute('aria-label', tier.title);
+      tier.append(
+        createSprite(resolver, def.sprite, { size: opts.itemSize, label: '' }),
+        el('span', 'z1r-tier-name', def.name),
+      );
+      tier.addEventListener('click', () => {
+        closePopover();
+        placement.set({ item: id });
+      });
+      popover.append(tier);
+    }
+    popover.hidden = false;
+    // Under the cell, kept inside the panel, with the pointer on the cell.
+    const panel = root.getBoundingClientRect();
+    const box = cell.getBoundingClientRect();
+    const left = Math.max(0, Math.min(box.left - panel.left - 6, panel.width - popover.offsetWidth));
+    popover.style.insetInlineStart = `${left}px`;
+    popover.style.insetBlockStart = `${box.bottom - panel.top + 6}px`;
+    popover.style.setProperty('--tip', `${box.left - panel.left - left + box.width / 2 - 6}px`);
+    popover.querySelector<HTMLButtonElement>('.z1r-tier:not(:disabled)')?.focus();
+  };
+
+  const chainCell = (chain: PaletteChain): HTMLElement => {
+    const inventory = ITEMS_BY_ID.get(chain.inventory);
+    const cell = el('button', 'z1r-item');
+    cell.type = 'button';
+    cell.dataset.item = chain.inventory;
+    cell.dataset.group = 'chain';
+    cell.dataset.chain = String(chain.tiers.length > 1);
+    const placeable = chain.tiers.some((id) => targetFor(id));
+    cell.dataset.placeable = String(placeable);
+    cell.dataset.armed = 'false';
+    cell.dataset.placed = 'false';
+    if (chain.tiers.length > 1) cell.setAttribute('aria-haspopup', 'true');
+    const slot = el('span', 'z1r-item-sprite');
+    cell.append(slot);
+
+    cell.addEventListener('click', () => {
+      if (!placeable) return;
+      if (chain.tiers.length > 1) {
+        showPopover(cell, chain);
+        return;
+      }
+      const only = chain.tiers[0] ?? '';
+      placement.set({ item: placement.get().item === only ? '' : only });
+    });
+    wireStage(cell, inventory?.id);
+
+    let renderedSprite: string | null = null;
+    cellPatches.push((state) => {
+      const value = inventory ? (state.items[inventory.id] ?? 0) : 0;
+      const key = inventory ? spriteFor(inventory, value) : '';
+      renderedSprite = memoise(renderedSprite, key, () => {
+        slot.replaceChildren(createSprite(resolver, key, { size: opts.itemSize, label: '' }));
+      });
+      cell.dataset.owned = String(value > 0);
+      cell.dataset.held = String(value > 0);
+      const armedId = placement.get().item;
+      const armed = chain.tiers.includes(armedId);
+      cell.dataset.armed = String(armed);
+      const where = placedSuffix(chain.tiers, placedAt);
+      cell.dataset.placed = String(!!where);
+      const heldText = inventory
+        ? ` — ${value > 0 ? `holding ${labelFor(inventory, value)}` : 'not held'}`
+        : '';
+      const armedName = armed ? (SCREEN_ITEMS_BY_ID.get(armedId)?.name ?? armedId) : '';
+      const action = !placeable
+        ? ' — nowhere in this window to place it'
+        : armed
+          ? ` — ${armedName} armed`
+          : chain.tiers.length > 1
+            ? ' — click to pick which one you found'
+            : ' — click to arm';
+      cell.title =
+        `${chain.name}${heldText}${where}${action}` +
+        `; right-click raises ${chain.name}, Shift+right-click lowers it`;
+      cell.setAttribute('aria-pressed', String(armed));
+      cell.setAttribute('aria-label', cell.title);
+    });
+
+    return cell;
+  };
+
+  const cellFor = (entry: string): HTMLElement | null => {
+    const chain = PALETTE_CHAINS.find((c) => c.inventory === entry);
+    if (chain) return chainCell(chain);
+    const def = ROOM_ITEMS_BY_ID.get(entry) ?? SCREEN_ITEMS_BY_ID.get(entry);
+    return def ? placeableCell(def) : null;
+  };
+
+  for (const { name, caption, entries } of PALETTE_GROUPS) {
+    const cells = group(name, caption);
+    for (const entry of entries) {
+      const cell = cellFor(entry);
+      if (cell) cells.append(cell);
+    }
   }
-  for (const def of MINOR_DROPS) poolCells.append(placeableCell(def));
-  const heldCells = group('held', 'Held');
-  for (const id of HELD_GROUP) {
-    const def = ROOM_ITEMS_BY_ID.get(id);
-    if (def) heldCells.append(placeableCell(def));
-  }
-  // The Heart Container leads the dungeon pickups: it is a level's own drop far
-  // more often than anything else, and four here split evenly into two rows.
-  const dungeonCells = group('dungeon');
-  const heartDef = ROOM_ITEMS_BY_ID.get('heart');
-  if (heartDef) dungeonCells.append(placeableCell(heartDef));
-  for (const def of ROOM_ITEMS.filter((entry) => !SCREEN_ITEMS_BY_ID.has(entry.id))) {
-    dungeonCells.append(placeableCell(def));
-  }
-  const overworldCells = group('overworld', 'Overworld only');
-  for (const def of OVERWORLD_EXTRAS) {
-    overworldCells.append(placeableCell(def));
-  }
+
   // Every inventory item can be placed now, so this group is normally absent;
   // it stays for any item added to the inventory before it has a placement.
   const placedSomewhere = (item: ItemDef) => SCREEN_ITEMS.some((e) => e.itemId === item.id);
@@ -1312,7 +1480,7 @@ function buildMap(
    * the toolbar's spot and Collected controls are already pointing at it. It
    * fills an item location only once its spot is named, which is the toolbar's
    * question to ask rather than this click's. The same item on the same screen
-   * again lifts it, the way a room does, and the item stays armed either way.
+   * again lifts it, the way a room does. Either way the item is put down.
    */
   const placeOnScreen = (screen: string, item: string) => {
     // The overworld holds shuffle-pool entries and the overworld-only items;
@@ -1326,6 +1494,8 @@ function buildMap(
       if (!isItem) store.dispatch({ type: 'setMark', screen, mark: 'item' });
       store.dispatch({ type: 'setScreenNote', screen, patch: { item } });
     }
+    // One find, one placement: the item is put down once it has landed.
+    placement.set({ item: '' });
     selected = screen;
     highlightSelection();
     syncToolbar(store.getState());
