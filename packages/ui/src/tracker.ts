@@ -319,6 +319,12 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    * build, which mounts the same panels the same way.
    */
   const palette = interactive && !compact && (placeInto.rooms || placeInto.map);
+  /*
+   * Whether Item locations goes in the palette's card — see the card below.
+   * When it does, it is the compact panel, whose columns carry the Triforce
+   * pieces, so the Triforce panel is not built at all.
+   */
+  const inCard = palette && sections.includes('items') && sections.includes('locations');
 
   const builders: Record<TrackerSection, () => HTMLElement> = {
     seed: () => buildSeedPanel(store, patches, interactive),
@@ -332,7 +338,9 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
             grouped: mode === 'overlay' || compact,
           }),
     dungeons: () => buildTriforce(store, resolver, patches, interactive),
-    locations: () => buildLocations(store, resolver, patches, interactive, compact),
+    // In the Items card the compact panel is used: a column per level headed by
+    // its Triforce piece, which covers the Triforce panel as well.
+    locations: () => buildLocations(store, resolver, patches, interactive, compact || inCard),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive, placement),
     rooms: () => buildRooms(store, resolver, patches, interactive, placement),
@@ -361,6 +369,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   // narrow and was leaving most of its own panel empty.
   const built = new Map<TrackerSection, HTMLElement>();
   for (const name of sections) {
+    if (name === 'dungeons' && inCard) continue;
     // An unknown `?sections=` value must not take the whole overlay down.
     const build = builders[name];
     if (build) built.set(name, build());
@@ -370,13 +379,14 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
   const locations = built.get('locations');
 
   /*
-   * On the page, the palette's card also holds Item locations and the
-   * Triforce: the palette wraps on the left, the other two sit to its right.
+   * On the page, the palette's card also holds Item locations: the palette
+   * wraps on the left, the compact locations panel sits to its right, its
+   * columns headed by each level's Triforce piece.
    *
-   * They are what the palette's placements fill in, so they read as one tool
-   * rather than three panels. Each keeps its own heading and fold; folding
-   * Items folds the lot, because the card is one child of the Items panel and
-   * a folded panel hides everything but its title.
+   * It is what the palette's placements fill in, so the two read as one tool.
+   * It keeps its own heading and fold; folding Items folds both, because the
+   * card is one child of the Items panel and a folded panel hides everything
+   * but its title.
    */
   const card = palette && items ? [locations, triforce].filter((n): n is HTMLElement => !!n) : [];
   if (items && card.length) {

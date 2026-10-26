@@ -800,7 +800,9 @@ export function buildRooms(
   if (interactive) {
     document.addEventListener('keydown', (event) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
+      // Not always an element: an event sent to the document has the document
+      // as its target, and that has no `closest`.
+      const target = event.target instanceof Element ? event.target : null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       const door = BRUSH_ORDER[Number(event.key) - 1];
       if (!door || !/^[1-6]$/.test(event.key)) return;
