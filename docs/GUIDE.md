@@ -420,7 +420,7 @@ The tracker has these mouse and keyboard shortcuts:
 | Overworld | Right-click a screen | Clear its mark |
 | Overworld | Left or Right arrow on a screen | Step through the marks |
 | Overworld | Esc | Let go of the selected screen |
-| Levels | 1 to 6 | Pick a door state |
+| Levels panel | Number keys 1 to 6 | Pick a door state (Open … Clear) |
 | Levels | Right-click a wall | Reset the wall to unknown |
 | Locations | Click or right-click a chip | Toggle Collected |
 
