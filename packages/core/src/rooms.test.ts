@@ -361,6 +361,7 @@ test('a well-formed room map survives a load unchanged', () => {
           doors: { north: 'open', east: 'bombed', south: 'locked', west: 'unknown' },
           collected: true,
           from: 'stair',
+          ladder: true,
         },
       },
     },
@@ -503,4 +504,35 @@ test('a loaded pair still evicts in the right order afterwards', () => {
     ['D1', 'D2', 'D3'].map((id) => room(state, 6, id)?.transport),
     [0, 2, 2],
   );
+});
+
+/* ----------------------------------------------------------- ladder block */
+
+test('a room can be marked as needing the Ladder, and that alone keeps it', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 4, room: 'C3', patch: { ladder: true } });
+  assert.equal(state.rooms['4']?.C3?.ladder, true);
+  // A non-boolean is refused, not coerced.
+  const refused = reduce(state, {
+    type: 'setRoomNote',
+    level: 4,
+    room: 'C3',
+    patch: { ladder: 'yes' as unknown as boolean },
+  });
+  assert.equal(refused, state);
+  // Clearing it leaves nothing worth keeping, so the room goes.
+  state = reduce(state, { type: 'setRoomNote', level: 4, room: 'C3', patch: { ladder: false } });
+  assert.equal(state.rooms['4']?.C3, undefined);
+});
+
+test('the ladder mark survives a save, and is absent from older ones', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 4, room: 'C3', patch: { ladder: true } });
+  const loaded = migrate(JSON.parse(JSON.stringify(state)));
+  assert.ok(loaded);
+  assert.equal(loaded.rooms['4']?.C3?.ladder, true);
+  const older = JSON.parse(JSON.stringify(state));
+  older.rooms['4'].C3 = { visited: true };
+  const fromOlder = migrate(older);
+  assert.equal(fromOlder?.rooms['4']?.C3?.ladder, false);
 });

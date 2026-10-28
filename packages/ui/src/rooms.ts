@@ -400,6 +400,13 @@ export function buildRooms(
        */
       const entrance = el('span', 'z1r-room-start');
       cell.append(entrance);
+      /*
+       * Water in the way: the Ladder's sprite in the top-right corner. Once the
+       * Ladder is held it stays, dimmed and checked, so the room still reads as
+       * one that needed it — and now does not.
+       */
+      const ladder = el('span', 'z1r-room-ladder');
+      cell.append(ladder);
       grid.append(cell);
 
       let bossArt: HTMLElement | null = null;
@@ -407,6 +414,7 @@ export function buildRooms(
       let renderedMark: string | null = null;
       let renderedTitle: string | null = null;
       let renderedEntrance: boolean | null = null;
+      let renderedLadder: string | null = null;
 
       cellPatches.push((state) => {
         const note = roomsOf(state)[id];
@@ -420,6 +428,18 @@ export function buildRooms(
           } else entrance.replaceChildren();
         });
         cell.setAttribute('aria-current', String(id === selected));
+
+        const ladderHeld = (state.items['ladder'] ?? 0) >= 1;
+        const ladderState = note?.ladder ? (ladderHeld ? 'clear' : 'blocked') : '';
+        renderedLadder = memoise(renderedLadder, ladderState, () => {
+          cell.dataset.ladder = ladderState;
+          if (!ladderState) {
+            ladder.replaceChildren();
+            return;
+          }
+          ladder.replaceChildren(createSprite(resolver, 'item.ladder', { size: 14, label: '' }));
+          if (ladderState === 'clear') ladder.append(el('span', 'z1r-room-ladder-ok', '✓'));
+        });
 
         for (const { side, edge } of edges) {
           edge.dataset.door = note?.doors[side] ?? 'unknown';
@@ -477,6 +497,8 @@ export function buildRooms(
 
         const parts = [id];
         if (isEntrance) parts.push('entrance');
+        if (ladderState === 'blocked') parts.push('needs the Ladder');
+        if (ladderState === 'clear') parts.push('needed the Ladder — held, passable now');
         if (note) {
           parts.push(note.visited ? 'visited' : 'not visited');
           if (item) {
@@ -551,6 +573,15 @@ export function buildRooms(
     commit(selected, { type: 'setLevelStart', level, room: selected });
   });
 
+  const ladderToggle = el('button', 'z1r-room-pick z1r-room-word', 'Ladder');
+  ladderToggle.type = 'button';
+  ladderToggle.title = 'Water in the way: this room needs the Ladder';
+  ladderToggle.addEventListener('click', () => {
+    if (!selected) return;
+    const current = roomsOf(store.getState())[selected]?.ladder ?? false;
+    commit(selected, { type: 'setRoomNote', level, room: selected, patch: { ladder: !current } });
+  });
+
   const wipe = el('button', 'z1r-room-pick z1r-room-word', 'Wipe');
   wipe.type = 'button';
   wipe.title = 'Forget everything recorded about this room';
@@ -574,11 +605,12 @@ export function buildRooms(
         stairs: 'none',
         transport: 0,
         from: 'auto',
+        ladder: false,
         doors: { north: 'unknown', east: 'unknown', south: 'unknown', west: 'unknown' },
       },
     });
   });
-  idRow.append(visitedToggle, entranceToggle, wipe);
+  idRow.append(visitedToggle, entranceToggle, ladderToggle, wipe);
 
   /*
    * What is in the room, and whether it has been picked up.
@@ -881,6 +913,8 @@ export function buildRooms(
     setToggle(visitedToggle, 'Visited', !!note?.visited);
     entranceToggle.disabled = off;
     setToggle(entranceToggle, 'Entrance', !!selected && state.levelStarts[String(level)] === selected);
+    ladderToggle.disabled = off;
+    setToggle(ladderToggle, 'Ladder', !!note?.ladder);
     wipe.disabled = !interactive || !note;
 
     const item = note?.item ?? '';

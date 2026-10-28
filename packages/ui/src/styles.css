@@ -2177,8 +2177,19 @@
 }
 
 /* Which screen is being edited, or an instruction when none is. */
+/*
+ * A fixed width, not a minimum: the text changes with every click — a screen
+ * id, "Pick a level", "Placing Medium rupee secret" — and its weight with the
+ * toolbar's state, and a box that sized itself to it pushed the marker buttons
+ * along the row each time. 14em holds the longest of them; anything longer is
+ * cut with an ellipsis rather than moving the row.
+ */
 .z1r-tool-target {
-  min-inline-size: 6.5em;
+  flex: none;
+  inline-size: 14em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--z1r-text-md);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -3325,6 +3336,48 @@
  * carries the panel as its own ground, the way the item locations check does,
  * rather than a dark glow that would be a hand-picked colour.
  */
+/*
+ * Needs the Ladder: its sprite in the top-right corner. Once the Ladder is
+ * held the sprite dims and a check sits on it — a shape, so cleared does not
+ * rest on the dimming alone.
+ */
+.z1r-room-ladder {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  z-index: 3;
+  display: flex;
+  inline-size: 34%;
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+
+.z1r-room-ladder:empty {
+  display: none;
+}
+
+.z1r-room-ladder > .z1r-sprite {
+  inline-size: 100%;
+  block-size: 100%;
+  filter: drop-shadow(0 0 1px var(--z1r-bg)) drop-shadow(0 0 1px var(--z1r-bg));
+}
+
+.z1r-room[data-ladder="clear"] .z1r-room-ladder > .z1r-sprite {
+  opacity: 0.45;
+}
+
+.z1r-room-ladder-ok {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: var(--z1r-text-2xs);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--z1r-good);
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+}
+
 /* The level's entrance: the overworld's start pennant, in the top-left corner. */
 .z1r-room-start {
   position: absolute;

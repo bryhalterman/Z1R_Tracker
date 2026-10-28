@@ -325,6 +325,12 @@ export interface RoomNote {
   collected: boolean;
   /** How the item was found, and so which location slot it fills. */
   from: RoomFrom;
+  /**
+   * Water in the way: the room cannot be crossed, or its item reached,
+   * without the Ladder. Whether the Ladder is held is read from the inventory
+   * when the room is drawn, not stored here.
+   */
+  ladder: boolean;
 }
 
 /**
@@ -347,6 +353,7 @@ export function emptyRoom(): RoomNote {
     doors: { north: 'unknown', east: 'unknown', south: 'unknown', west: 'unknown' },
     collected: false,
     from: 'auto',
+    ladder: false,
   };
 }
 
@@ -360,6 +367,7 @@ export function roomIsBare(room: RoomNote): boolean {
     room.transport === 0 &&
     !room.collected &&
     room.from === 'auto' &&
+    !room.ladder &&
     ROOM_SIDES.every((side) => room.doors[side] === 'unknown')
   );
 }

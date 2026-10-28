@@ -347,6 +347,8 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
         doors,
         collected,
         from,
+        // Absent in every save before it existed, which is no water recorded.
+        ladder: note.ladder === true,
       };
       // Absence is the empty state, so a room that conformed down to nothing
       // must not be written back out as sixty-four unknown doors.

@@ -1636,6 +1636,8 @@ function buildMap(
         : armed
           ? `Placing ${placing}`
           : selected || 'Pick a screen';
+    // The box is a fixed width and clips; the whole line is on hover.
+    target.title = target.textContent;
     toolbar.dataset.waiting = String(needsLevel || needsStairway);
 
     // The pennant is not a mark, so "already this" means "is the start".
