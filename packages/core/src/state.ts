@@ -23,6 +23,7 @@ import {
   DOOR_STATES_BY_ID,
   emptyRoom,
   isRoomFrom,
+  isRoomChute,
   isRoomId,
   isRoomLevel,
   isRoomSide,
@@ -906,6 +907,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       if (patch.from !== undefined && !isRoomFrom(patch.from)) return state;
       if (patch.collected !== undefined && typeof patch.collected !== 'boolean') return state;
       if (patch.ladder !== undefined && typeof patch.ladder !== 'boolean') return state;
+      if (patch.chute !== undefined && !isRoomChute(patch.chute)) return state;
       // Same refusal as `collectRoom`: collecting an empty room is not a fact.
       const item = patch.item ?? target.current.item;
       if (patch.collected === true && item === '') return state;

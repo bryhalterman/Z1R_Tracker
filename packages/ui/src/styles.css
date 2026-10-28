@@ -3378,6 +3378,56 @@
   text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
 }
 
+/*
+ * A chute room: two bars for its two rows of blocks, a third of the way in from
+ * each side, under the room's marks so the item still reads in the middle lane.
+ */
+.z1r-room-chute {
+  position: absolute;
+  inset: 3px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.z1r-room-chute:not([data-chute="vertical"], [data-chute="horizontal"]) {
+  display: none;
+}
+
+.z1r-room-chute::before,
+.z1r-room-chute::after {
+  content: "";
+  position: absolute;
+  background: color-mix(in srgb, var(--z1r-room-ink) 55%, transparent);
+}
+
+.z1r-room-chute[data-chute="vertical"]::before,
+.z1r-room-chute[data-chute="vertical"]::after {
+  inset-block: 0;
+  inline-size: 3px;
+}
+
+.z1r-room-chute[data-chute="vertical"]::before {
+  inset-inline-start: calc(33% - 1px);
+}
+
+.z1r-room-chute[data-chute="vertical"]::after {
+  inset-inline-end: calc(33% - 1px);
+}
+
+.z1r-room-chute[data-chute="horizontal"]::before,
+.z1r-room-chute[data-chute="horizontal"]::after {
+  inset-inline: 0;
+  block-size: 3px;
+}
+
+.z1r-room-chute[data-chute="horizontal"]::before {
+  inset-block-start: calc(33% - 1px);
+}
+
+.z1r-room-chute[data-chute="horizontal"]::after {
+  inset-block-end: calc(33% - 1px);
+}
+
 /* The level's entrance: the overworld's start pennant, in the top-left corner. */
 .z1r-room-start {
   position: absolute;

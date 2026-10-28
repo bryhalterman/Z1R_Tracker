@@ -17,6 +17,7 @@ import {
   ROOM_ROWS,
   ROOM_SIDES,
   type DoorState,
+  type RoomChute,
 } from './rooms.js';
 import { bundledManifest } from './index.js';
 
@@ -362,6 +363,7 @@ test('a well-formed room map survives a load unchanged', () => {
           collected: true,
           from: 'stair',
           ladder: true,
+          chute: 'vertical',
         },
       },
     },
@@ -535,4 +537,39 @@ test('the ladder mark survives a save, and is absent from older ones', () => {
   older.rooms['4'].C3 = { visited: true };
   const fromOlder = migrate(older);
   assert.equal(fromOlder?.rooms['4']?.C3?.ladder, false);
+});
+
+/* ------------------------------------------------------------- chute room */
+
+test('a room can be marked as a vertical or horizontal chute, and that alone keeps it', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: 'vertical' } });
+  assert.equal(state.rooms['2']?.B5?.chute, 'vertical');
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: 'horizontal' } });
+  assert.equal(state.rooms['2']?.B5?.chute, 'horizontal');
+  // Anything but the three values is refused, not coerced.
+  const refused = reduce(state, {
+    type: 'setRoomNote',
+    level: 2,
+    room: 'B5',
+    patch: { chute: 'diagonal' as unknown as RoomChute },
+  });
+  assert.equal(refused, state);
+  // Clearing it leaves nothing worth keeping, so the room goes.
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: '' } });
+  assert.equal(state.rooms['2']?.B5, undefined);
+});
+
+test('the chute mark survives a save, and is empty in older or damaged ones', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: 'horizontal' } });
+  const loaded = migrate(JSON.parse(JSON.stringify(state)));
+  assert.ok(loaded);
+  assert.equal(loaded.rooms['2']?.B5?.chute, 'horizontal');
+  const older = JSON.parse(JSON.stringify(state));
+  older.rooms['2'].B5 = { visited: true };
+  assert.equal(migrate(older)?.rooms['2']?.B5?.chute, '');
+  const damaged = JSON.parse(JSON.stringify(state));
+  damaged.rooms['2'].B5 = { visited: true, chute: 'sideways' };
+  assert.equal(migrate(damaged)?.rooms['2']?.B5?.chute, '');
 });

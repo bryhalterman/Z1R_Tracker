@@ -24,6 +24,7 @@ import {
   DOOR_STATES_BY_ID,
   emptyRoom,
   isRoomFrom,
+  isRoomChute,
   isRoomId,
   isRoomLevel,
   roomIsBare,
@@ -349,6 +350,8 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
         from,
         // Absent in every save before it existed, which is no water recorded.
         ladder: note.ladder === true,
+        // Likewise absent before it existed, which is an ordinary room.
+        chute: isRoomChute(note.chute) ? note.chute : '',
       };
       // Absence is the empty state, so a room that conformed down to nothing
       // must not be written back out as sixty-four unknown doors.

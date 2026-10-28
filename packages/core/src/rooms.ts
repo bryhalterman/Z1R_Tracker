@@ -331,6 +331,24 @@ export interface RoomNote {
    * when the room is drawn, not stored here.
    */
   ladder: boolean;
+  /** Which way the room's chute runs, or empty for none. */
+  chute: RoomChute;
+}
+
+/**
+ * A chute room: two rows of blocks down the middle that split the room into
+ * lanes. `vertical` runs north to south, `horizontal` west to east; empty is
+ * an ordinary room.
+ */
+export type RoomChute = '' | 'vertical' | 'horizontal';
+
+export const ROOM_CHUTES: readonly RoomChute[] = ['', 'vertical', 'horizontal'];
+
+const ROOM_CHUTE_SET: ReadonlySet<string> = new Set<string>(ROOM_CHUTES);
+
+/** True for one of the three values; the reducer and `migrate` both gate on it. */
+export function isRoomChute(value: unknown): value is RoomChute {
+  return typeof value === 'string' && ROOM_CHUTE_SET.has(value);
 }
 
 /**
@@ -354,6 +372,7 @@ export function emptyRoom(): RoomNote {
     collected: false,
     from: 'auto',
     ladder: false,
+    chute: '',
   };
 }
 
@@ -368,6 +387,7 @@ export function roomIsBare(room: RoomNote): boolean {
     !room.collected &&
     room.from === 'auto' &&
     !room.ladder &&
+    room.chute === '' &&
     ROOM_SIDES.every((side) => room.doors[side] === 'unknown')
   );
 }

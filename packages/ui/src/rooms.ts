@@ -27,6 +27,7 @@ import {
   POOL_BY_ID,
   ROOM_COLUMNS,
   ROOM_FROMS,
+  ROOM_CHUTES,
   ROOM_ITEMS_BY_ID,
   ROOM_ROWS,
   ROOM_SIDES,
@@ -43,6 +44,7 @@ import {
   type ItemDef,
   type RoomFrom,
   type RoomNote,
+  type RoomChute,
   type RoomSide,
   type RoomSlotKind,
   type RoomStairKind,
@@ -168,6 +170,12 @@ const STAIR_WORD: Record<RoomStairKind, string> = {
   none: 'None',
   item: 'To item',
   transport: 'Transport',
+};
+
+/** The arrow the Chute chip shows for each direction. */
+const CHUTE_ARROW: Record<Exclude<RoomChute, ''>, string> = {
+  vertical: '↕',
+  horizontal: '↔',
 };
 
 /**
@@ -407,6 +415,12 @@ export function buildRooms(
        */
       const ladder = el('span', 'z1r-room-ladder');
       cell.append(ladder);
+      /*
+       * A chute room: its two rows of blocks drawn as two bars down the room,
+       * the way they sit on screen, so the direction is a shape.
+       */
+      const chute = el('span', 'z1r-room-chute');
+      cell.append(chute);
       grid.append(cell);
 
       let bossArt: HTMLElement | null = null;
@@ -440,6 +454,8 @@ export function buildRooms(
           ladder.replaceChildren(createSprite(resolver, 'item.ladder', { size: 14, label: '' }));
           if (ladderState === 'clear') ladder.append(el('span', 'z1r-room-ladder-ok', '✓'));
         });
+
+        chute.dataset.chute = note?.chute ?? '';
 
         for (const { side, edge } of edges) {
           edge.dataset.door = note?.doors[side] ?? 'unknown';
@@ -499,6 +515,7 @@ export function buildRooms(
         if (isEntrance) parts.push('entrance');
         if (ladderState === 'blocked') parts.push('needs the Ladder');
         if (ladderState === 'clear') parts.push('needed the Ladder — held, passable now');
+        if (note?.chute) parts.push(`${note.chute} chute`);
         if (note) {
           parts.push(note.visited ? 'visited' : 'not visited');
           if (item) {
@@ -582,6 +599,21 @@ export function buildRooms(
     commit(selected, { type: 'setRoomNote', level, room: selected, patch: { ladder: !current } });
   });
 
+  /*
+   * One chip that steps through the three answers — none, vertical,
+   * horizontal — rather than three more chips on an already full row. The
+   * label spells the direction out with an arrow, so it is not tint alone.
+   */
+  const chuteToggle = el('button', 'z1r-room-pick z1r-room-word', 'Chute');
+  chuteToggle.type = 'button';
+  chuteToggle.title = 'Chute room: click to step through none, vertical, horizontal';
+  chuteToggle.addEventListener('click', () => {
+    if (!selected) return;
+    const current = roomsOf(store.getState())[selected]?.chute ?? '';
+    const next = ROOM_CHUTES[(ROOM_CHUTES.indexOf(current) + 1) % ROOM_CHUTES.length] ?? '';
+    commit(selected, { type: 'setRoomNote', level, room: selected, patch: { chute: next } });
+  });
+
   const wipe = el('button', 'z1r-room-pick z1r-room-word', 'Wipe');
   wipe.type = 'button';
   wipe.title = 'Forget everything recorded about this room';
@@ -606,11 +638,12 @@ export function buildRooms(
         transport: 0,
         from: 'auto',
         ladder: false,
+        chute: '',
         doors: { north: 'unknown', east: 'unknown', south: 'unknown', west: 'unknown' },
       },
     });
   });
-  idRow.append(visitedToggle, entranceToggle, ladderToggle, wipe);
+  idRow.append(visitedToggle, entranceToggle, ladderToggle, chuteToggle, wipe);
 
   /*
    * What is in the room, and whether it has been picked up.
@@ -915,6 +948,9 @@ export function buildRooms(
     setToggle(entranceToggle, 'Entrance', !!selected && state.levelStarts[String(level)] === selected);
     ladderToggle.disabled = off;
     setToggle(ladderToggle, 'Ladder', !!note?.ladder);
+    chuteToggle.disabled = off;
+    const chuteWay = note?.chute ?? '';
+    setToggle(chuteToggle, chuteWay ? `Chute ${CHUTE_ARROW[chuteWay]}` : 'Chute', chuteWay !== '');
     wipe.disabled = !interactive || !note;
 
     const item = note?.item ?? '';
