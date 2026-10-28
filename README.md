@@ -29,6 +29,8 @@ the same for the other two targets.
 
 ## Using it
 
+The [user guide](docs/GUIDE.md) walks through every panel and control.
+
 - **Left click** an item to add it, **right click** to remove it.
 - Progressive items (Sword, Arrow, Boomerang, Candle, Ring, Potion) step up through their tiers and
   wrap back to nothing.
