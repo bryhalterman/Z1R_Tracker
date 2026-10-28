@@ -29,7 +29,9 @@ the same for the other two targets.
 
 ## Using it
 
-The [user guide](docs/GUIDE.md) walks through every panel and control.
+The [user guide](docs/GUIDE.md) walks through every panel and control. For a player's-eye tour of
+what the tracker does, read the [Z1R Tracker article](https://www.xunlyn.com/codex/z1r/z1r-tracker)
+on Xunlyn85.
 
 - **Left click** an item to add it, **right click** to remove it.
 - Progressive items (Sword, Arrow, Boomerang, Candle, Ring, Potion) step up through their tiers and
