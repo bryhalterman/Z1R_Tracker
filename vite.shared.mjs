@@ -20,7 +20,8 @@ export function spriteManifest() {
   return {
     name: 'z1r-sprite-manifest',
     configureServer(server) {
-      server.middlewares.use('/sprites.json', (_req, res) => {
+      // Under the app's base, for the reason `localMaps` gives below.
+      server.middlewares.use(`${server.config.base}sprites.json`, (_req, res) => {
         res.setHeader('content-type', 'application/json');
         // Read per request so manifest edits show up without a restart.
         res.end(readFileSync(MANIFEST, 'utf8'));
@@ -66,7 +67,11 @@ export function localMaps() {
   return {
     name: 'z1r-local-maps',
     configureServer(server) {
-      server.middlewares.use('/maps', (req, res, next) => {
+      // Mounted under the app's base. Plugin middleware runs before Vite
+      // strips the base from the URL, so the web app's requests arrive as
+      // `/Z1R_Tracker/maps/...` and a bare `/maps` mount never saw them: they
+      // fell through to `index.html`. A relative base resolves to `/` here.
+      server.middlewares.use(`${server.config.base}maps`, (req, res, next) => {
         const name = (req.url ?? '').replace(/^\//, '').split('?')[0];
         if (!name || name.includes('..')) return next();
         try {
