@@ -1,3 +1,5 @@
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
 import { localMaps, spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
 
@@ -27,7 +29,7 @@ function classicScriptTag(): Plugin {
  */
 export default defineConfig({
   base: './',
-  plugins: [spriteManifest(), localMaps(), classicScriptTag()],
+  plugins: [react(), tailwindcss(), spriteManifest(), localMaps(), classicScriptTag()],
   resolve: { alias: workspaceAliases },
   build: {
     outDir: 'dist',

@@ -1,0 +1,97 @@
+/*
+ * Tailwind and the shadcn theme, for the React room card only.
+ *
+ * The rest of the tracker is plain DOM styled by `styles.css`, so Tailwind is
+ * brought in without its preflight: the base reset would restyle every button,
+ * heading and list on the page. Utilities are generated only from the card's
+ * own source folders, so no class the existing panels use can pick one up.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "tw-animate-css";
+
+@source "./room-card";
+@source "./components";
+
+/* The tracker is dark-only, so shadcn's `dark:` styles always apply. */
+@custom-variant dark (&:where(.spectrum, .spectrum *));
+
+/*
+ * shadcn's theme variables, bound to the tracker's own Spectrum aliases rather
+ * than shadcn's palette, so the card matches the panels around it and
+ * `theme:check` still measures the colours it uses. On `.spectrum` — the page
+ * body — because the layout picker's popover is portalled out of the card.
+ */
+.spectrum {
+  --background: var(--z1r-field);
+  --foreground: var(--z1r-text);
+  --card: var(--z1r-field);
+  --card-foreground: var(--z1r-text);
+  --popover: var(--z1r-panel);
+  --popover-foreground: var(--z1r-text);
+  --primary: var(--z1r-accent);
+  --primary-foreground: var(--z1r-bg);
+  --secondary: var(--z1r-inset);
+  --secondary-foreground: var(--z1r-text);
+  --muted: var(--z1r-inset);
+  --muted-foreground: var(--z1r-muted);
+  --accent: var(--z1r-inset);
+  --accent-foreground: var(--z1r-text);
+  --destructive: var(--z1r-bad);
+  --border: var(--z1r-border);
+  --input: var(--z1r-border);
+  --ring: var(--z1r-accent);
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--z1r-font);
+}
+
+/*
+ * The slice of preflight the shadcn components lean on, scoped to the card and
+ * its popover: border boxes, borders that only appear when a utility asks,
+ * and controls that inherit the page's font instead of the browser's.
+ */
+@layer base {
+  :where(.z1r-card, .z1r-card *, .z1r-card ::before, .z1r-card ::after) {
+    box-sizing: border-box;
+    border: 0 solid;
+    margin: 0;
+  }
+
+  :where(.z1r-card) :where(button, input, kbd) {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+  }
+}
+
+/* Where the card sits in the panel: beside the sheet when there is width. */
+.z1r-room-cardhost {
+  flex: 1 1 var(--z1r-room-aside);
+  min-inline-size: 0;
+}

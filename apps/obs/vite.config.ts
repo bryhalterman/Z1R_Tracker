@@ -1,4 +1,6 @@
 import { fileURLToPath } from 'node:url';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { localMaps, spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
 
@@ -15,7 +17,7 @@ export default defineConfig({
   define: {
     __BUILD_ID__: JSON.stringify(new Date().toISOString().slice(5, 16).replace('T', ' ')),
   },
-  plugins: [spriteManifest(), localMaps()],
+  plugins: [react(), tailwindcss(), spriteManifest(), localMaps()],
   resolve: { alias: workspaceAliases },
   build: {
     outDir: 'dist',

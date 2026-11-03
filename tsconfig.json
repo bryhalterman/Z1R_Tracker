@@ -3,10 +3,12 @@
   "compilerOptions": {
     "baseUrl": ".",
     "noEmit": true,
+    "jsx": "react-jsx",
     "types": ["vite/client", "node"]
   },
   "include": [
     "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.tsx",
     "apps/*/src/**/*.ts",
     "apps/*/*.config.ts",
     "vite.shared.d.mts"

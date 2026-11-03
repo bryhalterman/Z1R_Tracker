@@ -1,3 +1,5 @@
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { localMaps, spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
 
@@ -7,7 +9,7 @@ const base = process.env.PAGES_BASE ?? '/Z1R_Tracker/';
 
 export default defineConfig({
   base,
-  plugins: [spriteManifest(), localMaps()],
+  plugins: [react(), tailwindcss(), spriteManifest(), localMaps()],
   resolve: { alias: workspaceAliases },
   build: {
     outDir: 'dist',
