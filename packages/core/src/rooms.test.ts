@@ -16,6 +16,7 @@ import {
   ROOM_ITEMS,
   ROOM_ROWS,
   ROOM_SIDES,
+  ROOM_TRANSPORT_MAX,
   type DoorState,
   type RoomChute,
 } from './rooms.js';
@@ -91,12 +92,28 @@ test('the four numbers are independent, and each level pairs on its own', () => 
   assert.equal(room(state, 5, 'H1')?.transport, 1);
 });
 
-test('a number outside 1-4, or a fractional one, is refused', () => {
+test('a number below 1, past what the grid can hold, or fractional, is refused', () => {
   const base = createInitialState();
-  for (const number of [0, 5, -1, 2.5, Number.NaN]) {
+  for (const number of [0, ROOM_TRANSPORT_MAX + 1, -1, 2.5, Number.NaN]) {
     const state = reduce(base, { type: 'placeRoomTransport', level: 1, room: 'A1', number });
     assert.equal(state, base, `number ${String(number)}`);
   }
+});
+
+test('a level holds more than four transport pairs', () => {
+  let state = createInitialState();
+  const rooms = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2', 'E1', 'E2', 'F1', 'F2'];
+  rooms.forEach((id, index) => {
+    const number = Math.floor(index / 2) + 1;
+    state = reduce(state, { type: 'placeRoomTransport', level: 9, room: id, number });
+  });
+  // Six pairs, and every room kept its number: nothing was evicted.
+  rooms.forEach((id, index) => {
+    assert.equal(room(state, 9, id)?.transport, Math.floor(index / 2) + 1, id);
+  });
+  // And a save holding pair 6 loads it back.
+  const loaded = migrate(JSON.parse(JSON.stringify(state)));
+  assert.equal(loaded?.rooms['9']?.F2?.transport, 6);
 });
 
 test('moving the staircase kind off transport clears the pair number', () => {
@@ -463,7 +480,7 @@ test('a room that conforms down to nothing is not kept', () => {
 });
 
 test('transport numbers out of range, fractional or NaN load as unpaired', () => {
-  for (const transport of [0, 5, -2, 1.5, Number.NaN, 'two', null]) {
+  for (const transport of [0, ROOM_TRANSPORT_MAX + 1, -2, 1.5, Number.NaN, 'two', null]) {
     const state = migrate({
       ...preRoomsSave(),
       rooms: { '1': { A1: { stairs: 'transport', transport, transportSeq: 1 } } },

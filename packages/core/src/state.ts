@@ -30,7 +30,7 @@ import {
   roomIsBare,
   ROOM_ITEMS_BY_ID,
   ROOM_STAIRS_BY_ID,
-  ROOM_TRANSPORT_COUNT,
+  ROOM_TRANSPORT_MAX,
   ROOM_TRANSPORT_PAIR_SIZE,
   type DoorState,
   type RoomFrom,
@@ -852,7 +852,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       // Refused, not clamped: a 7 or a 2.5 is a caller bug, and quietly turning
       // it into a 4 would pair two rooms the player never paired.
       if (!Number.isInteger(action.number)) return state;
-      if (action.number < 1 || action.number > ROOM_TRANSPORT_COUNT) return state;
+      if (action.number < 1 || action.number > ROOM_TRANSPORT_MAX) return state;
       // Re-placing the number a room already holds would restamp it as the
       // newest of the pair, which would change which room an eviction picks.
       if (target.current.transport === action.number) return state;
@@ -902,7 +902,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       }
       if (patch.transport !== undefined) {
         if (!Number.isInteger(patch.transport)) return state;
-        if (patch.transport < 0 || patch.transport > ROOM_TRANSPORT_COUNT) return state;
+        if (patch.transport < 0 || patch.transport > ROOM_TRANSPORT_MAX) return state;
       }
       if (patch.from !== undefined && !isRoomFrom(patch.from)) return state;
       if (patch.collected !== undefined && typeof patch.collected !== 'boolean') return state;

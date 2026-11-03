@@ -304,8 +304,11 @@ The **Stairs** row has three choices:
   The room shows the staircase icon.
 - **Transport** for one end of a transport staircase.
 
-A transport staircase gets the lowest free pair number, 1 to 4,
+A transport staircase gets the lowest free pair number,
 and the room shows that number.
+A level has no limit on pairs.
+The row shows numbers 1 to 4 to start,
+and always one more than the highest number in use on the level.
 The two rooms with the same number are the two ends of one staircase.
 Click a different number to change the pair,
 or click the selected number again to unpair the room and keep the staircase.

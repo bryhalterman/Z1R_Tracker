@@ -148,7 +148,7 @@ export const ROOM_STAIRS: readonly RoomStairDef[] = [
   // of, and the one worth marking because it holds something.
   { id: 'item', name: 'Item stairs', tag: 'IT' },
   // The paired kind. Two of these in a level are the same staircase, which is
-  // why they carry a number — see `ROOM_TRANSPORT_COUNT`.
+  // why they carry a number — see `ROOM_TRANSPORT_MAX`.
   { id: 'transport', name: 'Transport stairs', tag: 'TP' },
 ];
 
@@ -156,11 +156,19 @@ export const ROOM_STAIRS_BY_ID: ReadonlyMap<string, RoomStairDef> = new Map(
   ROOM_STAIRS.map((entry) => [entry.id, entry]),
 );
 
-/** How many transport pairs a level can hold, numbered 1-4. */
-export const ROOM_TRANSPORT_COUNT = 4;
-
 /** A transport number names a pair, so two rooms hold it and no more. */
 export const ROOM_TRANSPORT_PAIR_SIZE = 2;
+
+/**
+ * The highest pair number a room can carry.
+ *
+ * Not a game rule: a level holds as many transport pairs as the seed gives it,
+ * Level 9 more than the others, so the tracker sets no limit of its own. This
+ * is the most pairs the grid could physically hold — every room paired off —
+ * and exists only so an imported save cannot name pair 1e9 and have the strip
+ * draw a button for every number up to it.
+ */
+export const ROOM_TRANSPORT_MAX = (ROOM_ROWS * ROOM_COLUMNS) / ROOM_TRANSPORT_PAIR_SIZE;
 
 export interface BossDef {
   readonly id: string;
@@ -298,7 +306,7 @@ export interface RoomNote {
   /** `BossDef` id. Empty for a room with no boss in it. */
   boss: string;
   stairs: RoomStairKind;
-  /** Which transport pair, 1-4. 0 means unpaired, including for item stairs. */
+  /** Which transport pair, from 1. 0 means unpaired, including for item stairs. */
   transport: number;
   /**
    * When this room's transport number was placed, relative to the others in

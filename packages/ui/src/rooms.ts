@@ -33,7 +33,7 @@ import {
   ROOM_SIDES,
   ROOM_STAIRS,
   ROOM_STAIRS_BY_ID,
-  ROOM_TRANSPORT_COUNT,
+  ROOM_TRANSPORT_MAX,
   ROOM_TRANSPORT_PAIR_SIZE,
   SHUFFLE_POOL,
   bossAllowedOnLevel,
@@ -742,10 +742,13 @@ export function buildRooms(
   /*
    * The staircase, and for a transport which pair it is half of.
    *
-   * Segmented buttons rather than two dropdowns: three kinds and four pair
-   * numbers are few enough to show at once, and a dropdown hid which one was
-   * current behind a click. The pair only appears for a transport, since a
+   * Segmented buttons rather than two dropdowns: three kinds and a handful of
+   * pair numbers are few enough to show at once, and a dropdown hid which one
+   * was current behind a click. The pair only appears for a transport, since a
    * number means nothing on any other staircase.
+   *
+   * A level has no fixed number of pairs, so the row grows: four numbers to
+   * start, and always one past the highest in use, so a new pair is a click.
    */
   const { value: stairsRow } = detailRow('Stairs');
   const stairsGroup = segmented('What the staircase in this room is');
@@ -753,13 +756,16 @@ export function buildRooms(
   pairGroup.classList.add('z1r-room-pair');
   stairsRow.append(stairsGroup, pairGroup);
 
-  /** The lowest pair with room for another half, or 1 when all four are full. */
+  /** How many pair numbers the row shows when no more are in use. */
+  const PAIRS_SHOWN = 4;
+
+  /** The lowest pair with room for another half. */
   const nextPair = (rooms: Record<string, RoomNote>): number => {
     const counts = new Map<number, number>();
     for (const note of Object.values(rooms)) {
       if (note.transport) counts.set(note.transport, (counts.get(note.transport) ?? 0) + 1);
     }
-    for (let number = 1; number <= ROOM_TRANSPORT_COUNT; number++) {
+    for (let number = 1; number <= ROOM_TRANSPORT_MAX; number++) {
       if ((counts.get(number) ?? 0) < ROOM_TRANSPORT_PAIR_SIZE) return number;
     }
     return 1;
@@ -798,7 +804,11 @@ export function buildRooms(
   });
 
   const pairButtons: { number: number; button: HTMLButtonElement }[] = [];
-  for (let number = 1; number <= ROOM_TRANSPORT_COUNT; number++) {
+  /** Adds buttons up to `count`; they are kept, and hidden when not needed. */
+  const ensurePairButtons = (count: number) => {
+    for (let number = pairButtons.length + 1; number <= count; number++) addPairButton(number);
+  };
+  const addPairButton = (number: number) => {
     const button = segButton(String(number), '');
     button.dataset.pair = String(number);
     button.addEventListener('click', () => {
@@ -815,7 +825,8 @@ export function buildRooms(
     });
     pairGroup.append(button);
     pairButtons.push({ number, button });
-  }
+  };
+  ensurePairButtons(PAIRS_SHOWN);
 
   /*
    * The doors: pick a state, then click walls.
@@ -1023,8 +1034,12 @@ export function buildRooms(
      */
     pairGroup.hidden = stairs !== 'transport';
     const transport = note?.transport ?? 0;
+    const highest = Math.max(0, ...Object.values(roomsOf(state)).map((room) => room.transport));
+    const shown = Math.min(ROOM_TRANSPORT_MAX, Math.max(PAIRS_SHOWN, highest + 1));
+    ensurePairButtons(shown);
     for (const { number, button } of pairButtons) {
-      button.disabled = off;
+      button.hidden = number > shown;
+      button.disabled = off || number > shown;
       button.setAttribute('aria-pressed', String(transport === number));
       button.title =
         transport === number

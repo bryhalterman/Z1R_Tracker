@@ -31,7 +31,7 @@ import {
   ROOM_ITEMS_BY_ID,
   ROOM_SIDES,
   ROOM_STAIRS_BY_ID,
-  ROOM_TRANSPORT_COUNT,
+  ROOM_TRANSPORT_MAX,
   ROOM_TRANSPORT_PAIR_SIZE,
   type DoorState,
   type RoomDoors,
@@ -322,7 +322,7 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
       // rather than being rounded into a pair nobody placed.
       const pair = Number(note.transport);
       const transport =
-        stairs === 'transport' && Number.isInteger(pair) && pair >= 1 && pair <= ROOM_TRANSPORT_COUNT
+        stairs === 'transport' && Number.isInteger(pair) && pair >= 1 && pair <= ROOM_TRANSPORT_MAX
           ? pair
           : 0;
       // The eviction stamp is meaningless without a number. A missing one
