@@ -20,7 +20,16 @@ import {
   type DoorState,
   type RoomPushBlock,
 } from './rooms.js';
-import { ROOM_LAYOUTS, ROOM_LAYOUT_COLUMNS, ROOM_LAYOUT_GROUPS, ROOM_LAYOUT_ROWS } from './layouts.js';
+import {
+  ROOM_LAYOUTS,
+  ROOM_LAYOUTS_BY_ID,
+  ROOM_LAYOUT_COLUMNS,
+  ROOM_LAYOUT_GROUPS,
+  ROOM_LAYOUT_ROWS,
+  layoutCanHaveStairs,
+  layoutCanPush,
+  layoutHasStairs,
+} from './layouts.js';
 import { bundledManifest } from './index.js';
 
 /** The room record for one level/room pair, or undefined when it is bare. */
@@ -677,4 +686,46 @@ test('push block and cleared survive a save, and default in older or damaged one
   damaged.rooms['3'].D4 = { visited: true, pushBlock: 'shoved', cleared: 'yes' };
   assert.equal(migrate(damaged)?.rooms['3']?.D4?.pushBlock, '');
   assert.equal(migrate(damaged)?.rooms['3']?.D4?.cleared, false);
+});
+
+/* ------------------------------------------------ push blocks and stairs */
+
+test('a push block needs a block in the middle row, as the game looks for it', () => {
+  const push = ROOM_LAYOUTS.filter(layoutCanPush).map((layout) => layout.id).sort();
+  assert.deepEqual(push, [
+    'arch',
+    'arrows',
+    'block-ring',
+    'c-shape',
+    'center-block',
+    'closed-ring',
+    'columns',
+    'cross-path',
+    'diagonals',
+    'diamond',
+    'five-pairs',
+    'low-blocks',
+    'maze',
+    'pillar-rows',
+    'single-block',
+    'spiral',
+    'three-bars',
+    'twin-blocks',
+    'two-blocks',
+    'vertical-chute',
+  ]);
+  // Statues are not blocks: the game matches the block tile only.
+  const statues = ROOM_LAYOUTS_BY_ID.get('two-statues');
+  assert.ok(statues);
+  assert.equal(layoutCanPush(statues), false);
+});
+
+test('stairs come from the layout itself or from a push block, so some rooms never have any', () => {
+  const builtIn = ROOM_LAYOUTS.filter(layoutHasStairs).map((layout) => layout.id).sort();
+  assert.deepEqual(builtIn, ['diamond', 'spiral', 'wedge']);
+  assert.equal(ROOM_LAYOUTS.filter(layoutCanHaveStairs).length, 21);
+  const corners = ROOM_LAYOUTS_BY_ID.get('corner-statues');
+  assert.ok(corners);
+  assert.equal(layoutCanPush(corners), false);
+  assert.equal(layoutCanHaveStairs(corners), false);
 });

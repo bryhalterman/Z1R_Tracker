@@ -696,6 +696,39 @@ export function isRoomLayout(value: unknown): value is string {
   return value === '' || (typeof value === 'string' && ROOM_LAYOUTS_BY_ID.has(value));
 }
 
+/** The square row the game looks along for a push block: the middle one. */
+const PUSH_BLOCK_ROW = 3;
+
+/**
+ * Whether a room on this layout can have a push block.
+ *
+ * The game does not store where a room's push block is. It takes the leftmost
+ * block in the middle row (`FindAndCreatePushBlockObject` in Aldo Nunez's
+ * disassembly, Z_05.asm) and matches the block tile only, so statues do not
+ * count. A layout with no block in that row has nothing to push. This is the
+ * game's rule, not a record of where the randomizer puts them: Spiral passes
+ * it, and the original game uses it once, in the 2nd Quest.
+ */
+export function layoutCanPush(def: RoomLayoutDef): boolean {
+  return def.rows[PUSH_BLOCK_ROW]?.includes('#') ?? false;
+}
+
+/** Whether the layout draws a staircase of its own: Diamond, Wedge, Spiral. */
+export function layoutHasStairs(def: RoomLayoutDef): boolean {
+  return def.rows.some((row) => row.includes('='));
+}
+
+/**
+ * Whether a room on this layout can have stairs at all.
+ *
+ * A dungeon room's stairs are either part of its layout or revealed by
+ * pushing its block (the "block → stairs" secret, which always puts them in
+ * the same spot), so a room that can do neither never has any.
+ */
+export function layoutCanHaveStairs(def: RoomLayoutDef): boolean {
+  return layoutHasStairs(def) || layoutCanPush(def);
+}
+
 /**
  * The layout a pre-layout save's chute mark stands for.
  *
