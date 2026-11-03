@@ -21,6 +21,7 @@ import {
   MARKS,
   MARKS_BY_KIND,
   OVERWORLD_COLUMNS,
+  overworldMap,
   OVERWORLD_ROWS,
   OVERWORLD_STAIRWAY_COUNT,
   warpRoutes,
@@ -1352,8 +1353,17 @@ function buildMap(
    */
   const MAP_COLUMNS_PERCENT = 16 * 100;
   const MAP_ROWS_PERCENT = (468 / 440) * 8 * 100;
-  const mapKey = () =>
-    store.getState().seed.mirroredOverworld ? 'ref.overworld.mirrored' : 'ref.overworld';
+  /*
+   * The Overworld Quest picks the map, Mirrored its orientation. All six are
+   * the wiki's maps in the same 1280x468 layout, so the cells place any of them
+   * the same way.
+   */
+  const mapKey = () => {
+    const { overworldQuest, mirroredOverworld } = store.getState().seed;
+    const quest = overworldMap(overworldQuest);
+    const base = quest === '1st' ? 'ref.overworld' : `ref.overworld.${quest}`;
+    return mirroredOverworld ? `${base}.mirrored` : base;
+  };
 
   /*
    * Marker toolbar, fixed above the map.

@@ -33,6 +33,36 @@ export const DUNGEON_QUESTS: readonly { value: DungeonQuest; label: string }[] =
   { value: 'random', label: 'Random' },
 ];
 
+/**
+ * The Overworld Quest dropdown: which caves and secrets the overworld has.
+ *
+ * A setting of its own, apart from Dungeon Quest, which decides what is inside
+ * the levels. It changes the map the overworld grid is drawn from, which is
+ * why it has a field here. The two Mixed options place caves from both quests'
+ * locations and differ in how many caves and large secrets a seed gets; the
+ * wiki keeps one Mixed map for both. See Order of the Ate's flag notes:
+ * https://sites.google.com/view/orderoftheate/zelda-1-randomizer/flag-explanations/upper-drop-downs
+ */
+export type OverworldQuest = '1st' | '2nd' | 'mixed-1st' | 'mixed-2nd' | 'random';
+
+export const OVERWORLD_QUESTS: readonly { value: OverworldQuest; label: string }[] = [
+  { value: '1st', label: '1st Quest' },
+  { value: '2nd', label: '2nd Quest' },
+  { value: 'mixed-1st', label: 'Mixed Quest - 1st' },
+  { value: 'mixed-2nd', label: 'Mixed Quest - 2nd' },
+  { value: 'random', label: 'Random' },
+];
+
+/**
+ * Which overworld map a seed is drawn on. Random is not known until you play,
+ * so it shows the 1st Quest map until the quest you found is picked.
+ */
+export function overworldMap(quest: OverworldQuest): '1st' | '2nd' | 'mixed' {
+  if (quest === '2nd') return '2nd';
+  if (quest === 'mixed-1st' || quest === 'mixed-2nd') return 'mixed';
+  return '1st';
+}
+
 /** https://z1r.wiki/wiki/Dungeon_Items_(Flags) — "Item Shuffle" dropdown. */
 export type ItemShuffle = 'none' | 'dungeon' | 'anywhere-hearts-in-dungeons' | 'items-hearts' | 'random';
 
@@ -57,6 +87,7 @@ export interface SeedSettings {
   /** The full flag string. Stored verbatim; never parsed. */
   flags: string;
   dungeonQuest: DungeonQuest;
+  overworldQuest: OverworldQuest;
   itemShuffle: ItemShuffle;
   /** Triforce / hearts / keys / compass / map join the shuffle. */
   shuffleDungeonDrops: boolean;
@@ -81,6 +112,7 @@ export function createSeedSettings(): SeedSettings {
     seed: '',
     flags: '',
     dungeonQuest: '1st',
+    overworldQuest: '1st',
     itemShuffle: 'items-hearts',
     shuffleDungeonDrops: true,
     shuffleMinorDrops: false,

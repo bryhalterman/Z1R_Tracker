@@ -48,6 +48,7 @@ everything else goes in **Flags** or **Notes**.
 | Seed | Stores the seed number for your own reference |
 | Flags | Stores the full flag string as typed; the tracker never reads it |
 | Dungeon Quest | Sets how many item slots each level has and whether each is a floor or stair slot |
+| Overworld Quest | Sets which overworld map the map panel is drawn on |
 | Item Shuffle | Records which item pool is in play |
 | Shuffle dungeon drops | Records that the Triforce, hearts, keys, compass, and map join the shuffle |
 | Shuffle minor drops | Records that a level can hold extra floor items |
@@ -61,6 +62,13 @@ Random No Shapes, and Random.
 When the quest choice leaves it open which quest each half of the game uses,
 a **Quest split** control appears.
 Set **L1-6** and **L7-9** once you know which quest each half turned out to be.
+
+**Overworld Quest** is a separate setting in the randomizer,
+for which caves and secrets the overworld has.
+It offers 1st Quest, 2nd Quest, Mixed Quest - 1st, Mixed Quest - 2nd, and Random.
+Each quest has its own map, and both Mixed options share the Mixed map.
+Random shows the 1st Quest map until you pick the quest you found.
+**Mirrored overworld** flips whichever map is in use.
 
 The per-quest slot tables and the region data are in
 the [seeds and item locations notes](SEEDS.md).
@@ -245,26 +253,48 @@ The title also counts the rooms you have recorded on that level.
 
 Click a room to select it and mark it visited.
 A visited room is drawn as an inked box; an unvisited room is bare paper.
-The strip beside or under the map edits the selected room.
+The room card beside or under the map holds everything about the selected room.
+It opens with the room drawn: its layout across the floor,
+its boss faint behind that, and its four walls with their doors.
+The rows under the drawing set the rest.
+
+A room on the map shows small marks in its bottom-left corner:
+a skull for a room with a boss,
+and a block for a push block, dashed until you have checked it.
+Hover a room to read everything recorded about it.
 
 ### Use the room toggles
 
-The top row of the strip has five buttons:
+The top row of the card has three buttons:
 
 | Button | What it does |
 | --- | --- |
 | Visited | Marks the room walked, or removes the mark |
 | Entrance | Makes this the room you enter the level by; a level has one, shown by the pennant |
-| Ladder | Marks water in the room that needs the Ladder |
-| Chute | Steps through no chute, vertical (↕), and horizontal (↔) |
 | Wipe | Forgets everything recorded about the room |
 
-A room marked Ladder shows the Ladder in its top-right corner.
-Once you hold the Ladder the icon dims and gets a check mark,
-so the room reads as passable.
+### Record the room's layout
 
-A chute room shows two bars across the room in the direction the chute runs,
-the same way its two rows of blocks sit on screen.
+Every dungeon room is built from one of the game's 42 layouts:
+the blocks, statues, water, and sand that stand on its floor.
+The **Layout** row shows the selected room's layout as a picture and a name.
+
+Click it to open the list.
+Layouts are grouped as Open, Blocks, Water, and Floor,
+and each one shows its picture beside its name.
+Type in the box at the top to narrow the list,
+and press Enter to take the first match.
+Arrow keys move through the list and Escape closes it.
+Choose **Not recorded** to clear the layout.
+
+Picking a layout marks the room visited.
+The room's cell on the map draws the layout faintly under its marks.
+In the pictures a block is a solid square, a statue a ring,
+water a filled square with a line through it, sand a dot,
+and built-in stairs two short bars.
+
+A room marked as a chute before layouts existed
+loads as the Vertical chute or Horizontal chute layout.
 
 ### Record the room's item
 
@@ -294,6 +324,8 @@ so the From row hides for them.
 Pick the boss from the **Boss** row.
 Ganon and Princess Zelda appear for Level 9 only.
 Click the selected boss again, or **none**, to clear it.
+The boss shows behind the room drawing on the card,
+and as a skull on the room's map cell.
 
 ### Record the stairs
 
@@ -320,7 +352,7 @@ replaces the room that has held it longest.
 The **Doors** row works like a paint brush:
 
 1. Pick a door state, or press its number key.
-1. Click the walls of the room drawing to paint them.
+1. Click the walls of the room drawing at the top of the card to paint them.
 
 | Key | State | Meaning |
 | --- | --- | --- |
@@ -336,6 +368,30 @@ so four open doors take five clicks.
 Clicking a wall that already shows the picked state resets it to unknown,
 and right-clicking a wall always does.
 The number keys work anywhere on the page except in text fields.
+
+### Mark a push block
+
+A block in a dungeon room sometimes pushes, but never in a fixed room.
+The **Push** row records what you know:
+
+- **None** for nothing suspected.
+- **Maybe** for a room worth trying.
+  Its map cell shows a dashed block.
+- **Checked** once you have tried it.
+  Its map cell shows a solid block with a check.
+
+### Mark a room cleared
+
+Some rooms drop an item only once every enemy in them is killed.
+**Cleared** in the **Drops** row marks the room done.
+
+### Mark water that needs the Ladder
+
+**Needs Ladder** in the **Water** row marks water in the room
+that you cannot cross without the Ladder.
+The room shows the Ladder in its top-right corner.
+Once you hold the Ladder the icon dims and gets a check mark,
+so the room reads as passable.
 
 ### Clear a level
 
@@ -431,7 +487,7 @@ The tracker has these mouse and keyboard shortcuts:
 
 No state in the tracker is signaled by color alone.
 Held items and collected slots have a solid border, and the rest a dashed one.
-Marks, staircases, ladders, chutes,
+Marks, staircases, ladders, room layouts,
 and door states are drawn shapes or carry a text code,
 and every control names its state in its tooltip.
 The full rule is in the [architecture notes](ARCHITECTURE.md#accessibility).

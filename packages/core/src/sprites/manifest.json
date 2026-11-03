@@ -243,6 +243,26 @@
       "name": "Overworld map (mirrored)",
       "glyph": ""
     },
+    "ref.overworld.2nd": {
+      "url": "./maps/overworld-2nd.webp",
+      "name": "Overworld map, 2nd Quest",
+      "glyph": ""
+    },
+    "ref.overworld.2nd.mirrored": {
+      "url": "./maps/overworld-2nd-mirrored.webp",
+      "name": "Overworld map, 2nd Quest (mirrored)",
+      "glyph": ""
+    },
+    "ref.overworld.mixed": {
+      "url": "./maps/overworld-mixed.webp",
+      "name": "Overworld map, Mixed Quest",
+      "glyph": ""
+    },
+    "ref.overworld.mixed.mirrored": {
+      "url": "./maps/overworld-mixed-mirrored.webp",
+      "name": "Overworld map, Mixed Quest (mirrored)",
+      "glyph": ""
+    },
     "boss.ganon": {
       "name": "Ganon",
       "url": "https://www.videogamesprites.net/Zelda1/Bosses/7%20-%20Ganon%20-%20Red1.gif"

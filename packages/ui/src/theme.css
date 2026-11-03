@@ -61,6 +61,10 @@
      from the destructive red. */
   --z1r-heart: var(--spectrum-magenta-1000);
   --z1r-overworld: var(--spectrum-yellow-1000);
+  /* Room layout squares. Drawn shapes, never text, and each square kind has a
+     shape of its own as well — so these are fills, not readability pairs. */
+  --z1r-water: var(--spectrum-blue-900);
+  --z1r-sand: var(--spectrum-orange-900);
 
   /* Geometry. */
   --z1r-radius: var(--spectrum-corner-radius-75);

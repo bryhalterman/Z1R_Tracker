@@ -18,8 +18,9 @@ import {
   ROOM_SIDES,
   ROOM_TRANSPORT_MAX,
   type DoorState,
-  type RoomChute,
+  type RoomPushBlock,
 } from './rooms.js';
+import { ROOM_LAYOUTS, ROOM_LAYOUT_COLUMNS, ROOM_LAYOUT_GROUPS, ROOM_LAYOUT_ROWS } from './layouts.js';
 import { bundledManifest } from './index.js';
 
 /** The room record for one level/room pair, or undefined when it is bare. */
@@ -380,7 +381,9 @@ test('a well-formed room map survives a load unchanged', () => {
           collected: true,
           from: 'stair',
           ladder: true,
-          chute: 'vertical',
+          layout: 'vertical-chute',
+          pushBlock: 'checked',
+          cleared: true,
         },
       },
     },
@@ -556,37 +559,122 @@ test('the ladder mark survives a save, and is absent from older ones', () => {
   assert.equal(fromOlder?.rooms['4']?.C3?.ladder, false);
 });
 
-/* ------------------------------------------------------------- chute room */
+/* ------------------------------------------------------------ room layout */
 
-test('a room can be marked as a vertical or horizontal chute, and that alone keeps it', () => {
+test('every layout is a full grid of known squares, with a unique id and game index', () => {
+  assert.equal(ROOM_LAYOUTS.length, 42);
+  assert.equal(new Set(ROOM_LAYOUTS.map((layout) => layout.id)).size, 42);
+  // The game's table runs 0x00-0x29 with nothing skipped.
+  assert.deepEqual(
+    ROOM_LAYOUTS.map((layout) => layout.code).sort((a, b) => a - b),
+    Array.from({ length: 42 }, (_, index) => index),
+  );
+  for (const layout of ROOM_LAYOUTS) {
+    assert.equal(layout.rows.length, ROOM_LAYOUT_ROWS, layout.id);
+    for (const row of layout.rows) {
+      assert.match(row, new RegExp(`^[.#o=~:x]{${ROOM_LAYOUT_COLUMNS}}$`), layout.id);
+    }
+    assert.ok(ROOM_LAYOUT_GROUPS.some((group) => group.id === layout.group), layout.id);
+  }
+});
+
+test('a room can be given a layout, and that alone keeps it', () => {
   let state = createInitialState();
-  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: 'vertical' } });
-  assert.equal(state.rooms['2']?.B5?.chute, 'vertical');
-  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: 'horizontal' } });
-  assert.equal(state.rooms['2']?.B5?.chute, 'horizontal');
-  // Anything but the three values is refused, not coerced.
-  const refused = reduce(state, {
-    type: 'setRoomNote',
-    level: 2,
-    room: 'B5',
-    patch: { chute: 'diagonal' as unknown as RoomChute },
-  });
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: 'vertical-chute' } });
+  assert.equal(state.rooms['2']?.B5?.layout, 'vertical-chute');
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: 'moat' } });
+  assert.equal(state.rooms['2']?.B5?.layout, 'moat');
+  // An id that names no layout is refused, not stored.
+  const refused = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: 'diagonal-moat' } });
   assert.equal(refused, state);
   // Clearing it leaves nothing worth keeping, so the room goes.
-  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: '' } });
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: '' } });
   assert.equal(state.rooms['2']?.B5, undefined);
 });
 
-test('the chute mark survives a save, and is empty in older or damaged ones', () => {
+test('the layout survives a save, and is empty in older or damaged ones', () => {
   let state = createInitialState();
-  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { chute: 'horizontal' } });
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: 'spiral' } });
   const loaded = migrate(JSON.parse(JSON.stringify(state)));
   assert.ok(loaded);
-  assert.equal(loaded.rooms['2']?.B5?.chute, 'horizontal');
+  assert.equal(loaded.rooms['2']?.B5?.layout, 'spiral');
   const older = JSON.parse(JSON.stringify(state));
   older.rooms['2'].B5 = { visited: true };
-  assert.equal(migrate(older)?.rooms['2']?.B5?.chute, '');
+  assert.equal(migrate(older)?.rooms['2']?.B5?.layout, '');
   const damaged = JSON.parse(JSON.stringify(state));
-  damaged.rooms['2'].B5 = { visited: true, chute: 'sideways' };
-  assert.equal(migrate(damaged)?.rooms['2']?.B5?.chute, '');
+  damaged.rooms['2'].B5 = { visited: true, layout: 'sideways' };
+  assert.equal(migrate(damaged)?.rooms['2']?.B5?.layout, '');
+});
+
+test('a chute marked before layouts existed loads as that chute layout', () => {
+  const saved = JSON.parse(JSON.stringify(createInitialState()));
+  saved.rooms = {
+    '2': {
+      B5: { visited: true, chute: 'vertical' },
+      B6: { visited: true, chute: 'horizontal' },
+      B7: { visited: true, chute: 'sideways' },
+    },
+  };
+  const loaded = migrate(saved);
+  assert.equal(loaded?.rooms['2']?.B5?.layout, 'vertical-chute');
+  assert.equal(loaded?.rooms['2']?.B6?.layout, 'horizontal-chute');
+  assert.equal(loaded?.rooms['2']?.B7?.layout, '');
+  // The old field is not carried forward.
+  assert.equal((loaded?.rooms['2']?.B5 as unknown as Record<string, unknown>)?.chute, undefined);
+});
+
+/* ------------------------------------------------------ push block, cleared */
+
+test('a push block can be flagged and checked, and anything else is refused', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 3, room: 'D4', patch: { pushBlock: 'maybe' } });
+  assert.equal(state.rooms['3']?.D4?.pushBlock, 'maybe');
+  state = reduce(state, { type: 'setRoomNote', level: 3, room: 'D4', patch: { pushBlock: 'checked' } });
+  assert.equal(state.rooms['3']?.D4?.pushBlock, 'checked');
+  const refused = reduce(state, {
+    type: 'setRoomNote',
+    level: 3,
+    room: 'D4',
+    patch: { pushBlock: 'pushed' as unknown as RoomPushBlock },
+  });
+  assert.equal(refused, state);
+  // Back to nothing leaves nothing worth keeping, so the room goes.
+  state = reduce(state, { type: 'setRoomNote', level: 3, room: 'D4', patch: { pushBlock: '' } });
+  assert.equal(state.rooms['3']?.D4, undefined);
+});
+
+test('a cleared room keeps itself, and a non-boolean is refused', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 3, room: 'D4', patch: { cleared: true } });
+  assert.equal(state.rooms['3']?.D4?.cleared, true);
+  const refused = reduce(state, {
+    type: 'setRoomNote',
+    level: 3,
+    room: 'D4',
+    patch: { cleared: 'yes' as unknown as boolean },
+  });
+  assert.equal(refused, state);
+  state = reduce(state, { type: 'setRoomNote', level: 3, room: 'D4', patch: { cleared: false } });
+  assert.equal(state.rooms['3']?.D4, undefined);
+});
+
+test('push block and cleared survive a save, and default in older or damaged ones', () => {
+  let state = createInitialState();
+  state = reduce(state, {
+    type: 'setRoomNote',
+    level: 3,
+    room: 'D4',
+    patch: { pushBlock: 'maybe', cleared: true },
+  });
+  const loaded = migrate(JSON.parse(JSON.stringify(state)));
+  assert.equal(loaded?.rooms['3']?.D4?.pushBlock, 'maybe');
+  assert.equal(loaded?.rooms['3']?.D4?.cleared, true);
+  const older = JSON.parse(JSON.stringify(state));
+  older.rooms['3'].D4 = { visited: true };
+  assert.equal(migrate(older)?.rooms['3']?.D4?.pushBlock, '');
+  assert.equal(migrate(older)?.rooms['3']?.D4?.cleared, false);
+  const damaged = JSON.parse(JSON.stringify(state));
+  damaged.rooms['3'].D4 = { visited: true, pushBlock: 'shoved', cleared: 'yes' };
+  assert.equal(migrate(damaged)?.rooms['3']?.D4?.pushBlock, '');
+  assert.equal(migrate(damaged)?.rooms['3']?.D4?.cleared, false);
 });

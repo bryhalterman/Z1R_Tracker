@@ -24,7 +24,7 @@ import {
   DOOR_STATES_BY_ID,
   emptyRoom,
   isRoomFrom,
-  isRoomChute,
+  isRoomPushBlock,
   isRoomId,
   isRoomLevel,
   roomIsBare,
@@ -38,6 +38,7 @@ import {
   type RoomNote,
   type RoomStairKind,
 } from './rooms.js';
+import { isRoomLayout, layoutFromChute } from './layouts.js';
 
 import {
   DUNGEON_BLOCKS_BY_ID,
@@ -89,6 +90,7 @@ function pruneDungeons(
 const QUESTS = new Set([
   '1st', '2nd', 'mixed', 'shapes', 'mixed-shapes', 'random-no-shapes', 'random',
 ]);
+const OVERWORLD_QUEST_VALUES = new Set(['1st', '2nd', 'mixed-1st', 'mixed-2nd', 'random']);
 const SHUFFLES = new Set([
   'none', 'dungeon', 'anywhere-hearts-in-dungeons', 'items-hearts', 'random',
 ]);
@@ -350,8 +352,15 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
         from,
         // Absent in every save before it existed, which is no water recorded.
         ladder: note.ladder === true,
-        // Likewise absent before it existed, which is an ordinary room.
-        chute: isRoomChute(note.chute) ? note.chute : '',
+        // Absent before it existed, which is no layout recorded. A save from
+        // when chutes were marked by direction keeps them as the two chute
+        // layouts; an id no longer known reads as unrecorded.
+        layout: isRoomLayout(note.layout)
+          ? note.layout
+          : layoutFromChute((raw as { chute?: unknown }).chute),
+        // Both absent before they existed: nothing tried, nothing cleared.
+        pushBlock: isRoomPushBlock(note.pushBlock) ? note.pushBlock : '',
+        cleared: note.cleared === true,
       };
       // Absence is the empty state, so a room that conformed down to nothing
       // must not be written back out as sixty-four unknown doors.
@@ -388,6 +397,8 @@ function conformHints(saved: unknown): HintEntry[] {
 function conformSeed(base: SeedSettings, saved: unknown): SeedSettings {
   const seed = conform(base, saved);
   if (!QUESTS.has(seed.dungeonQuest)) seed.dungeonQuest = base.dungeonQuest;
+  // Absent before it existed, when the map was always the 1st Quest's.
+  if (!OVERWORLD_QUEST_VALUES.has(seed.overworldQuest)) seed.overworldQuest = base.overworldQuest;
   if (!SHUFFLES.has(seed.itemShuffle)) seed.itemShuffle = base.itemShuffle;
   if (seed.questLow !== '1st' && seed.questLow !== '2nd') seed.questLow = base.questLow;
   if (seed.questHigh !== '1st' && seed.questHigh !== '2nd') seed.questHigh = base.questHigh;

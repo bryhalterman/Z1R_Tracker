@@ -9,6 +9,7 @@
 import {
   DUNGEON_QUESTS,
   ITEM_SHUFFLES,
+  OVERWORLD_QUESTS,
   questIsAmbiguous,
   questsMustDiffer,
   type ConcreteQuest,
@@ -65,7 +66,7 @@ export function buildSeedPanel(store: Store, patches: Patch[], interactive: bool
 
   const select = <T extends string>(
     options: readonly { value: T; label: string }[],
-    key: 'dungeonQuest' | 'itemShuffle',
+    key: 'dungeonQuest' | 'overworldQuest' | 'itemShuffle',
   ) => {
     const el = document.createElement('select');
     el.className = 'z1r-input';
@@ -108,6 +109,7 @@ export function buildSeedPanel(store: Store, patches: Patch[], interactive: bool
     field('Seed', text('seed', 'e.g. 1234567890')),
     field('Flags', text('flags', 'paste the flag string')),
     field('Dungeon Quest', select(DUNGEON_QUESTS, 'dungeonQuest'), 'Sets each level’s item slots'),
+    field('Overworld Quest', select(OVERWORLD_QUESTS, 'overworldQuest'), 'Sets the overworld map'),
     field('Item Shuffle', select(ITEM_SHUFFLES, 'itemShuffle')),
   );
 

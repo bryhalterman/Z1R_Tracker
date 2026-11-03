@@ -3277,19 +3277,44 @@
 /* ----------------------------------------------------------- room contents */
 
 /*
- * The boss fills the room rather than sitting in a corner: a boss room is the
- * thing you scan this sheet for, and the sprite says which one without a
- * legend. The item sprite and the stair marks ride above it.
+ * The cell's quiet marks, in the free bottom-left corner: a skull for a boss
+ * room, a block for a push block. Small and in the room's own ink, so they
+ * mark the room without covering its layout or its item. Which boss, and the
+ * rest, is on the room card and in the cell's tooltip.
  */
-.z1r-room-boss {
+.z1r-room-flags {
   position: absolute;
-  inset: 3px;
-  inline-size: calc(100% - 6px);
-  block-size: calc(100% - 6px);
-  background-size: contain;
-  opacity: 0.9;
+  inset-block-end: 3px;
+  inset-inline-start: 3px;
+  z-index: 3;
+  display: flex;
+  gap: 1px;
+  color: var(--z1r-room-ink);
+  opacity: 0.75;
   pointer-events: none;
-  z-index: 1;
+}
+
+.z1r-room-flag {
+  inline-size: 10px;
+  block-size: 10px;
+}
+
+.z1r-room-flag-boss path {
+  fill: currentColor;
+  fill-rule: evenodd;
+}
+
+.z1r-room-flag-push-maybe path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-dasharray: 2.4 1.6;
+}
+
+.z1r-room-flag-push-checked path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
 }
 
 .z1r-room-mark {
@@ -3379,53 +3404,179 @@
 }
 
 /*
- * A chute room: two bars for its two rows of blocks, a third of the way in from
- * each side, under the room's marks so the item still reads in the middle lane.
+ * The room's layout, faint across the floor and under every mark, so the
+ * shape reads as the room's paper and the item and boss still read on top.
  */
-.z1r-room-chute {
+.z1r-room-layout {
   position: absolute;
-  inset: 3px;
-  z-index: 1;
+  inset: 4px;
+  z-index: 0;
+  display: flex;
+  opacity: 0.45;
   pointer-events: none;
 }
 
-.z1r-room-chute:not([data-chute="vertical"], [data-chute="horizontal"]) {
+.z1r-room-layout-art {
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+/* One drawing for every square kind, in the cell, the picker and its list. */
+.z1r-layout-block,
+.z1r-layout-stairs {
+  fill: var(--z1r-room-ink);
+}
+
+.z1r-layout-statue {
+  fill: none;
+  stroke: var(--z1r-room-ink);
+  stroke-width: 0.16;
+}
+
+.z1r-layout-water {
+  fill: var(--z1r-water);
+}
+
+.z1r-layout-wave {
+  fill: var(--z1r-room-ink);
+}
+
+.z1r-layout-sand {
+  fill: var(--z1r-sand);
+}
+
+.z1r-layout-black {
+  fill: color-mix(in srgb, var(--z1r-room-ink) 80%, transparent);
+}
+
+/*
+ * The Layout row: the current layout as a chip, and the list it opens.
+ *
+ * The list floats over the rows below rather than pushing them down, so
+ * opening it does not move the door compass out from under the pointer.
+ */
+.z1r-layout-row {
+  position: relative;
+}
+
+.z1r-layout-current {
+  gap: 6px;
+}
+
+.z1r-layout-current-name[data-known="false"] {
+  color: var(--z1r-muted);
+  font-style: italic;
+}
+
+.z1r-layout-caret {
+  color: var(--z1r-muted);
+}
+
+.z1r-layout-thumb {
+  display: inline-flex;
+  flex: none;
+  inline-size: 36px;
+  block-size: 21px;
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  --z1r-room-ink: var(--z1r-text);
+}
+
+.z1r-layout-current .z1r-layout-thumb:empty {
   display: none;
 }
 
-.z1r-room-chute::before,
-.z1r-room-chute::after {
-  content: "";
+.z1r-layout-thumb-art {
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.z1r-layout-menu {
   position: absolute;
-  background: color-mix(in srgb, var(--z1r-room-ink) 55%, transparent);
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  inline-size: min(280px, 100%);
+  min-inline-size: 220px;
+  padding: 6px;
+  background: var(--z1r-panel);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
 }
 
-.z1r-room-chute[data-chute="vertical"]::before,
-.z1r-room-chute[data-chute="vertical"]::after {
-  inset-block: 0;
-  inline-size: 3px;
+.z1r-layout-menu[hidden] {
+  display: none;
 }
 
-.z1r-room-chute[data-chute="vertical"]::before {
-  inset-inline-start: calc(33% - 1px);
+.z1r-layout-filter {
+  font: inherit;
+  font-size: var(--z1r-text-md);
+  padding: 4px 6px;
+  color: var(--z1r-text);
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
 }
 
-.z1r-room-chute[data-chute="vertical"]::after {
-  inset-inline-end: calc(33% - 1px);
+.z1r-layout-list {
+  display: flex;
+  flex-direction: column;
+  max-block-size: 320px;
+  overflow-y: auto;
 }
 
-.z1r-room-chute[data-chute="horizontal"]::before,
-.z1r-room-chute[data-chute="horizontal"]::after {
-  inset-inline: 0;
-  block-size: 3px;
+.z1r-layout-group {
+  padding: 6px 4px 2px;
+  font-size: var(--z1r-text-xs);
+  color: var(--z1r-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.z1r-room-chute[data-chute="horizontal"]::before {
-  inset-block-start: calc(33% - 1px);
+.z1r-layout-group[hidden] {
+  display: none;
 }
 
-.z1r-room-chute[data-chute="horizontal"]::after {
-  inset-block-end: calc(33% - 1px);
+.z1r-layout-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  font: inherit;
+  font-size: var(--z1r-text-md);
+  color: var(--z1r-text);
+  text-align: start;
+  background: transparent;
+  border: var(--z1r-border-width) solid transparent;
+  border-radius: var(--z1r-radius);
+  cursor: pointer;
+}
+
+.z1r-layout-option[hidden] {
+  display: none;
+}
+
+.z1r-layout-option:hover,
+.z1r-layout-option:focus-visible {
+  background: var(--z1r-inset);
+}
+
+/* The selected entry: ringed and checked, so it is not told by tint alone. */
+.z1r-layout-option[aria-selected="true"] {
+  border-color: var(--z1r-accent);
+}
+
+.z1r-layout-check {
+  flex: none;
+  inline-size: 1em;
+  visibility: hidden;
+}
+
+.z1r-layout-option[aria-selected="true"] .z1r-layout-check {
+  visibility: visible;
 }
 
 /* The level's entrance: the overworld's start pennant, in the top-left corner. */
@@ -3485,7 +3636,12 @@
   align-content: start;
   min-inline-size: 0;
   gap: 5px;
+  padding: var(--z1r-space-md);
   font-size: var(--z1r-text-xs);
+  /* A card: one room's whole record, set apart from the sheet beside it. */
+  background: var(--z1r-field);
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
 }
 
 .z1r-room-detail-row {
@@ -3741,13 +3897,41 @@
   color: var(--z1r-muted);
 }
 
-/* The room: a hub with a wall button on each side, each wall as long as its
-   side and 24px deep. */
+/*
+ * The room: a hub with a wall button on each side, each wall as long as its
+ * side and 24px deep. The hub is the game room's own 12:7, so the layout drawn
+ * inside it keeps its squares square.
+ */
+.z1r-room-picture {
+  display: flex;
+  justify-content: center;
+}
+
 .z1r-door-room {
   --wall: 24px;
   position: relative;
-  inline-size: min(100%, 220px);
-  block-size: 150px;
+  inline-size: min(100%, 300px);
+  aspect-ratio: 300 / 196;
+}
+
+/* The boss, large and faint behind the layout: the room's occupant as its
+   backdrop, the way the sheet's cell no longer has room to show it. */
+.z1r-door-boss {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.z1r-door-layout {
+  position: absolute;
+  inset: 4px;
+  display: flex;
+  opacity: 0.75;
+  pointer-events: none;
+  --z1r-room-ink: var(--z1r-text);
 }
 
 .z1r-door-hub {
@@ -3762,6 +3946,7 @@
   background: color-mix(in srgb, var(--z1r-text) 5%, transparent);
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius-sm);
+  overflow: hidden;
 }
 
 .z1r-door-wall {

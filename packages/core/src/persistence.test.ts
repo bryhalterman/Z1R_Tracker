@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { importState, migrate } from './persistence.js';
 import { MAX_EXTRA_FLOOR_SLOTS, createInitialState, reduce, type TrackerState } from './state.js';
 import { ITEMS_BY_ID } from './items.js';
+import { overworldMap } from './seed.js';
 
 /** A save written before hearts/keys/rupees and boss/map/compass were dropped. */
 function legacySave(): Record<string, unknown> {
@@ -233,4 +234,24 @@ test('migrate keeps hintSeq above ids already present in the save', () => {
   const next = reduce(state, { type: 'addHint' });
   assert.equal(next.hints.some((h) => h.id === 'h42'), true);
   assert.equal(next.hints.filter((h) => h.id === 'h42').length, 1);
+});
+
+test('the overworld quest survives a save, and defaults to 1st Quest in older or damaged ones', () => {
+  const state = createInitialState();
+  state.seed.overworldQuest = 'mixed-2nd';
+  assert.equal(migrate(JSON.parse(JSON.stringify(state)))?.seed.overworldQuest, 'mixed-2nd');
+  const older = JSON.parse(JSON.stringify(state));
+  delete older.seed.overworldQuest;
+  assert.equal(migrate(older)?.seed.overworldQuest, '1st');
+  const damaged = JSON.parse(JSON.stringify(state));
+  damaged.seed.overworldQuest = 'third';
+  assert.equal(migrate(damaged)?.seed.overworldQuest, '1st');
+});
+
+test('each overworld quest names its map, and Random shows the 1st Quest map', () => {
+  assert.equal(overworldMap('1st'), '1st');
+  assert.equal(overworldMap('2nd'), '2nd');
+  assert.equal(overworldMap('mixed-1st'), 'mixed');
+  assert.equal(overworldMap('mixed-2nd'), 'mixed');
+  assert.equal(overworldMap('random'), '1st');
 });

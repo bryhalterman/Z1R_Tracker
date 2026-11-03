@@ -339,24 +339,31 @@ export interface RoomNote {
    * when the room is drawn, not stored here.
    */
   ladder: boolean;
-  /** Which way the room's chute runs, or empty for none. */
-  chute: RoomChute;
+  /** `ROOM_LAYOUTS` id of what stands on the floor, or '' until recorded. */
+  layout: string;
+  /** Whether a block here might push, and whether that has been tried. */
+  pushBlock: RoomPushBlock;
+  /**
+   * Every enemy in the room killed. A drop room gives its item up only then,
+   * so this is what says the drop has been had.
+   */
+  cleared: boolean;
 }
 
 /**
- * A chute room: two rows of blocks down the middle that split the room into
- * lanes. `vertical` runs north to south, `horizontal` west to east; empty is
- * an ordinary room.
+ * A push block is never guaranteed: the randomizer decides which rooms have
+ * one. `maybe` flags a room worth trying, `checked` says it has been tried;
+ * empty is a room nobody has thought about.
  */
-export type RoomChute = '' | 'vertical' | 'horizontal';
+export type RoomPushBlock = '' | 'maybe' | 'checked';
 
-export const ROOM_CHUTES: readonly RoomChute[] = ['', 'vertical', 'horizontal'];
+export const ROOM_PUSH_BLOCKS: readonly RoomPushBlock[] = ['', 'maybe', 'checked'];
 
-const ROOM_CHUTE_SET: ReadonlySet<string> = new Set<string>(ROOM_CHUTES);
+const ROOM_PUSH_BLOCK_SET: ReadonlySet<string> = new Set<string>(ROOM_PUSH_BLOCKS);
 
 /** True for one of the three values; the reducer and `migrate` both gate on it. */
-export function isRoomChute(value: unknown): value is RoomChute {
-  return typeof value === 'string' && ROOM_CHUTE_SET.has(value);
+export function isRoomPushBlock(value: unknown): value is RoomPushBlock {
+  return typeof value === 'string' && ROOM_PUSH_BLOCK_SET.has(value);
 }
 
 /**
@@ -380,7 +387,9 @@ export function emptyRoom(): RoomNote {
     collected: false,
     from: 'auto',
     ladder: false,
-    chute: '',
+    layout: '',
+    pushBlock: '',
+    cleared: false,
   };
 }
 
@@ -395,7 +404,9 @@ export function roomIsBare(room: RoomNote): boolean {
     !room.collected &&
     room.from === 'auto' &&
     !room.ladder &&
-    room.chute === '' &&
+    room.layout === '' &&
+    room.pushBlock === '' &&
+    !room.cleared &&
     ROOM_SIDES.every((side) => room.doors[side] === 'unknown')
   );
 }

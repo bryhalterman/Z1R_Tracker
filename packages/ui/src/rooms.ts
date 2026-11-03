@@ -27,7 +27,12 @@ import {
   POOL_BY_ID,
   ROOM_COLUMNS,
   ROOM_FROMS,
-  ROOM_CHUTES,
+  ROOM_LAYOUTS,
+  ROOM_LAYOUTS_BY_ID,
+  ROOM_LAYOUT_COLUMNS,
+  ROOM_LAYOUT_GROUPS,
+  ROOM_LAYOUT_ROWS,
+  ROOM_PUSH_BLOCKS,
   ROOM_ITEMS_BY_ID,
   ROOM_ROWS,
   ROOM_SIDES,
@@ -44,7 +49,8 @@ import {
   type ItemDef,
   type RoomFrom,
   type RoomNote,
-  type RoomChute,
+  type RoomLayoutDef,
+  type RoomPushBlock,
   type RoomSide,
   type RoomSlotKind,
   type RoomStairKind,
@@ -137,8 +143,6 @@ const SIDE_NAME: Record<RoomSide, string> = {
   west: 'West',
 };
 
-/** Rendered edge length of the boss art filling a cell, in CSS pixels. */
-const BOSS_ART_SIZE = 34;
 /** Rendered edge length of the item sprite riding above it. */
 const MARK_ART_SIZE = 15;
 
@@ -172,11 +176,84 @@ const STAIR_WORD: Record<RoomStairKind, string> = {
   transport: 'Transport',
 };
 
-/** The arrow the Chute chip shows for each direction. */
-const CHUTE_ARROW: Record<Exclude<RoomChute, ''>, string> = {
-  vertical: '↕',
-  horizontal: '↔',
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+type FlagIcon = 'boss' | 'push-maybe' | 'push-checked';
+
+/**
+ * The cell's corner marks, each a drawn shape so it reads without colour: a
+ * skull, a dashed block for a push block not yet tried, and a solid block with
+ * a check cut into it once it has been.
+ */
+const FLAG_PATHS: Record<FlagIcon, string> = {
+  boss:
+    'M8 1.5C4.4 1.5 2 4 2 7c0 1.9.9 3.3 2.2 4.1v2.4c0 .6.4 1 1 1h5.6c.6 0 1-.4 1-1v-2.4' +
+    'C13.1 10.3 14 8.9 14 7c0-3-2.4-5.5-6-5.5ZM5.5 6a1.4 1.4 0 1 0 0 2.8a1.4 1.4 0 1 0 0-2.8Z' +
+    'M10.5 6a1.4 1.4 0 1 0 0 2.8a1.4 1.4 0 1 0 0-2.8Z',
+  'push-maybe': 'M2.5 2.5h11v11h-11Z',
+  'push-checked': 'M2 2h12v12H2ZM4.6 8.2l2.3 2.3 4.6-4.6',
 };
+
+function flagIcon(kind: FlagIcon): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', `z1r-room-flag z1r-room-flag-${kind}`);
+  svg.setAttribute('viewBox', '0 0 16 16');
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', FLAG_PATHS[kind]);
+  svg.append(path);
+  return svg;
+}
+
+/**
+ * A layout drawn as a 12x7 grid, one shape per square.
+ *
+ * Each kind of square is its own shape as well as its own fill — a block is a
+ * solid square, a statue a ring, water a filled square with a line through it,
+ * sand a dot, stairs two rungs — so the picture still reads with the colour
+ * taken away. Stretched to whatever box it is given: a room cell is not the
+ * same shape as the game's room, and the grid matters more than square squares.
+ */
+function layoutArt(def: RoomLayoutDef, className: string): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', className);
+  svg.setAttribute('viewBox', `0 0 ${ROOM_LAYOUT_COLUMNS} ${ROOM_LAYOUT_ROWS}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  const shape = (tag: string, kind: string, attrs: Record<string, number>) => {
+    const node = document.createElementNS(SVG_NS, tag);
+    node.setAttribute('class', `z1r-layout-${kind}`);
+    for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, String(value));
+    svg.append(node);
+  };
+  def.rows.forEach((row, y) => {
+    [...row].forEach((square, x) => {
+      const full = { x, y, width: 1, height: 1 };
+      switch (square) {
+        case '#':
+          shape('rect', 'block', { x: x + 0.06, y: y + 0.06, width: 0.88, height: 0.88 });
+          break;
+        case 'o':
+          shape('ellipse', 'statue', { cx: x + 0.5, cy: y + 0.5, rx: 0.3, ry: 0.3 });
+          break;
+        case '=':
+          shape('rect', 'stairs', { x: x + 0.15, y: y + 0.2, width: 0.7, height: 0.15 });
+          shape('rect', 'stairs', { x: x + 0.15, y: y + 0.65, width: 0.7, height: 0.15 });
+          break;
+        case '~':
+          shape('rect', 'water', full);
+          shape('rect', 'wave', { x, y: y + 0.45, width: 1, height: 0.1 });
+          break;
+        case ':':
+          shape('ellipse', 'sand', { cx: x + 0.5, cy: y + 0.5, rx: 0.14, ry: 0.14 });
+          break;
+        case 'x':
+          shape('rect', 'black', full);
+          break;
+      }
+    });
+  });
+  return svg;
+}
 
 /**
  * A two-state chip whose state is spelled out, not only tinted.
@@ -416,19 +493,27 @@ export function buildRooms(
       const ladder = el('span', 'z1r-room-ladder');
       cell.append(ladder);
       /*
-       * A chute room: its two rows of blocks drawn as two bars down the room,
-       * the way they sit on screen, so the direction is a shape.
+       * The room's layout, drawn faintly across the floor under everything
+       * else, so a mapped level shows the shapes you walked through.
        */
-      const chute = el('span', 'z1r-room-chute');
-      cell.append(chute);
+      const layout = el('span', 'z1r-room-layout');
+      cell.append(layout);
+      /*
+       * Small marks in the free bottom-left corner: a skull for a boss, a block
+       * for a push block. The boss's own art lives on the room card now, where
+       * it has the space; here it would cover the room's layout and item.
+       */
+      const flags = el('span', 'z1r-room-flags');
+      flags.setAttribute('aria-hidden', 'true');
+      cell.append(flags);
       grid.append(cell);
 
-      let bossArt: HTMLElement | null = null;
-      let renderedBoss: string | null = null;
+      let renderedFlags: string | null = null;
       let renderedMark: string | null = null;
       let renderedTitle: string | null = null;
       let renderedEntrance: boolean | null = null;
       let renderedLadder: string | null = null;
+      let renderedLayout: string | null = null;
 
       cellPatches.push((state) => {
         const note = roomsOf(state)[id];
@@ -455,7 +540,11 @@ export function buildRooms(
           if (ladderState === 'clear') ladder.append(el('span', 'z1r-room-ladder-ok', '✓'));
         });
 
-        chute.dataset.chute = note?.chute ?? '';
+        const layoutId = note?.layout ?? '';
+        renderedLayout = memoise(renderedLayout, layoutId, () => {
+          const def = ROOM_LAYOUTS_BY_ID.get(layoutId);
+          layout.replaceChildren(...(def ? [layoutArt(def, 'z1r-room-layout-art')] : []));
+        });
 
         for (const { side, edge } of edges) {
           edge.dataset.door = note?.doors[side] ?? 'unknown';
@@ -466,19 +555,11 @@ export function buildRooms(
         got.hidden = !collected;
 
         const boss = note?.boss ?? '';
-        renderedBoss = memoise(renderedBoss, boss, () => {
-          bossArt?.remove();
-          bossArt = null;
-          const def = boss ? DUNGEON_BOSSES_BY_ID.get(boss) : undefined;
-          if (!def) return;
-          // Labelled empty so the cell's own tooltip wins: the sprite sits
-          // inside the button and a title here would shadow it.
-          bossArt = createSprite(resolver, def.sprite, {
-            size: BOSS_ART_SIZE,
-            className: 'z1r-room-boss',
-            label: '',
-          });
-          cell.prepend(bossArt);
+        const push = note?.pushBlock ?? '';
+        renderedFlags = memoise(renderedFlags, `${boss ? 'boss' : ''}|${push}`, () => {
+          flags.replaceChildren();
+          if (boss) flags.append(flagIcon('boss'));
+          if (push) flags.append(flagIcon(push === 'maybe' ? 'push-maybe' : 'push-checked'));
         });
 
         const stairs = note?.stairs ?? 'none';
@@ -515,7 +596,8 @@ export function buildRooms(
         if (isEntrance) parts.push('entrance');
         if (ladderState === 'blocked') parts.push('needs the Ladder');
         if (ladderState === 'clear') parts.push('needed the Ladder — held, passable now');
-        if (note?.chute) parts.push(`${note.chute} chute`);
+        const layoutDef = ROOM_LAYOUTS_BY_ID.get(layoutId);
+        if (layoutDef) parts.push(`${layoutDef.name} layout`);
         if (note) {
           parts.push(note.visited ? 'visited' : 'not visited');
           if (item) {
@@ -570,7 +652,7 @@ export function buildRooms(
    * the panel. They are about this room, and pushed to the other edge they
    * read as controls for the whole sheet, a long way from the id they act on.
    */
-  const { value: idRow } = detailRow('Room', false);
+  const { row: idLine, value: idRow } = detailRow('Room', false);
   const roomLabel = el('span', 'z1r-room-id');
   idRow.append(roomLabel);
 
@@ -599,21 +681,6 @@ export function buildRooms(
     commit(selected, { type: 'setRoomNote', level, room: selected, patch: { ladder: !current } });
   });
 
-  /*
-   * One chip that steps through the three answers — none, vertical,
-   * horizontal — rather than three more chips on an already full row. The
-   * label spells the direction out with an arrow, so it is not tint alone.
-   */
-  const chuteToggle = el('button', 'z1r-room-pick z1r-room-word', 'Chute');
-  chuteToggle.type = 'button';
-  chuteToggle.title = 'Chute room: click to step through none, vertical, horizontal';
-  chuteToggle.addEventListener('click', () => {
-    if (!selected) return;
-    const current = roomsOf(store.getState())[selected]?.chute ?? '';
-    const next = ROOM_CHUTES[(ROOM_CHUTES.indexOf(current) + 1) % ROOM_CHUTES.length] ?? '';
-    commit(selected, { type: 'setRoomNote', level, room: selected, patch: { chute: next } });
-  });
-
   const wipe = el('button', 'z1r-room-pick z1r-room-word', 'Wipe');
   wipe.type = 'button';
   wipe.title = 'Forget everything recorded about this room';
@@ -638,12 +705,149 @@ export function buildRooms(
         transport: 0,
         from: 'auto',
         ladder: false,
-        chute: '',
+        layout: '',
+        pushBlock: '',
+        cleared: false,
         doors: { north: 'unknown', east: 'unknown', south: 'unknown', west: 'unknown' },
       },
     });
   });
-  idRow.append(visitedToggle, entranceToggle, ladderToggle, chuteToggle, wipe);
+  idRow.append(visitedToggle, entranceToggle, wipe);
+
+  /*
+   * What stands on the room's floor: one of the game's 42 layouts.
+   *
+   * A dropdown rather than a row of chips, because 42 pictures do not fit on a
+   * row and the names alone do not say what a room looks like. Each entry is
+   * its picture and its name, filed under what fills the room, and the box at
+   * the top narrows the list as you type. Picking a layout marks the room
+   * walked, the same as naming its boss does: you have seen it.
+   */
+  const { row: layoutLine, value: layoutRow } = detailRow('Layout');
+  layoutRow.classList.add('z1r-layout-row');
+  const layoutButton = el('button', 'z1r-room-pick z1r-room-word z1r-layout-current');
+  layoutButton.type = 'button';
+  layoutButton.setAttribute('aria-haspopup', 'listbox');
+  layoutButton.setAttribute('aria-expanded', 'false');
+  const layoutThumb = el('span', 'z1r-layout-thumb');
+  const layoutName = el('span', 'z1r-layout-current-name', 'not recorded');
+  layoutButton.append(layoutThumb, layoutName, el('span', 'z1r-layout-caret', '▾'));
+
+  const layoutMenu = el('div', 'z1r-layout-menu');
+  layoutMenu.hidden = true;
+  const layoutFilter = el('input', 'z1r-layout-filter');
+  layoutFilter.type = 'search';
+  layoutFilter.placeholder = 'Filter layouts';
+  layoutFilter.setAttribute('aria-label', 'Filter layouts by name');
+  const layoutList = el('div', 'z1r-layout-list');
+  layoutList.setAttribute('role', 'listbox');
+  layoutList.setAttribute('aria-label', 'Room layouts');
+  layoutMenu.append(layoutFilter, layoutList);
+  layoutRow.append(layoutButton, layoutMenu);
+
+  const setLayout = (id: string) => {
+    if (!selected) return;
+    commit(selected, {
+      type: 'setRoomNote',
+      level,
+      room: selected,
+      patch: id ? { layout: id, visited: true } : { layout: '' },
+    });
+  };
+
+  const layoutOptions: { id: string; name: string; button: HTMLButtonElement }[] = [];
+  const layoutGroups: { heading: HTMLElement; ids: Set<string> }[] = [];
+  const addLayoutOption = (id: string, name: string, def?: RoomLayoutDef) => {
+    const button = el('button', 'z1r-layout-option');
+    button.type = 'button';
+    button.setAttribute('role', 'option');
+    button.dataset.layout = id;
+    const thumb = el('span', 'z1r-layout-thumb');
+    if (def) thumb.append(layoutArt(def, 'z1r-layout-thumb-art'));
+    // The check is the selected entry's non-colour mark; the tint behind it
+    // only repeats it.
+    button.append(el('span', 'z1r-layout-check', '✓'), thumb, el('span', 'z1r-layout-name', name));
+    button.addEventListener('click', () => {
+      setLayout(id);
+      closeLayoutMenu(true);
+    });
+    layoutList.append(button);
+    layoutOptions.push({ id, name, button });
+  };
+  addLayoutOption('', 'Not recorded');
+  for (const group of ROOM_LAYOUT_GROUPS) {
+    const heading = el('div', 'z1r-layout-group', group.name);
+    heading.setAttribute('role', 'presentation');
+    layoutList.append(heading);
+    const ids = new Set<string>();
+    for (const def of ROOM_LAYOUTS.filter((layout) => layout.group === group.id)) {
+      addLayoutOption(def.id, def.name, def);
+      ids.add(def.id);
+    }
+    layoutGroups.push({ heading, ids });
+  }
+
+  const visibleLayoutOptions = () => layoutOptions.filter(({ button }) => !button.hidden);
+  const filterLayouts = () => {
+    const query = layoutFilter.value.trim().toLowerCase();
+    for (const { name, button } of layoutOptions) {
+      button.hidden = query !== '' && !name.toLowerCase().includes(query);
+    }
+    for (const { heading, ids } of layoutGroups) {
+      heading.hidden = !layoutOptions.some(({ id, button }) => ids.has(id) && !button.hidden);
+    }
+  };
+  const openLayoutMenu = () => {
+    if (!selected) return;
+    layoutMenu.hidden = false;
+    layoutButton.setAttribute('aria-expanded', 'true');
+    layoutFilter.value = '';
+    filterLayouts();
+    layoutFilter.focus();
+  };
+  function closeLayoutMenu(returnFocus = false) {
+    if (layoutMenu.hidden) return;
+    layoutMenu.hidden = true;
+    layoutButton.setAttribute('aria-expanded', 'false');
+    if (returnFocus) layoutButton.focus();
+  }
+
+  layoutButton.addEventListener('click', () => {
+    if (layoutMenu.hidden) openLayoutMenu();
+    else closeLayoutMenu();
+  });
+  layoutFilter.addEventListener('input', filterLayouts);
+  layoutMenu.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeLayoutMenu(true);
+      return;
+    }
+    // Enter in the filter takes the first match, so typing "moat" and Enter
+    // is the whole gesture.
+    if (event.key === 'Enter' && event.target === layoutFilter) {
+      event.preventDefault();
+      visibleLayoutOptions()[0]?.button.click();
+      return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const visible = visibleLayoutOptions().map(({ button }) => button);
+    if (visible.length === 0) return;
+    const at = visible.indexOf(document.activeElement as HTMLButtonElement);
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    const next = at === -1 ? (step === 1 ? 0 : visible.length - 1) : at + step;
+    if (next < 0) layoutFilter.focus();
+    else visible[Math.min(next, visible.length - 1)]?.focus();
+  });
+  if (interactive) {
+    // A click anywhere outside the row puts the list away, the way a native
+    // dropdown does — a room click included, which also changes the room.
+    document.addEventListener('pointerdown', (event) => {
+      if (event.target instanceof Node && layoutRow.contains(event.target)) return;
+      closeLayoutMenu();
+    });
+  }
 
   /*
    * What is in the room, and whether it has been picked up.
@@ -652,7 +856,7 @@ export function buildRooms(
    * offering a picker. Collected is the one gesture that grants an item, which
    * is why it sits right beside the sprite it is about.
    */
-  const { value: itemRow } = detailRow('Item');
+  const { row: itemLine, value: itemRow } = detailRow('Item');
   const itemCell = el('span', 'z1r-room-itemcell');
   const itemName = el('span', 'z1r-room-item-name');
   const collectedToggle = el('button', 'z1r-room-pick z1r-room-word', 'Collected');
@@ -704,7 +908,7 @@ export function buildRooms(
     return { from, button };
   });
 
-  const { value: bossRow } = detailRow('Boss');
+  const { row: bossLine, value: bossRow } = detailRow('Boss');
   const bossPicker = el('span', 'z1r-room-picker');
   bossRow.append(bossPicker);
 
@@ -750,7 +954,7 @@ export function buildRooms(
    * A level has no fixed number of pairs, so the row grows: four numbers to
    * start, and always one past the highest in use, so a new pair is a click.
    */
-  const { value: stairsRow } = detailRow('Stairs');
+  const { row: stairsLine, value: stairsRow } = detailRow('Stairs');
   const stairsGroup = segmented('What the staircase in this room is');
   const pairGroup = segmented('Which transport pair this staircase is half of');
   pairGroup.classList.add('z1r-room-pair');
@@ -917,7 +1121,76 @@ export function buildRooms(
     walls.push({ side, button, tag });
   }
 
-  doorsRow.append(brushRow, room);
+  doorsRow.append(brushRow);
+
+  /*
+   * The room itself, drawn: its layout across the floor and its boss behind
+   * that, inside the four walls the door brushes paint. It heads the card, so
+   * the first thing under the room's name is what the room looks like.
+   */
+  const picture = el('div', 'z1r-room-picture');
+  const hubBoss = el('span', 'z1r-door-boss');
+  const hubLayout = el('span', 'z1r-door-layout');
+  hub.append(hubBoss, hubLayout);
+  picture.append(room);
+
+  /*
+   * Whether a block here might push. Never guaranteed — the randomizer decides
+   * — so the row records the suspicion and then the check, not the answer.
+   */
+  const { row: pushLine, value: pushValue } = detailRow('Push');
+  const pushGroup = segmented('Whether a block in this room might push');
+  pushValue.append(pushGroup);
+  const PUSH_WORD: Record<RoomPushBlock, string> = { '': 'None', maybe: 'Maybe', checked: 'Checked' };
+  const PUSH_TITLE: Record<RoomPushBlock, string> = {
+    '': 'No push block suspected here',
+    maybe: 'A block here might push — not tried yet',
+    checked: 'Tried the blocks here',
+  };
+  const pushButtons = ROOM_PUSH_BLOCKS.map((value) => {
+    const button = segButton(PUSH_WORD[value], PUSH_TITLE[value]);
+    button.dataset.push = value || 'none';
+    button.addEventListener('click', () => {
+      if (!selected) return;
+      commit(selected, { type: 'setRoomNote', level, room: selected, patch: { pushBlock: value } });
+    });
+    pushGroup.append(button);
+    return { value, button };
+  });
+
+  /* Every enemy killed: what a drop room asks before it gives its item up. */
+  const { row: dropsLine, value: dropsValue } = detailRow('Drops');
+  const clearedToggle = el('button', 'z1r-room-pick z1r-room-word', 'Cleared');
+  clearedToggle.type = 'button';
+  clearedToggle.title = 'Every enemy in this room killed';
+  clearedToggle.addEventListener('click', () => {
+    if (!selected) return;
+    const current = roomsOf(store.getState())[selected]?.cleared ?? false;
+    commit(selected, { type: 'setRoomNote', level, room: selected, patch: { cleared: !current } });
+  });
+  dropsValue.append(clearedToggle);
+
+  const { row: waterLine, value: waterValue } = detailRow('Water');
+  waterValue.append(ladderToggle);
+
+  /*
+   * The card's order, set here once every row exists: the room, then what it
+   * looks like and how its doors stand, then what is in it, then the checks a
+   * runner makes on the way through.
+   */
+  detail.append(
+    idLine,
+    picture,
+    doorsLine,
+    layoutLine,
+    itemLine,
+    fromRow,
+    bossLine,
+    stairsLine,
+    pushLine,
+    dropsLine,
+    waterLine,
+  );
 
   /* ------------------------------------------------------------- the passes */
 
@@ -941,6 +1214,9 @@ export function buildRooms(
   own.push((state) => runPatches(cellPatches, state));
 
   let renderedItemCell: string | null = null;
+  let renderedLayout: string | null = null;
+  let renderedHubBoss: string | null = null;
+  let renderedHubLayout: string | null = null;
 
   own.push((state) => {
     const brush = placement.get();
@@ -958,10 +1234,29 @@ export function buildRooms(
     entranceToggle.disabled = off;
     setToggle(entranceToggle, 'Entrance', !!selected && state.levelStarts[String(level)] === selected);
     ladderToggle.disabled = off;
-    setToggle(ladderToggle, 'Ladder', !!note?.ladder);
-    chuteToggle.disabled = off;
-    const chuteWay = note?.chute ?? '';
-    setToggle(chuteToggle, chuteWay ? `Chute ${CHUTE_ARROW[chuteWay]}` : 'Chute', chuteWay !== '');
+    setToggle(ladderToggle, 'Needs Ladder', !!note?.ladder);
+    const push = note?.pushBlock ?? '';
+    for (const { value, button } of pushButtons) {
+      button.disabled = off;
+      button.setAttribute('aria-pressed', String(!!selected && push === value));
+    }
+    clearedToggle.disabled = off;
+    setToggle(clearedToggle, 'Cleared', !!note?.cleared);
+    const layoutId = note?.layout ?? '';
+    const layoutDef = ROOM_LAYOUTS_BY_ID.get(layoutId);
+    layoutButton.disabled = off;
+    if (off) closeLayoutMenu();
+    renderedLayout = memoise(renderedLayout, layoutId, () => {
+      layoutThumb.replaceChildren(...(layoutDef ? [layoutArt(layoutDef, 'z1r-layout-thumb-art')] : []));
+      layoutName.textContent = layoutDef ? layoutDef.name : 'not recorded';
+      layoutName.dataset.known = String(!!layoutDef);
+      layoutButton.title = layoutDef
+        ? `${layoutDef.name} — pick a different layout`
+        : 'Pick what stands on this room’s floor';
+      for (const { id, button } of layoutOptions) {
+        button.setAttribute('aria-selected', String(id === layoutId));
+      }
+    });
     wipe.disabled = !interactive || !note;
 
     const item = note?.item ?? '';
@@ -1047,7 +1342,16 @@ export function buildRooms(
           : `Transport pair ${number}`;
     }
 
-    hub.textContent = selected;
+    const bossId = note?.boss ?? '';
+    renderedHubBoss = memoise(renderedHubBoss, bossId, () => {
+      const def = bossId ? DUNGEON_BOSSES_BY_ID.get(bossId) : undefined;
+      hubBoss.replaceChildren(
+        ...(def ? [createSprite(resolver, def.sprite, { size: 64, label: '' })] : []),
+      );
+    });
+    renderedHubLayout = memoise(renderedHubLayout, layoutId, () => {
+      hubLayout.replaceChildren(...(layoutDef ? [layoutArt(layoutDef, 'z1r-room-layout-art')] : []));
+    });
     for (const { door, button } of brushButtons) {
       button.setAttribute('aria-pressed', String(door === doorBrush));
     }
