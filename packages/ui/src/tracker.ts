@@ -56,6 +56,7 @@ import { askToConfirm } from './confirm/ask.js';
 import { placedIndex, placedSuffix } from './placed.js';
 import { mountItemPalette, targetFor } from './palette/mount.js';
 import { mountPanelToggle } from './panel/mount.js';
+import { mountDockItems } from './items/mount.js';
 import { MAP_PREVIEW_EVENT, type MapPreview } from './map-preview.js';
 import {
   mountMapBrushes,
@@ -352,9 +353,9 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
             grouped: mode === 'overlay' || compact,
           }),
     dungeons: () => buildTriforce(store, resolver, patches, interactive),
-    // In the Items card the compact panel is used: a column per level headed by
-    // its Triforce piece, which covers the Triforce panel as well.
-    locations: () => buildLocations(store, resolver, patches, interactive, compact || inCard),
+    // A column per level headed by its Triforce piece — which, in the page's
+    // Items card, covers the Triforce panel as well.
+    locations: () => buildLocations(store, resolver, patches, interactive),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive, placement),
     rooms: () => buildRooms(store, resolver, patches, interactive, placement),
@@ -563,9 +564,9 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
 /**
  * The inventory, as the OBS dock and overlay show it.
  *
- * A click raises an item and Shift+click or a right click lowers it. This is
- * what the dock is for during a stream, so it is kept exactly as it was; the
- * page builds `buildPalette` in its place.
+ * On the dock a click raises an item and Shift+click or a right click lowers
+ * it — that grid is React, see `items/`. The overlay's is plain DOM and takes
+ * no clicks. The page builds `buildPalette` in their place.
  */
 function buildItems(
   store: Store,
@@ -588,6 +589,27 @@ function buildItems(
    */
   root.style.setProperty('--z1r-item-min', `${opts.itemSize + 10}px`);
 
+  /*
+   * The dock's grid is React — see `items/`. Same classes and attributes, so it
+   * looks and hooks as it did. The overlay keeps the plain-DOM grid below: it
+   * takes no clicks, and its first paint is measured synchronously for the fit.
+   */
+  if (opts.interactive) {
+    const grid = mountDockItems(body);
+    const step = (id: string, direction: 1 | -1) => store.dispatch({ type: 'cycleItem', id, direction });
+    patches.push((state) =>
+      grid.render({
+        state,
+        placedAt: placedIndex(state),
+        resolver,
+        itemSize: opts.itemSize,
+        grouped: opts.grouped,
+        step,
+      }),
+    );
+    return root;
+  }
+
   const placedAt = new Map<string, string[]>();
   const cellOpts = { ...opts, placedAt };
 
@@ -604,7 +626,7 @@ function buildItems(
    */
   const buildGroup = (group: 'passive' | 'bslot', grid: HTMLElement) => {
     for (const def of ITEMS.filter((item) => item.group === group)) {
-      grid.append(buildItemCell(store, resolver, def, cellPatches, cellOpts));
+      grid.append(buildItemCell(resolver, def, cellPatches, cellOpts));
     }
   };
 
@@ -646,12 +668,10 @@ function buildItems(
 }
 
 function buildItemCell(
-  store: Store,
   resolver: SpriteResolver,
   def: ItemDef,
   patches: Patch[],
   opts: {
-    interactive: boolean;
     itemSize: number;
     placedAt: Map<string, string[]>;
   },
@@ -666,7 +686,8 @@ function buildItemCell(
   cell.dataset.group = def.group;
   cell.dataset.armed = 'false';
   cell.dataset.placed = 'false';
-  if (!opts.interactive) cell.disabled = true;
+  // Only the overlay draws this cell, and it takes no clicks.
+  cell.disabled = true;
 
   /** Every room item this cell can stand for — a chain covers more than one. */
   const covers = roomItemsForInventory(def);
@@ -676,22 +697,6 @@ function buildItemCell(
   const slot = el('span', 'z1r-item-sprite');
   const badge = el('span', 'z1r-item-badge');
   cell.append(slot, badge);
-
-  if (opts.interactive) {
-    const step = (direction: 1 | -1) =>
-      store.dispatch({ type: 'cycleItem', id: def.id, direction });
-    cell.addEventListener('click', (event) => step(event.shiftKey ? -1 : 1));
-    cell.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      step(-1);
-    });
-    cell.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-        event.preventDefault();
-        step(-1);
-      }
-    });
-  }
 
   let renderedSprite: string | null = null;
 

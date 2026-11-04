@@ -30,41 +30,12 @@ import { createSprite } from './sprite.js';
 import { memoise, runPatches, type Patch } from './patch.js';
 import { mountCompactLocations } from './locations/mount.js';
 
-/**
- * What a slot shows before its item is known.
- *
- * A glyph rather than a labelled chip: the shape says which kind of slot this
- * is on its own, so the kind survives being read in grayscale and costs no
- * width. `stair` is deliberately absent — it draws the tracker's own staircase
- * art instead, the same shape the overworld warps and the room sheet use, so a
- * staircase reads the same way wherever it appears.
- */
-const KIND_GLYPH: Record<string, string> = {
-  floor: '▭',
-  heart: '♥',
-  overworld: '◆',
-};
-
 const KIND_TITLE: Record<string, string> = {
   floor: 'Lying on the dungeon floor',
   stair: 'Behind a staircase / item basement',
   heart: 'Heart Container',
   overworld: 'Named overworld location',
 };
-
-/** Sprite edge length inside a 24px box, leaving its border and padding. */
-const SLOT_ART = 20;
-
-/** The staircase is drawn art, so it sits inside the box rather than filling it. */
-const SLOT_GLYPH_ART = 14;
-
-/** Where a slot's item was read from, phrased for a tooltip. */
-function sourceText(placement: ItemPlacement): string {
-  const source = placement.source;
-  if (source.kind === 'room') return `placed in L${source.level} ${source.room}`;
-  if (source.kind === 'screen') return `placed on overworld ${source.screen}`;
-  return 'recorded in an older save';
-}
 
 /**
  * Toggle a filled slot's collected flag on whatever it was read from.
@@ -125,201 +96,22 @@ function overflowKind(placement: ItemPlacement): string {
   return 'kind' in placement && typeof placement.kind === 'string' ? placement.kind : 'overworld';
 }
 
+/**
+ * The Locations panel: a column per level, headed by its Triforce piece.
+ *
+ * Every mount uses the compact form — the page and the desktop build in the
+ * Items card, the OBS dock and the overlay on their own. A full-width form
+ * with a row per slot existed before the Items card, and no mount reached it
+ * any more.
+ */
 export function buildLocations(
   store: Store,
   resolver: SpriteResolver,
   patches: Patch[],
   interactive: boolean,
-  compact = false,
 ): HTMLElement {
-  if (compact) return buildCompactLocations(store, resolver, patches, interactive);
-  const root = document.createElement('section');
-  root.className = 'z1r-panel z1r-locations';
-  const title = document.createElement('h2');
-  title.className = 'z1r-panel-title';
-  title.textContent = 'Item locations';
-  root.append(title);
-
-  const summary = document.createElement('span');
-  summary.className = 'z1r-locations-summary';
-  title.append(summary);
-
-  const rows = document.createElement('div');
-  rows.className = 'z1r-loc-rows';
-  root.append(rows);
-
-  /** The derivation for the pass in progress, read by every slot's patch. */
-  let derived: ItemLocations = deriveItemLocations(store.getState());
-
-  // Rebuilding is driven by the *shape* of what is drawn, not by every state
-  // change — the slots themselves patch in place.
-  let renderedSignature = '';
-  const slotPatches: Patch[] = [];
-
-  const rebuild = (state: TrackerState) => {
-    rows.replaceChildren();
-    slotPatches.length = 0;
-
-    const groups = groupSlots(derived);
-    for (const [name, list] of groups) {
-      const block = document.createElement('div');
-      block.className = 'z1r-loc-block';
-
-      const level = list[0]?.level;
-      // The overworld's tile spans the row under the nine levels.
-      block.dataset.overworld = String(level === undefined);
-      const label = document.createElement('span');
-      label.className = 'z1r-loc-level';
-      label.textContent = name;
-      // The long form stays reachable on hover: the line has room for two
-      // characters, and "OW" is not self-explanatory on a first read.
-      label.title = level === undefined ? 'Overworld locations' : `Level ${level}`;
-      block.append(label);
-
-      for (const location of list) {
-        block.append(
-          buildSlot(resolver, location.kind, slotPatches, () => ({
-            location,
-            placement: derived.byId.get(location.id) ?? null,
-          })),
-        );
-      }
-
-      /*
-       * Placements past this group's slots, after them on the same line.
-       *
-       * Shown rather than refused: the slot counts are a default quest's, and a
-       * seed can hold more. Read by index on each pass, because the shape
-       * signature above guarantees the count has not moved under them.
-       */
-      overflowFor(derived, level).forEach((first, index) => {
-        block.append(
-          buildSlot(resolver, overflowKind(first), slotPatches, () => ({
-            location: null,
-            placement: overflowFor(derived, level)[index] ?? null,
-          })),
-        );
-      });
-
-      if (interactive && level !== undefined && state.seed.shuffleMinorDrops) {
-        // Only reachable with Shuffle Minor Drops on, which is the flag that
-        // allows more than one item on a dungeon floor. A bare sign rather than
-        // "+ floor": the line is 24px tall, and the level it belongs to is
-        // named at the head of that same line.
-        const add = document.createElement('button');
-        add.type = 'button';
-        add.className = 'z1r-slot-add';
-        add.textContent = '+';
-        add.title = 'Add an extra floor slot for this level';
-        add.setAttribute('aria-label', add.title);
-        add.addEventListener('click', () =>
-          store.dispatch({ type: 'addFloorSlot', level, delta: 1 }),
-        );
-        block.append(add);
-
-        if ((state.extraFloorSlots[String(level)] ?? 0) > 0) {
-          const remove = document.createElement('button');
-          remove.type = 'button';
-          remove.className = 'z1r-slot-add';
-          remove.textContent = '−';
-          remove.title = 'Remove the last extra floor slot';
-          remove.setAttribute('aria-label', remove.title);
-          remove.addEventListener('click', () =>
-            store.dispatch({ type: 'addFloorSlot', level, delta: -1 }),
-          );
-          block.append(remove);
-        }
-      }
-
-      rows.append(block);
-    }
-  };
-
-  patches.push((state) => {
-    derived = deriveItemLocations(state);
-    const signature = shapeOf(state, derived);
-    renderedSignature = memoise(renderedSignature, signature, () => rebuild(state)) ?? '';
-    runPatches(slotPatches, state);
-
-    const collected = derived.slots.filter((slot) => slot.placement?.collected).length;
-    summary.textContent = `${collected}/${derived.slots.length}`;
-  });
-
-  return root;
+  return buildCompactLocations(store, resolver, patches, interactive);
 }
-
-/**
- * One 24px box: what is known to be here, and whether it has been picked up.
- *
- * Display only. It is a plain element rather than a button so it neither takes
- * focus nor looks like a thing to press; the facts it shows are changed on the
- * maps, and the whole of what it says is in its label as words.
- *
- * `location` is null for an overflow chip, which belongs to no listed slot.
- */
-function buildSlot(
-  resolver: SpriteResolver,
-  kind: string,
-  patches: Patch[],
-  read: () => { location: LocationDef | null; placement: ItemPlacement | null },
-): HTMLElement {
-  const { location } = read();
-  const slot = document.createElement('span');
-  slot.className = 'z1r-loc-slot';
-  slot.setAttribute('role', 'img');
-  if (location) slot.dataset.slot = location.id;
-  else slot.dataset.overflow = 'true';
-  slot.dataset.kind = kind;
-  slot.dataset.known = 'false';
-  slot.dataset.collected = 'false';
-
-  const face = document.createElement('span');
-  face.className = 'z1r-loc-face';
-  slot.append(face);
-
-  let renderedFace: string | null = null;
-  patches.push(() => {
-    const { placement } = read();
-    const entry = placement?.item ? SCREEN_ITEMS_BY_ID.get(placement.item) : undefined;
-    const collected = !!placement?.collected;
-    slot.dataset.known = String(!!entry);
-    slot.dataset.collected = String(collected);
-
-    const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
-    const about = location
-      ? (location.note ?? KIND_TITLE[location.kind] ?? location.kind)
-      : 'more than this level has slots for';
-    // Every state in words as well as in the border and the tick: this is what
-    // a screen reader is given, and the text channel is the one that does not
-    // depend on seeing the difference between a dashed and a solid edge.
-    slot.title =
-      `${where} — ${entry ? entry.name : 'nothing recorded'}` +
-      ` — ${collected ? 'picked up' : 'not picked up'}` +
-      (placement ? ` — ${sourceText(placement)}` : '') +
-      ` (${about})`;
-    slot.setAttribute('aria-label', slot.title);
-
-    const faceKey = entry ? `item:${entry.sprite}` : `kind:${kind}`;
-    renderedFace = memoise(renderedFace, faceKey, () => {
-      if (entry) {
-        face.replaceChildren(createSprite(resolver, entry.sprite, { size: SLOT_ART, label: '' }));
-        return;
-      }
-      if (kind === 'stair') {
-        face.replaceChildren(
-          createSprite(resolver, 'ui.stairs', { size: SLOT_GLYPH_ART, label: '' }),
-        );
-        return;
-      }
-      face.replaceChildren();
-      face.textContent = KIND_GLYPH[kind] ?? '?';
-    });
-  });
-
-  return slot;
-}
-
-/* ------------------------------------------------------------------ compact */
 
 /** Single letter per slot kind — the whole label will not fit at this size. */
 const KIND_INITIAL: Record<string, string> = {
