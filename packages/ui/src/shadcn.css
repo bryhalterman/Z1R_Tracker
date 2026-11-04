@@ -17,6 +17,7 @@
 @source "./seed-form";
 @source "./hint-log";
 @source "./toolbar";
+@source "./confirm";
 @source "./components";
 
 /* The tracker is dark-only, so shadcn's `dark:` styles always apply. */

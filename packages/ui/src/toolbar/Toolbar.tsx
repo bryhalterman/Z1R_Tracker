@@ -10,15 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { exportState, importState, type Store, type TrackerState } from '@z1r/core';
 import { Button } from '#components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '#components/ui/alert-dialog';
+import { ConfirmLoss } from '../confirm/ConfirmLoss.js';
 import { SeedSheet } from '../seed-form/SeedSheet.js';
 import { HintSheet } from '../hint-log/HintSheet.js';
 
@@ -26,40 +18,6 @@ export interface ToolbarProps {
   store: Store;
   /** Shown at the far end of the bar; the OBS dock uses it for its build id. */
   footnote?: string;
-}
-
-/** A yes-or-no question about losing the current run. */
-function ConfirmLoss({
-  open,
-  title,
-  description,
-  confirm,
-  onConfirm,
-  onCancel,
-}: {
-  open: boolean;
-  title: string;
-  description: string;
-  confirm: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
-      <AlertDialogContent className="z1r-ui">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button variant="destructive" onClick={onConfirm}>
-            {confirm}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
 }
 
 export function Toolbar({ store, footnote }: ToolbarProps) {

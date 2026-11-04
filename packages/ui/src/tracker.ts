@@ -52,6 +52,7 @@ import {
   type TrackerState,
 } from '@z1r/core';
 import { createSprite } from './sprite.js';
+import { askToConfirm } from './confirm/ask.js';
 import { memoise, runPatches, type Patch } from './patch.js';
 import { buildSeedPanel } from './seed-panel.js';
 import { buildLocations } from './locations.js';
@@ -1336,14 +1337,15 @@ function buildMap(
     const clear = el('button', 'z1r-chip-button z1r-map-clear', 'Clear');
     clear.type = 'button';
     clear.title = 'Remove every mark from the map. Items and Triforce are untouched.';
-    clear.addEventListener('click', () => {
-      const state = store.getState();
-      const marked = Object.keys(state.marks).length;
+    clear.addEventListener('click', async () => {
+      const marked = Object.keys(store.getState().marks).length;
       if (marked === 0) return;
-      const ok = globalThis.confirm?.(
-        `Clear all ${marked} marked screens? Items and Triforce are not affected.`,
-      );
-      if (ok !== false) store.dispatch({ type: 'clearMap' });
+      const ok = await askToConfirm({
+        title: 'Clear the overworld map?',
+        description: `All ${marked} marked screens are cleared. Items and the Triforce are not affected.`,
+        confirm: 'Clear map',
+      });
+      if (ok) store.dispatch({ type: 'clearMap' });
     });
     heading?.append(clear);
   }

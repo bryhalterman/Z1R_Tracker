@@ -44,6 +44,7 @@ import {
 } from '@z1r/core';
 import { memoise, runPatches, type Patch } from './patch.js';
 import { createSprite } from './sprite.js';
+import { askToConfirm } from './confirm/ask.js';
 import { layoutShapes } from './layout-shapes.js';
 import { DOOR_BRUSH_ORDER, mountRoomCard } from './room-card/mount.js';
 
@@ -287,18 +288,22 @@ export function buildRooms(
     const clear = el('button', 'z1r-chip-button z1r-chip-danger', 'Clear');
     clear.type = 'button';
     clear.title = 'Wipe this level’s room map. The other levels are untouched.';
-    clear.addEventListener('click', () => {
+    clear.addEventListener('click', async () => {
       const total = Object.keys(roomsOf(store.getState())).length;
       if (total === 0) return;
+      // Held from the click: the level showing can change while the dialog is
+      // up, and the answer is about the level it asked about.
+      const asked = level;
       // A whole level of mapping is a lot to lose to a misclick, and the
-      // confirm is scoped to this level for the same reason the action is.
-      const ok = globalThis.confirm?.(
-        `Clear all ${total} recorded rooms on Level ${level}? The other levels are not affected.`,
-      );
-      if (ok !== false) {
-        selected = '';
-        commit('', { type: 'clearRooms', level });
-      }
+      // question is scoped to this level for the same reason the action is.
+      const ok = await askToConfirm({
+        title: `Clear Level ${asked}?`,
+        description: `All ${total} recorded rooms on Level ${asked} are wiped. The other levels are not affected.`,
+        confirm: 'Clear level',
+      });
+      if (!ok) return;
+      if (level === asked) selected = '';
+      commit(level === asked ? '' : selected, { type: 'clearRooms', level: asked });
     });
     title.append(clear);
   }
