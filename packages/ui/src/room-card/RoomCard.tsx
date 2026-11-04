@@ -4,8 +4,7 @@
  * The first piece of the tracker written this way, so it is kept to one job.
  * It reads the whole state and the panel's view state as props and reports
  * every change through `commit`; the panel in `rooms.ts` still owns which room
- * and level are showing and which door state is armed, and re-renders the card
- * on every store change. Nothing here keeps a copy of anything the store holds.
+ * and level are showing, and re-renders the card on every store change. Nothing here keeps a copy of anything the store holds.
  */
 
 import { useRef, useState } from 'react';
@@ -57,7 +56,7 @@ import { LayoutArt } from './LayoutArt.js';
 import { Sprite } from '../shared/Sprite.js';
 
 /** Most-met first, so the keys under the left hand are the common ones. */
-export const DOOR_BRUSH_ORDER: readonly DoorState[] = ['open', 'locked', 'shutter', 'wall', 'bombed', 'unknown'];
+export const DOOR_ORDER: readonly DoorState[] = ['open', 'locked', 'shutter', 'wall', 'bombed', 'unknown'];
 
 export interface RoomCardProps {
   state: TrackerState;
@@ -66,8 +65,6 @@ export interface RoomCardProps {
   selected: string;
   interactive: boolean;
   resolver: SpriteResolver;
-  doorBrush: DoorState;
-  onDoorBrush: (door: DoorState) => void;
   /** Dispatches against the selected room and keeps it selected. */
   commit: (action: Action) => void;
 }
@@ -106,7 +103,7 @@ function doorLabel(state: DoorState): string {
 /** A labelled row: the key in a fixed column, the controls wrapping beside it. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[4.25rem_minmax(0,1fr)] items-start gap-2">
+    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-2">
       <span className="pt-1.5 text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </span>
@@ -198,7 +195,7 @@ function Segmented<T extends string>({
 }
 
 export function RoomCard(props: RoomCardProps) {
-  const { state, level, selected, interactive, resolver, doorBrush, onDoorBrush, commit } = props;
+  const { state, level, selected, interactive, resolver, commit } = props;
   const rooms = state.rooms[String(level)] ?? {};
   const note = selected ? rooms[selected] : undefined;
   const off = !interactive || !selected;
@@ -320,246 +317,283 @@ export function RoomCard(props: RoomCardProps) {
       </div>
 
       {/*
-       * The room drawn: its layout across the floor, its boss faint behind
-       * that, and four walls that take the armed door state on a click.
+       * The room on the left — its layout across the floor, its boss faint
+       * behind that, and a wall on each side that opens a menu of door states
+       * — and everything else about the room beside it. The two wrap into one
+       * column when the card is narrow.
        */}
-      <div className="flex justify-center">
-        <div className="z1r-door-room" role="group" aria-label="Doors">
-          <div className="z1r-door-hub">
-            <span className="z1r-door-boss">
-              {bossDef ? <Sprite resolver={resolver} spriteKey={bossDef.sprite} size={64} /> : null}
-            </span>
-            <span className="z1r-door-layout">
-              {layoutDef ? <LayoutArt def={layoutDef} className="z1r-room-layout-art" /> : null}
-            </span>
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="w-[150px] flex-none">
+          <div className="z1r-door-room" role="group" aria-label="Doors">
+            <div className="z1r-door-hub">
+              <span className="z1r-door-boss">
+                {bossDef ? <Sprite resolver={resolver} spriteKey={bossDef.sprite} size={48} /> : null}
+              </span>
+              <span className="z1r-door-layout">
+                {layoutDef ? <LayoutArt def={layoutDef} className="z1r-room-layout-art" /> : null}
+              </span>
+            </div>
+            {ROOM_SIDES.map((side) => (
+              <DoorWall
+                key={side}
+                side={side}
+                current={note?.doors[side] ?? 'unknown'}
+                disabled={off}
+                onPick={(door) => paintWall(side, door)}
+              />
+            ))}
           </div>
-          {ROOM_SIDES.map((side) => {
-            const current = note?.doors[side] ?? 'unknown';
-            const title = selected
-              ? `${SIDE_NAME[side]}: ${doorLabel(current)} — click to paint ${doorLabel(doorBrush)}, right-click to clear`
-              : 'Pick a room first';
+        </div>
+
+        <div className="grid min-w-[13rem] flex-1 gap-2">
+        <Row label="Layout">
+          <LayoutPicker
+            value={note?.layout ?? ''}
+            disabled={off}
+            onPick={(id) => patch(id ? { layout: id, visited: true } : { layout: '' })}
+          />
+        </Row>
+
+        {/* The item comes from the palette; this row shows it and whether it is held. */}
+        <Row label="Item">
+          <span
+            className={cn(
+              'inline-grid size-7 place-items-center rounded-md border',
+              itemDef ? 'border-border' : 'border-dashed border-border',
+            )}
+            title={itemDef ? itemDef.name : 'Nothing placed — arm an item in the palette and click this room'}
+          >
+            {itemDef ? <Sprite resolver={resolver} spriteKey={itemDef.sprite} size={18} /> : null}
+          </span>
+          <span className={cn(itemDef ? '' : 'text-muted-foreground italic')}>{itemDef ? itemDef.name : 'none'}</span>
+          <CheckToggle
+            label="Collected"
+            pressed={!!itemDef && !!note?.collected}
+            disabled={off || !itemDef}
+            title={
+              itemDef
+                ? note?.collected
+                  ? `Mark ${itemDef.name} not picked up. The inventory keeps what collecting gave it.`
+                  : `Mark ${itemDef.name} picked up, which marks it held`
+                : 'Nothing here to collect'
+            }
+            onPressedChange={(pressed) =>
+              selected && note?.item && commit({ type: 'collectRoom', level, room: selected, collected: pressed })
+            }
+          />
+          {itemDef ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={off}
+              title={`Forget that ${itemDef.name} is here`}
+              onClick={() => selected && commit({ type: 'setRoomItem', level, room: selected, item: '' })}
+            >
+              Clear
+            </Button>
+          ) : null}
+        </Row>
+
+        {/* Only a pool entry fills a slot, so only a pool entry is asked how it was found. */}
+        {slotted ? (
+          <Row label="From">
+            <Segmented
+              label="Which location slot this item fills"
+              value={note?.from ?? 'auto'}
+              disabled={off}
+              options={ROOM_FROMS.map((from) => ({
+                value: from,
+                text: from === 'auto' ? `Auto · ${FROM_NAME[autoFrom]}` : FROM_NAME[from],
+              }))}
+              onChange={(from) => from && selected && commit({ type: 'setRoomFrom', level, room: selected, from })}
+            />
+          </Row>
+        ) : null}
+
+        <Row label="Boss">
+          <ToggleGroup
+            aria-label="Boss in this room"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            className="flex-wrap"
+            value={note?.boss ? [note.boss] : []}
+            disabled={off}
+            onValueChange={(next) => setBoss(next[0] ?? '')}
+          >
+            {DUNGEON_BOSSES.filter((boss) => bossAllowedOnLevel(boss.id, level)).map((boss) => (
+              <ToggleGroupItem
+                key={boss.id}
+                value={boss.id}
+                title={boss.level9Only ? `${boss.name} — Level 9 only` : boss.name}
+                aria-label={boss.name}
+                className="size-8 px-0 data-[pressed]:border-primary data-[pressed]:ring-2 data-[pressed]:ring-primary"
+              >
+                <Sprite resolver={resolver} spriteKey={boss.sprite} size={22} />
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </Row>
+
+        <Row label="Stairs">
+          <Segmented
+            label="What the staircase in this room is"
+            value={selected ? stairs : null}
+            disabled={off}
+            options={ROOM_STAIRS.map((stair) => ({
+              value: stair.id,
+              text: STAIR_WORD[stair.id],
+              title: stair.tag ? `${stair.name} (${stair.tag})` : stair.name,
+              disabled: stairsRuledOut && stair.id !== 'none',
+            }))}
+            onChange={setStairs}
+          />
+          {stairsRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
+          {stairs === 'transport' ? (
+            <Segmented
+              label="Which transport pair this staircase is half of"
+              value={transport ? String(transport) : null}
+              disabled={off}
+              options={Array.from({ length: pairsShown }, (_, index) => ({
+                value: String(index + 1),
+                text: String(index + 1),
+                title: transport === index + 1 ? `Transport pair ${index + 1} — click again to unpair` : `Transport pair ${index + 1}`,
+              }))}
+              onChange={(value) => {
+                if (!selected) return;
+                // The pressed number again unpairs; the staircase itself stays.
+                commit(
+                  value === ''
+                    ? { type: 'clearRoomTransport', level, room: selected }
+                    : { type: 'placeRoomTransport', level, room: selected, number: Number(value) },
+                );
+              }}
+            />
+          ) : null}
+        </Row>
+
+        <Row label="Push">
+          <Segmented
+            label="Whether a block in this room might push"
+            value={selected ? (note?.pushBlock ?? '') || 'none' : null}
+            disabled={off}
+            options={ROOM_PUSH_BLOCKS.map((value) => ({
+              value: value || 'none',
+              text: PUSH_WORD[value],
+              title: PUSH_TITLE[value],
+              disabled: pushRuledOut && value !== '',
+            }))}
+            onChange={(value) => patch({ pushBlock: value === 'maybe' || value === 'checked' ? value : '' })}
+          />
+          {pushRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
+        </Row>
+
+          <Row label="Room">
+            <CheckToggle
+              label="Cleared"
+              pressed={!!note?.cleared}
+              disabled={off}
+              title="Every enemy in this room killed"
+              onPressedChange={(pressed) => patch({ cleared: pressed })}
+            />
+            <CheckToggle
+              label="Needs Ladder"
+              pressed={!!note?.ladder}
+              disabled={off}
+              title="Water in the way: this room needs the Ladder"
+              onPressedChange={(pressed) => patch({ ladder: pressed })}
+            />
+          </Row>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One wall of the room: shows its door, and opens a menu of the six door
+ * states on a click. The current state carries a check, so the menu does not
+ * lean on colour; keys 1-6 pick while it is open. Right-click clears the wall
+ * without opening anything.
+ */
+function DoorWall({
+  side,
+  current,
+  disabled,
+  onPick,
+}: {
+  side: RoomSide;
+  current: DoorState;
+  disabled: boolean;
+  onPick: (door: DoorState) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const pick = (door: DoorState) => {
+    onPick(door);
+    setOpen(false);
+  };
+  const title = disabled
+    ? 'Pick a room first'
+    : `${SIDE_NAME[side]}: ${doorLabel(current)} — click to choose, right-click to clear`;
+  return (
+    <Popover open={open && !disabled} onOpenChange={setOpen}>
+      <PopoverTrigger
+        className="z1r-door-wall"
+        data-side={SIDE_CLASS[side]}
+        data-door={current}
+        disabled={disabled}
+        title={title}
+        aria-label={title}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          if (!disabled) onPick('unknown');
+        }}
+      >
+        <span className="z1r-door-line" />
+        <span className="z1r-door-tag">{current === 'unknown' ? '?' : (DOOR_STATES_BY_ID.get(current)?.tag ?? '')}</span>
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        className="z1r-ui w-44 p-1"
+        onKeyDown={(event) => {
+          const door = DOOR_ORDER[Number(event.key) - 1];
+          if (door && /^[1-6]$/.test(event.key)) {
+            event.preventDefault();
+            pick(door);
+          }
+        }}
+      >
+        <div role="menu" aria-label={`${SIDE_NAME[side]} door`} className="grid">
+          {DOOR_ORDER.map((door, index) => {
+            const def = DOOR_STATES_BY_ID.get(door);
+            const word = door === 'unknown' ? 'Clear' : (def?.name.split(',')[0] ?? door);
+            const checked = door === current;
             return (
               <button
-                key={side}
+                key={door}
                 type="button"
-                className="z1r-door-wall"
-                data-side={SIDE_CLASS[side]}
-                data-door={current}
-                disabled={off}
-                title={title}
-                aria-label={title}
-                onClick={() => paintWall(side, current === doorBrush ? 'unknown' : doorBrush)}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  paintWall(side, 'unknown');
-                }}
+                role="menuitemradio"
+                aria-checked={checked}
+                title={def?.name ?? 'Not looked at yet'}
+                className={cn(
+                  'flex h-7 items-center gap-2 rounded-md px-2 text-left text-sm outline-none',
+                  'hover:bg-accent focus-visible:bg-accent',
+                  checked && 'font-semibold',
+                )}
+                onClick={() => pick(door)}
               >
-                <span className="z1r-door-line" />
-                <span className="z1r-door-tag">
-                  {current === 'unknown' ? '?' : (DOOR_STATES_BY_ID.get(current)?.tag ?? '')}
+                <span className="inline-flex w-3 justify-center">{checked ? <CheckIcon className="size-3.5" /> : null}</span>
+                <span data-door={door} className="inline-flex">
+                  <span className="z1r-door-line" />
                 </span>
+                <span className="flex-1 truncate">{word}</span>
+                <kbd className="text-[0.7rem] text-muted-foreground">{index + 1}</kbd>
               </button>
             );
           })}
         </div>
-      </div>
-
-      <Row label="Doors">
-        <ToggleGroup
-          aria-label="Door state to paint"
-          variant="outline"
-          size="sm"
-          spacing={1}
-          className="grid w-full max-w-80 grid-cols-3"
-          value={[doorBrush]}
-          onValueChange={(next) => {
-            const door = next[0] as DoorState | undefined;
-            if (door) onDoorBrush(door);
-          }}
-        >
-          {DOOR_BRUSH_ORDER.map((door, index) => {
-            const def = DOOR_STATES_BY_ID.get(door);
-            const word = door === 'unknown' ? 'Clear' : (def?.name.split(',')[0] ?? door);
-            return (
-              <ToggleGroupItem
-                key={door}
-                value={door}
-                title={`Paint walls ${def?.name.toLowerCase() ?? door} — key ${index + 1}`}
-                className="justify-start gap-1.5 px-1.5 data-[pressed]:border-primary"
-              >
-                <span data-door={door} className="inline-flex">
-                  <span className="z1r-door-line" />
-                </span>
-                <span className="truncate">{word}</span>
-                <kbd className="ml-auto text-[0.7rem] text-muted-foreground">{index + 1}</kbd>
-              </ToggleGroupItem>
-            );
-          })}
-        </ToggleGroup>
-      </Row>
-
-      <Row label="Layout">
-        <LayoutPicker
-          value={note?.layout ?? ''}
-          disabled={off}
-          onPick={(id) => patch(id ? { layout: id, visited: true } : { layout: '' })}
-        />
-      </Row>
-
-      {/* The item comes from the palette; this row shows it and whether it is held. */}
-      <Row label="Item">
-        <span
-          className={cn(
-            'inline-grid size-7 place-items-center rounded-md border',
-            itemDef ? 'border-border' : 'border-dashed border-border',
-          )}
-          title={itemDef ? itemDef.name : 'Nothing placed — arm an item in the palette and click this room'}
-        >
-          {itemDef ? <Sprite resolver={resolver} spriteKey={itemDef.sprite} size={18} /> : null}
-        </span>
-        <span className={cn(itemDef ? '' : 'text-muted-foreground italic')}>{itemDef ? itemDef.name : 'none'}</span>
-        <CheckToggle
-          label="Collected"
-          pressed={!!itemDef && !!note?.collected}
-          disabled={off || !itemDef}
-          title={
-            itemDef
-              ? note?.collected
-                ? `Mark ${itemDef.name} not picked up. The inventory keeps what collecting gave it.`
-                : `Mark ${itemDef.name} picked up, which marks it held`
-              : 'Nothing here to collect'
-          }
-          onPressedChange={(pressed) =>
-            selected && note?.item && commit({ type: 'collectRoom', level, room: selected, collected: pressed })
-          }
-        />
-        {itemDef ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={off}
-            title={`Forget that ${itemDef.name} is here`}
-            onClick={() => selected && commit({ type: 'setRoomItem', level, room: selected, item: '' })}
-          >
-            Clear
-          </Button>
-        ) : null}
-      </Row>
-
-      {/* Only a pool entry fills a slot, so only a pool entry is asked how it was found. */}
-      {slotted ? (
-        <Row label="From">
-          <Segmented
-            label="Which location slot this item fills"
-            value={note?.from ?? 'auto'}
-            disabled={off}
-            options={ROOM_FROMS.map((from) => ({
-              value: from,
-              text: from === 'auto' ? `Auto · ${FROM_NAME[autoFrom]}` : FROM_NAME[from],
-            }))}
-            onChange={(from) => from && selected && commit({ type: 'setRoomFrom', level, room: selected, from })}
-          />
-        </Row>
-      ) : null}
-
-      <Row label="Boss">
-        <ToggleGroup
-          aria-label="Boss in this room"
-          variant="outline"
-          size="sm"
-          spacing={1}
-          className="flex-wrap"
-          value={note?.boss ? [note.boss] : []}
-          disabled={off}
-          onValueChange={(next) => setBoss(next[0] ?? '')}
-        >
-          {DUNGEON_BOSSES.filter((boss) => bossAllowedOnLevel(boss.id, level)).map((boss) => (
-            <ToggleGroupItem
-              key={boss.id}
-              value={boss.id}
-              title={boss.level9Only ? `${boss.name} — Level 9 only` : boss.name}
-              aria-label={boss.name}
-              className="size-8 px-0 data-[pressed]:border-primary data-[pressed]:ring-2 data-[pressed]:ring-primary"
-            >
-              <Sprite resolver={resolver} spriteKey={boss.sprite} size={22} />
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </Row>
-
-      <Row label="Stairs">
-        <Segmented
-          label="What the staircase in this room is"
-          value={selected ? stairs : null}
-          disabled={off}
-          options={ROOM_STAIRS.map((stair) => ({
-            value: stair.id,
-            text: STAIR_WORD[stair.id],
-            title: stair.tag ? `${stair.name} (${stair.tag})` : stair.name,
-            disabled: stairsRuledOut && stair.id !== 'none',
-          }))}
-          onChange={setStairs}
-        />
-        {stairsRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
-        {stairs === 'transport' ? (
-          <Segmented
-            label="Which transport pair this staircase is half of"
-            value={transport ? String(transport) : null}
-            disabled={off}
-            options={Array.from({ length: pairsShown }, (_, index) => ({
-              value: String(index + 1),
-              text: String(index + 1),
-              title: transport === index + 1 ? `Transport pair ${index + 1} — click again to unpair` : `Transport pair ${index + 1}`,
-            }))}
-            onChange={(value) => {
-              if (!selected) return;
-              // The pressed number again unpairs; the staircase itself stays.
-              commit(
-                value === ''
-                  ? { type: 'clearRoomTransport', level, room: selected }
-                  : { type: 'placeRoomTransport', level, room: selected, number: Number(value) },
-              );
-            }}
-          />
-        ) : null}
-      </Row>
-
-      <Row label="Push">
-        <Segmented
-          label="Whether a block in this room might push"
-          value={selected ? (note?.pushBlock ?? '') || 'none' : null}
-          disabled={off}
-          options={ROOM_PUSH_BLOCKS.map((value) => ({
-            value: value || 'none',
-            text: PUSH_WORD[value],
-            title: PUSH_TITLE[value],
-            disabled: pushRuledOut && value !== '',
-          }))}
-          onChange={(value) => patch({ pushBlock: value === 'maybe' || value === 'checked' ? value : '' })}
-        />
-        {pushRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
-      </Row>
-
-      <Row label="Drops">
-        <CheckToggle
-          label="Cleared"
-          pressed={!!note?.cleared}
-          disabled={off}
-          title="Every enemy in this room killed"
-          onPressedChange={(pressed) => patch({ cleared: pressed })}
-        />
-      </Row>
-
-      <Row label="Water">
-        <CheckToggle
-          label="Needs Ladder"
-          pressed={!!note?.ladder}
-          disabled={off}
-          title="Water in the way: this room needs the Ladder"
-          onPressedChange={(pressed) => patch({ ladder: pressed })}
-        />
-      </Row>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

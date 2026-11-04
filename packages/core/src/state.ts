@@ -575,7 +575,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
       // The coast spot belongs to its screen: set there by the item, refused
       // anywhere else.
-      next.spot = conformSpot(action.screen, next.spot, next.item);
+      next.spot = conformSpot(action.screen, next.spot, next.item, state.seed.mirroredOverworld);
       // Coerced rather than refused, like the two numbers above: anything but
       // a literal `true` is not collected.
       const requested =
@@ -991,6 +991,18 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         } else if (seed.questLow === seed.questHigh) {
           seed.questHigh = seed.questLow === '1st' ? '2nd' : '1st';
         }
+      }
+      // Mirroring moves the coast between F16 and F1, so the Coast spot moves
+      // with it: off the old screen's item and onto the new one's.
+      if (seed.mirroredOverworld !== state.seed.mirroredOverworld) {
+        const screenNotes: Record<string, ScreenNote> = {};
+        for (const [screen, note] of Object.entries(state.screenNotes)) {
+          screenNotes[screen] = {
+            ...note,
+            spot: conformSpot(screen, note.spot, note.item, seed.mirroredOverworld),
+          };
+        }
+        return bump({ seed, screenNotes });
       }
       return bump({ seed });
     }

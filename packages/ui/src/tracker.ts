@@ -12,7 +12,7 @@ import {
   dungeonItems,
   safeStorage,
   COAST_ITEM_REQUIRES,
-  COAST_SCREEN,
+  coastScreen,
   DUNGEON_BLOCKS,
   DUNGEON_BLOCKS_BY_ID,
   DUNGEONS,
@@ -1387,7 +1387,7 @@ function buildMap(
         });
         // The coast is a fixed screen, so its notch is there from the start —
         // you can find the ledge before you can reach it.
-        const isCoast = id === COAST_SCREEN;
+        const isCoast = id === coastScreen(state.seed.mirroredOverworld);
         // The coast ledge is reachable the moment the Ladder is in hand — and
         // that is exactly when you have forgotten it is there.
         const coastReady = isCoast && (state.items[COAST_ITEM_REQUIRES] ?? 0) >= 1;

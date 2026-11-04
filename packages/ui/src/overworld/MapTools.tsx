@@ -16,7 +16,7 @@
 
 import { CheckIcon } from 'lucide-react';
 import {
-  COAST_SCREEN,
+  coastScreen,
   COAST_SPOT_ID,
   DUNGEON_BLOCKS,
   MARKS,
@@ -257,7 +257,7 @@ const SIZES = SECRET_SIZES.map((size) => ({
   title: `${size.name} — ${size.range} rupees when shop items are shuffled`,
 }));
 const ITEM_GROUPS = [{ options: [{ value: '', label: 'Item unknown' }, ...SCREEN_ITEMS.map((entry) => ({ value: entry.id, label: entry.name }))] }];
-// The coast is not offered: it is always `COAST_SCREEN`, never a tag.
+// The coast is not offered: it is always `coastScreen()`, never a tag.
 const SPOTS = [
   { value: '', label: 'Unnamed spot' },
   ...OVERWORLD_LOCATIONS.filter((location) => location.id !== COAST_SPOT_ID).map((location) => ({
@@ -399,7 +399,7 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
         {showing === 'item' && selected ? (
           <>
             <Row label="Spot">
-              {selected === COAST_SCREEN ? (
+              {selected === coastScreen(state.seed.mirroredOverworld) ? (
                 // The coast is this screen and no other, so there is nothing to
                 // pick: its item fills the Coast spot.
                 <span className="pt-1.5 text-sm" title="The coast ledge is always this screen; only its item is shuffled">

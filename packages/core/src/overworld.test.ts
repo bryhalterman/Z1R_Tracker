@@ -96,6 +96,17 @@ test('the coast is always F16: its item fills the spot, and no other screen can 
   assert.equal(state.screenNotes['B3']?.item, 'bow');
 });
 
+test('on a mirrored overworld the coast is F1, and toggling the mirror moves the spot', () => {
+  let state = reduce(createInitialState(), { type: 'setSeed', patch: { mirroredOverworld: true } });
+  state = reduce(state, { type: 'setScreenNote', screen: 'F1', patch: { item: 'raft' } });
+  state = reduce(state, { type: 'setScreenNote', screen: COAST_SCREEN, patch: { item: 'bow' } });
+  assert.equal(state.screenNotes['F1']?.spot, COAST_SPOT_ID);
+  assert.equal(state.screenNotes[COAST_SCREEN]?.spot, '');
+  state = reduce(state, { type: 'setSeed', patch: { mirroredOverworld: false } });
+  assert.equal(state.screenNotes['F1']?.spot, '');
+  assert.equal(state.screenNotes[COAST_SCREEN]?.spot, COAST_SPOT_ID);
+});
+
 test('a save with the coast tagged on another screen loads with the tag dropped', () => {
   const saved = JSON.parse(JSON.stringify(createInitialState()));
   saved.marks = { D13: 'item' };

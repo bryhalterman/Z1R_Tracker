@@ -47,7 +47,7 @@ import { memoise, runPatches, type Patch } from './patch.js';
 import { createSprite } from './sprite.js';
 import { askToConfirm } from './confirm/ask.js';
 import { layoutShapes } from './layout-shapes.js';
-import { DOOR_BRUSH_ORDER, mountRoomCard } from './room-card/mount.js';
+import { mountRoomCard } from './room-card/mount.js';
 import { mountClearButton } from './panel/mount.js';
 import { previewOnMap } from './map-preview.js';
 
@@ -598,35 +598,13 @@ export function buildRooms(
   /*
    * Everything about the selected room, drawn by React with shadcn/ui — see
    * `room-card/`. The panel keeps the view state, which room and level are
-   * showing and which door state is armed, and hands the card the whole state
+   * showing, and hands the card the whole state
    * on every redraw; the card reports changes back through `commit`.
    */
   const cardHost = el('div', 'z1r-room-cardhost');
   body.append(cardHost);
   const card = mountRoomCard(cardHost);
 
-  /*
-   * The door state the card's walls paint. It stays armed until another is
-   * picked, so a room of four open doors is five clicks; keys 1-6 arm one
-   * from anywhere outside a text field.
-   */
-  let doorBrush: DoorState = 'open';
-  const armDoor = (door: DoorState) => {
-    doorBrush = door;
-    redraw();
-  };
-  if (interactive) {
-    document.addEventListener('keydown', (event) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      // Not always an element: an event sent to the document has the document
-      // as its target, and that has no `closest`.
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
-      const door = DOOR_BRUSH_ORDER[Number(event.key) - 1];
-      if (!door || !/^[1-6]$/.test(event.key)) return;
-      armDoor(door);
-    });
-  }
 
   /* ------------------------------------------------------------- the passes */
 
@@ -662,8 +640,6 @@ export function buildRooms(
       selected,
       interactive,
       resolver,
-      doorBrush,
-      onDoorBrush: armDoor,
       commit: (action) => {
         if (selected) commit(selected, action);
       },

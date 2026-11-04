@@ -156,7 +156,7 @@ function conformShopPrices(saved: unknown, shop: readonly string[]): Record<stri
  * error rather than a wrong number: `shop` is indexed and mapped over, and a
  * string where an array belongs would iterate character by character.
  */
-function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
+function conformScreenNotes(saved: unknown, mirrored: boolean): Record<string, ScreenNote> {
   if (!saved || typeof saved !== 'object') return {};
   const out: Record<string, ScreenNote> = {};
   for (const [screen, value] of Object.entries(saved as Record<string, unknown>)) {
@@ -194,6 +194,7 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
       screen,
       typeof note.spot === 'string' && OVERWORLD_LOCATIONS.some((l) => l.id === note.spot) ? note.spot : '',
       item,
+      mirrored,
     );
     // New in v12, so absent from every earlier save, which reads as not
     // collected. Strictly true, and never without an item: a flag with nothing
@@ -459,7 +460,8 @@ export function migrate(raw: unknown): TrackerState | null {
     items: pruneItems(base.items, candidate.items),
     dungeons: pruneDungeons(base.dungeons, candidate.dungeons),
     marks: conformMarks(candidate.marks),
-    screenNotes: conformScreenNotes(candidate.screenNotes),
+    // After the seed, which says whether the coast is F16 or F1.
+    screenNotes: conformScreenNotes(candidate.screenNotes, conformSeed(base.seed, candidate.seed).mirroredOverworld),
     // Absent in every save written before v11, which loads as no rooms.
     rooms: conformRooms(candidate.rooms),
     // v1 saves predate seed tracking; merging over the defaults fills in any

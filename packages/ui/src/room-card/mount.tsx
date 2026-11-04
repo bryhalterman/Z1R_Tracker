@@ -7,8 +7,6 @@ import { createRoot } from 'react-dom/client';
 import { RoomCard, type RoomCardProps } from './RoomCard.js';
 import '../shadcn.css';
 
-export { DOOR_BRUSH_ORDER } from './RoomCard.js';
-
 export interface RoomCardHost {
   render(props: RoomCardProps): void;
 }

@@ -8,6 +8,8 @@
  * sits on each screen does.
  */
 
+import { mirrorScreen } from './regions.js';
+
 export const OVERWORLD_COLUMNS = 16;
 export const OVERWORLD_ROWS = 8;
 
@@ -203,8 +205,10 @@ export const DUNGEON_BLOCKS_BY_ID: ReadonlyMap<string, DungeonBlockDef> = new Ma
 export const COAST_SPOT_ID = 'ow.coast';
 
 /**
- * The screen the coast item is on. Fixed: the randomizer shuffles which item
- * sits on the coast ledge, never where the ledge is.
+ * The screen the coast item is on in an unmirrored overworld. Fixed: the
+ * randomizer shuffles which item sits on the coast ledge, never where the
+ * ledge is. Mirrored Overworld flips the map, which puts it on F1 — use
+ * `coastScreen`.
  *
  * It was once a tag the player put on any screen, which let a run record the
  * coast somewhere it cannot be. Now the spot belongs to this screen — see
@@ -212,14 +216,19 @@ export const COAST_SPOT_ID = 'ow.coast';
  */
 export const COAST_SCREEN = 'F16';
 
+/** The coast screen for this seed: F16, or F1 when the overworld is mirrored. */
+export function coastScreen(mirrored: boolean): string {
+  return mirrored ? mirrorScreen(COAST_SCREEN) : COAST_SCREEN;
+}
+
 /**
  * The spot a screen's note may carry. On the coast screen the spot is the
  * coast whenever there is an item to fill it; anywhere else the coast is not a
  * spot the screen can be, so a claim to it is dropped. The other named spots
  * are still the player's to tag.
  */
-export function conformSpot(screen: string, spot: string, item: string): string {
-  if (screen === COAST_SCREEN) return item ? COAST_SPOT_ID : '';
+export function conformSpot(screen: string, spot: string, item: string, mirrored: boolean): string {
+  if (screen === coastScreen(mirrored)) return item ? COAST_SPOT_ID : '';
   return spot === COAST_SPOT_ID ? '' : spot;
 }
 
