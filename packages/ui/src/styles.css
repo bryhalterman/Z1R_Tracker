@@ -1116,36 +1116,12 @@
 
 /* --------------------------------------------------------------- seed form */
 
+/* The form inside is React and lays itself out; see `seed-form/`. */
 .z1r-seed-body {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: var(--z1r-space-sm) var(--z1r-space-lg);
-  align-items: start;
-}
-
-.z1r-field {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
   min-inline-size: 0;
 }
 
-.z1r-field-label,
-.z1r-split-caption {
-  font-size: var(--z1r-text-sm);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--z1r-muted);
-}
-
-/* No opacity here: --z1r-muted is 6.37:1 on a panel and passes, and the 0.75
-   this carried dropped it to 4.28:1. The smaller type sets a hint apart on its
-   own. */
-.z1r-field-hint {
-  font-size: var(--z1r-text-sm);
-  color: var(--z1r-muted);
-}
-
+/* Text inputs and selects outside the React panels — the hint rows. */
 .z1r-input {
   inline-size: 100%;
   min-inline-size: 0;
@@ -1198,43 +1174,6 @@
   background-color: var(--z1r-panel);
   color: var(--z1r-muted);
   font-style: normal;
-}
-
-.z1r-quest-split {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.z1r-quest-split[hidden] {
-  display: none;
-}
-
-.z1r-split-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.z1r-segmented-sm button {
-  padding: 2px 8px;
-  font-size: var(--z1r-text-md);
-}
-
-.z1r-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.z1r-check {
-  display: flex;
-  align-items: center;
-  min-block-size: var(--spectrum-component-height-75);
-  gap: 6px;
-  font-size: var(--z1r-text-md);
-  color: var(--z1r-text);
-  cursor: pointer;
 }
 
 /* ------------------------------------------------------------- locations */
@@ -1485,35 +1424,12 @@
   color: var(--z1r-text);
 }
 
-.z1r-segmented {
+/* The seed button and its summary, which gives way first when the bar is narrow. */
+.z1r-controls-seed {
   display: inline-flex;
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
-}
-
-.z1r-segmented button:first-child {
-  border-start-start-radius: var(--z1r-radius);
-  border-end-start-radius: var(--z1r-radius);
-}
-
-.z1r-segmented button:last-child {
-  border-start-end-radius: var(--z1r-radius);
-  border-end-end-radius: var(--z1r-radius);
-}
-
-.z1r-segmented button {
-  padding: 5px 12px;
-  font: inherit;
-  color: var(--z1r-muted);
-  background: var(--z1r-panel);
-  border: 0;
-  cursor: pointer;
-}
-
-.z1r-segmented button[data-active="true"] {
-  color: var(--z1r-bg);
-  background: var(--z1r-accent);
-  font-weight: 600;
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 28rem;
 }
 
 .z1r-action {

@@ -1,5 +1,7 @@
 /*
- * Tailwind and the shadcn theme, for the React room card only.
+ * Tailwind and the shadcn theme, for the panels drawn in React: the room card
+ * and the seed form. Each React root carries `z1r-ui`, as does every popup
+ * they portal out, and that class is the scope for everything below.
  *
  * The rest of the tracker is plain DOM styled by `styles.css`, so Tailwind is
  * brought in without its preflight: the base reset would restyle every button,
@@ -12,6 +14,7 @@
 @import "tw-animate-css";
 
 @source "./room-card";
+@source "./seed-form";
 @source "./components";
 
 /* The tracker is dark-only, so shadcn's `dark:` styles always apply. */
@@ -21,7 +24,7 @@
  * shadcn's theme variables, bound to the tracker's own Spectrum aliases rather
  * than shadcn's palette, so the card matches the panels around it and
  * `theme:check` still measures the colours it uses. On `.spectrum` — the page
- * body — because the layout picker's popover is portalled out of the card.
+ * body — because popovers and select lists are portalled out of their panel.
  */
 .spectrum {
   --background: var(--z1r-field);
@@ -72,18 +75,18 @@
 }
 
 /*
- * The slice of preflight the shadcn components lean on, scoped to the card and
- * its popover: border boxes, borders that only appear when a utility asks,
+ * The slice of preflight the shadcn components lean on, scoped to the React
+ * panels and their popups: border boxes, borders that only appear when a utility asks,
  * and controls that inherit the page's font instead of the browser's.
  */
 @layer base {
-  :where(.z1r-card, .z1r-card *, .z1r-card ::before, .z1r-card ::after) {
+  :where(.z1r-ui, .z1r-ui *, .z1r-ui ::before, .z1r-ui ::after) {
     box-sizing: border-box;
     border: 0 solid;
     margin: 0;
   }
 
-  :where(.z1r-card) :where(button, input, kbd) {
+  :where(.z1r-ui) :where(button, input, kbd) {
     font: inherit;
     color: inherit;
     background: transparent;

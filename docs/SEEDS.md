@@ -7,7 +7,7 @@ typed field **only if it changes the tracker's structure** — how many item slo
 kind they are, or which named locations exist. Everything else is cosmetic, combat-affecting, or
 routing trivia, and lives in the free-text **Flags** box, which is stored verbatim and never parsed.
 
-So the Seed panel is:
+So the seed settings are:
 
 | Field | Why it's there |
 | --- | --- |

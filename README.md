@@ -47,7 +47,7 @@ on Xunlyn85.
 
 ## Seeds, settings and item locations
 
-The **Seed** panel takes the seed number, the full flag string, and the handful of settings that
+The **Seed** settings, opened from the header, take the seed number, the full flag string, and the handful of settings that
 actually change the tracker's shape. The important one is **Dungeon Quest**: it determines how many
 item slots each level has and whether they're **floor** items (lying in a room) or **stair** items
 (behind a staircase, in an item basement). Change it and the location list re-shapes to match.

@@ -1,11 +1,12 @@
 /**
- * Toolbar: reset, and save file import/export.
+ * Toolbar: the seed settings, reset, and save file import/export.
  *
  * Kept out of `tracker.ts` because the OBS browser source renders the tracker
  * without any of it — viewers should never see a Reset button.
  */
 
 import { exportState, importState, type Store } from '@z1r/core';
+import { mountSeedSheet } from './seed-form/mount.js';
 
 export interface ControlsOptions {
   readonly store: Store;
@@ -86,7 +87,16 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
     'z1r-action-danger',
   );
 
-  root.append(exportButton, importButton, resetButton, filePicker, status);
+  /*
+   * The seed settings open from here in a sheet rather than holding a panel
+   * on the page — see `seed-form/SeedSheet.tsx`. First in the bar, since they
+   * are the first thing set for a run.
+   */
+  const seedHost = document.createElement('span');
+  seedHost.className = 'z1r-controls-seed';
+  const unmountSeed = mountSeedSheet(seedHost, store);
+
+  root.append(seedHost, exportButton, importButton, resetButton, filePicker, status);
 
   if (footnote) {
     const note = document.createElement('span');
@@ -96,6 +106,7 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
   }
 
   return () => {
+    unmountSeed();
     root.replaceChildren();
   };
 }

@@ -103,8 +103,13 @@ export interface MountOptions {
   readonly defaultCollapsed?: readonly string[];
 }
 
+/*
+ * Seed is not among the defaults: the page and the desktop build open the seed
+ * settings from the toolbar's sheet instead (`mountControls`). It is still a
+ * section for the windows that have no toolbar to open it from and ask for it
+ * by name — the OBS map dock and the overlay.
+ */
 const DEFAULT_SECTIONS: readonly TrackerSection[] = [
-  'seed',
   'items',
   'dungeons',
   'locations',

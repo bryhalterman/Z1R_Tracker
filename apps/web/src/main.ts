@@ -24,18 +24,17 @@ async function main(): Promise<void> {
 
   mountControls(controlsRoot, { store });
   /*
-   * Seed and Hints start folded on the page.
+   * Hints starts folded on the page.
    *
-   * Both are entered once and then read rarely — the seed settings are set
-   * before the run and the hint log is empty until a hint is heard — and
-   * between them they were costing a third of the first screen. Folded only
-   * until this browser saves a folded set of its own, so someone who opens
-   * Seed finds it open next time.
+   * The hint log is empty until a hint is heard, and open it cost a good share
+   * of the first screen. Folded only until this browser saves a folded set of
+   * its own, so someone who opens Hints finds it open next time. The seed
+   * settings, which used to start folded beside it, open from the toolbar.
    */
   mountTracker(trackerRoot, {
     store,
     resolver,
-    defaultCollapsed: ['Seed', 'Hints'],
+    defaultCollapsed: ['Hints'],
     // Small enough to sit beside the panels it shares a column with. The
     // inventory is scanned for what is missing, not studied, and the art is
     // 16px of NES sprite however large the cell around it is.

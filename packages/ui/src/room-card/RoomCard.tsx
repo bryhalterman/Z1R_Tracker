@@ -253,7 +253,7 @@ export function RoomCard(props: RoomCardProps) {
   };
 
   return (
-    <div className="z1r-card grid gap-3 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground">
+    <div className="z1r-ui z1r-card grid gap-3 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground">
       {/* The room, and the things you do to a room as a whole. */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className={cn('mr-1 tabular-nums', selected ? 'text-base font-semibold' : 'text-muted-foreground')}>
@@ -583,7 +583,7 @@ function LayoutPicker({
         <span className={cn(current ? '' : 'text-muted-foreground italic')}>{current ? current.name : 'not recorded'}</span>
         <ChevronDownIcon data-icon="inline-end" />
       </PopoverTrigger>
-      <PopoverContent align="start" initialFocus={filter} className="z1r-card w-72 p-0">
+      <PopoverContent align="start" initialFocus={filter} className="z1r-ui w-72 p-0">
         <Command>
           <CommandInput ref={filter} placeholder="Filter layouts" />
           <CommandList className="max-h-80">

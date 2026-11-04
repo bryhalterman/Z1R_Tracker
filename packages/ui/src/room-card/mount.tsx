@@ -5,7 +5,7 @@
 
 import { createRoot } from 'react-dom/client';
 import { RoomCard, type RoomCardProps } from './RoomCard.js';
-import '../room-card.css';
+import '../shadcn.css';
 
 export { DOOR_BRUSH_ORDER } from './RoomCard.js';
 

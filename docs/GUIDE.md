@@ -25,12 +25,11 @@ The tracker remembers which panels you collapsed.
 
 ## Know the page layout
 
-The page stacks five areas from top to bottom:
+The page stacks four areas from top to bottom:
 
 | Area | What it holds |
 | --- | --- |
-| Header | Export, Import, and Reset |
-| Seed | The seed number, flag string, and the settings that change the tracker's shape |
+| Header | Seed, with a one-line summary of the seed beside it, then Export, Import, and Reset |
 | Hints | One row per hint you hear in the game |
 | Items | The item palette, with the Locations panel and Triforce beside it |
 | Overworld and Levels | The overworld map on the left, the dungeon room map on the right |
@@ -39,7 +38,10 @@ On a narrow window the areas wrap so the page still fits the window width.
 
 ## Set up the seed
 
-Fill in the **Seed** panel before you start playing.
+Click **Seed** in the header before you start playing.
+The seed settings slide in from the right;
+press Esc, click ×, or click outside them to close them.
+The header keeps a summary of the seed number, Dungeon Quest, and Item Shuffle.
 Only the fields that change what the tracker shows are controls;
 everything else goes in **Flags** or **Notes**.
 
