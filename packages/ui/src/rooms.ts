@@ -48,8 +48,7 @@ import { createSprite } from './sprite.js';
 import { askToConfirm } from './confirm/ask.js';
 import { layoutShapes } from './layout-shapes.js';
 import { mountRoomCard } from './room-card/mount.js';
-import { mountClearButton } from './panel/mount.js';
-import { previewOnMap } from './map-preview.js';
+import { mountClearButton, mountLevelStrip } from './panel/mount.js';
 
 /* ---------------------------------------------------------------- placement */
 
@@ -260,32 +259,17 @@ export function buildRooms(
 
   /* ------------------------------------------------------------ level pills */
 
-  const levels = el('span', 'z1r-room-levels');
-  levels.setAttribute('role', 'group');
-  levels.setAttribute('aria-label', 'Level');
-  title.append(levels);
-
-  const levelPills = LEVELS.map((value) => {
-    const pill = el('button', 'z1r-room-level', String(value));
-    pill.type = 'button';
-    pill.title = `Level ${value}`;
-    pill.disabled = !interactive;
-    pill.addEventListener('click', () => {
-      level = value;
-      // The selection names a room on the level you were looking at, and the
-      // same id on another level is a different room.
-      selected = '';
-      redraw();
-    });
-    // Hovering a level points at its entrance on the overworld map.
-    const preview = { kind: 'dungeon', level: value } as const;
-    pill.addEventListener('pointerenter', () => previewOnMap(pill, preview));
-    pill.addEventListener('pointerleave', () => previewOnMap(pill, null));
-    pill.addEventListener('focus', () => previewOnMap(pill, preview));
-    pill.addEventListener('blur', () => previewOnMap(pill, null));
-    levels.append(pill);
-    return { value, pill };
-  });
+  // React — see `panel/LevelStrip.tsx`.
+  const levelsHost = el('span', 'z1r-room-levels');
+  title.append(levelsHost);
+  const levelStrip = mountLevelStrip(levelsHost);
+  const pickLevel = (value: number) => {
+    level = value;
+    // The selection names a room on the level you were looking at, and the
+    // same id on another level is a different room.
+    selected = '';
+    redraw();
+  };
 
   title.append(el('span', 'z1r-room-spacer'));
 
@@ -610,17 +594,12 @@ export function buildRooms(
 
   own.push((state) => {
     drawCaption();
-    for (const { value, pill } of levelPills) {
-      pill.setAttribute('aria-pressed', String(value === level));
-      // A level with rooms recorded is drawn at full strength with a rule under
-      // its own digit; one with nothing is dimmed. Two channels, no hue.
-      const touched = Object.keys(roomsOf(state, value)).length > 0;
-      pill.dataset.touched = String(touched);
-      pill.setAttribute(
-        'aria-label',
-        `Level ${value} — ${touched ? 'rooms recorded' : 'nothing recorded'}`,
-      );
-    }
+    levelStrip.render({
+      levels: LEVELS.map((value) => ({ value, touched: Object.keys(roomsOf(state, value)).length > 0 })),
+      level,
+      disabled: !interactive,
+      onPick: pickLevel,
+    });
 
     const total = Object.keys(roomsOf(state)).length;
     count.textContent = `${total} ${total === 1 ? 'room' : 'rooms'}`;

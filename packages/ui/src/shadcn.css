@@ -54,7 +54,19 @@
   --border: var(--z1r-border);
   --input: var(--z1r-border);
   --ring: var(--z1r-accent);
-  --radius: 0.5rem;
+  /* The tracker's control radius — see the corner steps in `theme.css`. */
+  --radius: var(--z1r-radius);
+  /*
+   * The steps again, as runtime variables. The `@theme` block below inlines
+   * them into `rounded-*`, but the components also write
+   * `rounded-[min(var(--radius-md),12px)]`, which reads the variable itself —
+   * and Tailwind declares that on `:root`, above `.spectrum`, where the
+   * tracker's tokens are not defined yet. Declared here, it resolves.
+   */
+  --radius-sm: var(--z1r-radius-cell);
+  --radius-md: var(--z1r-radius);
+  --radius-lg: var(--z1r-radius);
+  --radius-xl: var(--z1r-radius-panel);
 }
 
 @theme inline {
@@ -76,10 +88,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* The tracker's three corner steps, not shadcn's offsets from one base:
+     `sm` is a cell, `md` and `lg` a control, `xl` a panel or popup. */
+  --radius-sm: var(--z1r-radius-cell);
+  --radius-md: var(--z1r-radius);
+  --radius-lg: var(--z1r-radius);
+  --radius-xl: var(--z1r-radius-panel);
   --font-sans: var(--z1r-font);
 }
 

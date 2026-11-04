@@ -60,7 +60,7 @@
 .z1r-panel {
   background: var(--z1r-panel);
   border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
+  border-radius: var(--z1r-radius-panel);
   padding: 7px 9px;
 }
 
@@ -497,7 +497,7 @@
      uses. A cell is 12px tall in the narrow width band, where a 4px radius
      rounds away a third of each edge, and the mark's colour is drawn as a 2px
      inset ring whose corners the larger radius eats into. */
-  border-radius: 2px;
+  border-radius: var(--z1r-radius-cell);
   cursor: pointer;
   box-shadow: inset 0 0 0 0 var(--mark-color, transparent);
   transition: box-shadow 90ms linear, background-color 90ms linear;
@@ -552,7 +552,7 @@
   /* Over map art a flat colour is not enough; the chip keeps the two letters
      legible on sand, water or forest alike. */
   padding: 0 2px;
-  border-radius: 0 0 3px 0;
+  border-radius: 0 0 var(--z1r-radius-cell) 0;
   background: color-mix(in srgb, var(--z1r-bg) 88%, transparent);
   opacity: 0.85;
   pointer-events: none;
@@ -780,7 +780,7 @@
   /* The same constant dark backing the centred mark uses: terrain art varies
      wildly and an icon that vanishes over forest is worse than no icon. */
   background: color-mix(in srgb, var(--z1r-bg) 78%, transparent);
-  border-radius: 2px;
+  border-radius: var(--z1r-radius-cell);
 }
 
 /* Sized from the cell rather than from the sprite call, so the row tracks the
@@ -808,7 +808,7 @@
   line-height: 1;
   color: var(--z1r-text);
   background: color-mix(in srgb, var(--z1r-bg) 88%, transparent);
-  border-radius: 0 0 0 3px;
+  border-radius: 0 0 0 var(--z1r-radius-cell);
   pointer-events: none;
 }
 
@@ -1859,81 +1859,10 @@
   gap: 5px var(--z1r-space-lg);
 }
 
-/*
- * Nine numerals, not nine chips.
- *
- * These were boxed buttons with the current one filled in the accent colour —
- * the default chip, borrowed from no part of this game. They are drawn as the
- * same heavy outlined figure the overworld map already uses for a dungeon
- * level, so the row speaks a shape the tracker has taught you to read rather
- * than introducing one that appears nowhere else. The box goes entirely; the
- * panel below already has sixty-four of them.
- */
+/* The level picker is a React strip drawn into this host — see
+   `panel/LevelStrip.tsx`, which holds its whole look. */
 .z1r-room-levels {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  margin-inline-start: var(--z1r-space-md);
-}
-
-.z1r-room-level {
-  position: relative;
-  /* The height of the heading's Clear button, so the numerals, the count and
-     the button all share one centre line. */
-  inline-size: 22px;
-  block-size: 28px;
-  padding: 0;
-  font: inherit;
-  font-size: var(--z1r-text-lg);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 28px;
-  letter-spacing: 0;
-  text-align: center;
-  color: var(--z1r-muted);
-  background: none;
-  border: 0;
-  border-radius: var(--z1r-radius);
-  cursor: pointer;
-}
-
-.z1r-room-level:hover:not(:disabled) {
-  color: var(--z1r-text);
-  background: var(--z1r-inset);
-}
-
-/* A level with rooms recorded is drawn at full strength; one with nothing on it
-   is dimmed, so switching away does not hide that there is something there.
-   Ahead of the selected rules below, which have the same specificity and must
-   win: the level you are looking at is never dimmed, recorded or not. */
-.z1r-room-level[data-touched="false"] {
-  /* 0.45 put --z1r-muted at 2.47:1 over the panel, and these are enabled
-     buttons carrying 17px text, so the 4.5:1 floor applies to them. 0.8
-     measures 4.65:1 and still reads as the quieter of the two states. */
-  opacity: 0.8;
-}
-
-/* Bolder, brighter, and underscored — three channels, so the selected level is
-   not telling you by colour alone. The same size as the others: a numeral that
-   grew on selection pushed the row about and outsized the heading around it. */
-.z1r-room-level[aria-pressed="true"] {
-  font-weight: 800;
-  color: var(--z1r-text);
-  opacity: 1;
-}
-
-.z1r-room-level[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  inset-inline: 4px;
-  inset-block-end: 3px;
-  block-size: 2px;
-  background: var(--z1r-accent);
-}
-
-.z1r-room-level:disabled {
-  cursor: default;
+  display: inline-flex;
 }
 
 .z1r-room-spacer {
@@ -1974,7 +1903,7 @@
     radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--z1r-text) 4%, transparent), transparent 70%);
   /* A map's frame: a thin rule, and a fainter second one just outside it. */
   border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius-sm);
+  border-radius: var(--z1r-radius);
   outline: var(--z1r-border-width) solid color-mix(in srgb, var(--z1r-border) 50%, transparent);
   outline-offset: 3px;
   margin: 4px;
@@ -2471,7 +2400,7 @@
   line-height: 1;
   color: var(--z1r-good);
   background: var(--z1r-panel);
-  border-radius: 2px;
+  border-radius: var(--z1r-radius-cell);
   pointer-events: none;
 }
 
@@ -2520,7 +2449,7 @@
   color: var(--z1r-text);
   background: color-mix(in srgb, var(--z1r-text) 5%, transparent);
   border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius-sm);
+  border-radius: var(--z1r-radius-cell);
   overflow: hidden;
 }
 
@@ -2535,7 +2464,7 @@
   color: var(--z1r-text);
   background: transparent;
   border: var(--z1r-border-width) solid transparent;
-  border-radius: var(--z1r-radius-sm);
+  border-radius: var(--z1r-radius-cell);
   cursor: pointer;
 }
 
@@ -2592,7 +2521,7 @@
   flex: none;
   inline-size: 18px;
   block-size: 7px;
-  border-radius: 1px;
+  border-radius: var(--z1r-radius-cell);
 }
 
 .z1r-door-wall[data-side="w"] .z1r-door-line,

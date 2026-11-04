@@ -67,8 +67,18 @@
   --z1r-sand: var(--spectrum-orange-900);
 
   /* Geometry. */
+  /*
+   * Corners, in three nested steps: whatever sits inside something else is
+   * rounded less than the thing around it, so the curves read as one family.
+   *   panel   8px  panels, cards, dialogs, popovers, notices
+   *   (base)  4px  controls inside them: buttons, inputs, tiles, chips, strips
+   *   cell    2px  the small repeated cells: map screens, door walls, stock slots
+   * Edges drawn as ruled lines (the room sheet's paper, a divider) stay square.
+   * The React components read the same three through `shadcn.css`.
+   */
+  --z1r-radius-panel: var(--spectrum-corner-radius-100);
   --z1r-radius: var(--spectrum-corner-radius-75);
-  --z1r-radius-sm: var(--spectrum-corner-radius-0);
+  --z1r-radius-cell: calc(var(--z1r-radius) / 2);
   --z1r-border-width: var(--spectrum-border-width-100);
   --z1r-border-width-thick: var(--spectrum-border-width-200);
 

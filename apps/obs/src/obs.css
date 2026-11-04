@@ -82,7 +82,7 @@ body.dock .z1r-item-grid {
   line-height: 1.4;
   color: var(--z1r-bg);
   background: var(--z1r-accent);
-  border-radius: 4px;
+  border-radius: var(--z1r-radius-panel);
   box-shadow: 0 4px 14px #000a;
   z-index: 999;
 }
@@ -103,6 +103,6 @@ body.dock .z1r-item-grid {
   color: #ffe9a8;
   background: #000;
   border: 2px solid var(--z1r-accent);
-  border-radius: 4px;
+  border-radius: var(--z1r-radius-panel);
   cursor: pointer;
 }
