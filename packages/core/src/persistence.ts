@@ -342,6 +342,10 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
 
       const conformed: RoomNote = {
         visited,
+        // Absent before it existed, which is nothing premarked. Strictly true,
+        // the same as visited, and never alongside it: a save holding both
+        // keeps the stronger fact, that the room was walked.
+        known: note.known === true && !visited,
         item,
         boss,
         stairs,

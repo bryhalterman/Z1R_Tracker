@@ -381,6 +381,7 @@ test('a well-formed room map survives a load unchanged', () => {
       '2': {
         C3: {
           visited: true,
+          known: false,
           item: 'bow',
           boss: 'dodongo',
           stairs: 'transport',
@@ -728,4 +729,70 @@ test('stairs come from the layout itself or from a push block, so some rooms nev
   assert.ok(corners);
   assert.equal(layoutCanPush(corners), false);
   assert.equal(layoutCanHaveStairs(corners), false);
+});
+
+/* ------------------------------------------------------------------ known */
+
+test('a room can be premarked as known without being visited', () => {
+  assert.equal(emptyRoom().known, false);
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { known: true } });
+  const room = state.rooms['2']?.C3;
+  assert.equal(room?.known, true);
+  assert.equal(room?.visited, false);
+  assert.ok(room && !roomIsBare(room));
+  const refused = reduce(state, {
+    type: 'setRoomNote',
+    level: 2,
+    room: 'C3',
+    patch: { known: 'yes' as unknown as boolean },
+  });
+  assert.equal(refused, state);
+  // Unmarking the only thing recorded leaves nothing to keep.
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { known: false } });
+  assert.equal(state.rooms['2']?.C3, undefined);
+});
+
+test('known survives a save, and defaults to false in older or damaged ones', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { known: true } });
+  assert.equal(migrate(JSON.parse(JSON.stringify(state)))?.rooms['2']?.C3?.known, true);
+  const older = JSON.parse(JSON.stringify(state));
+  older.rooms['2'].C3 = { visited: true };
+  assert.equal(migrate(older)?.rooms['2']?.C3?.known, false);
+  const damaged = JSON.parse(JSON.stringify(state));
+  damaged.rooms['2'].C3 = { visited: true, known: 'yes' };
+  assert.equal(migrate(damaged)?.rooms['2']?.C3?.known, false);
+});
+
+test('known and visited are one three-way state, never both', () => {
+  let state = createInitialState();
+  const room = () => state.rooms['2']?.C3;
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { known: true } });
+  assert.deepEqual([room()?.known, room()?.visited], [true, false]);
+  // Walking it — any gesture that records the room as visited — takes the premark off.
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { visited: true } });
+  assert.deepEqual([room()?.known, room()?.visited], [false, true]);
+  // And premarking a walked room takes the visit off.
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { known: true } });
+  assert.deepEqual([room()?.known, room()?.visited], [true, false]);
+  state = reduce(state, { type: 'toggleRoomVisited', level: 2, room: 'C3' });
+  assert.deepEqual([room()?.known, room()?.visited], [false, true]);
+  // A patch claiming both is refused whole.
+  const refused = reduce(state, {
+    type: 'setRoomNote',
+    level: 2,
+    room: 'C3',
+    patch: { known: true, visited: true },
+  });
+  assert.equal(refused, state);
+});
+
+test('a save holding both known and visited loads as visited', () => {
+  let state = createInitialState();
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { visited: true } });
+  const both = JSON.parse(JSON.stringify(state));
+  both.rooms['2'].C3.known = true;
+  const loaded = migrate(both)?.rooms['2']?.C3;
+  assert.deepEqual([loaded?.known, loaded?.visited], [false, true]);
 });

@@ -259,12 +259,28 @@ export function RoomCard(props: RoomCardProps) {
         <span className={cn('mr-1 tabular-nums', selected ? 'text-base font-semibold' : 'text-muted-foreground')}>
           {selected ? `L${level} · ${selected}` : 'Click a room'}
         </span>
-        <CheckToggle
-          label="Visited"
-          pressed={!!note?.visited}
+        {/* One three-way state: never on the map, seen on the map (the level's
+            Map item, or a guide), or walked. Core keeps the two from ever
+            both being set. */}
+        <Segmented
+          label="Whether this room is known from the map or has been visited"
+          value={selected ? (note?.visited ? 'visited' : note?.known ? 'known' : 'clear') : null}
           disabled={off}
-          title="Mark this room walked, or take the mark back off"
-          onPressedChange={() => selected && commit({ type: 'toggleRoomVisited', level, room: selected })}
+          options={[
+            { value: 'clear', text: 'Clear', title: 'Neither seen on the map nor walked' },
+            {
+              value: 'known',
+              text: 'Known',
+              title: "Seen on the level's map — the in-game Map or a guide — but not walked yet",
+            },
+            { value: 'visited', text: 'Visited', title: 'Walked into this room' },
+          ]}
+          onChange={(value) => {
+            if (value === 'known') patch({ known: true });
+            else if (value === 'visited') patch({ visited: true });
+            // Clear, or the pressed one clicked again.
+            else patch({ known: false, visited: false });
+          }}
         />
         <CheckToggle
           label="Entrance"
@@ -285,6 +301,7 @@ export function RoomCard(props: RoomCardProps) {
             // on the same state.
             patch({
               visited: false,
+              known: false,
               item: '',
               boss: '',
               stairs: 'none',

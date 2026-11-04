@@ -37,6 +37,7 @@ import {
   type DoorState,
   type ItemDef,
   type RoomNote,
+  type RoomNotePatch,
   type RoomLayoutDef,
   type RoomSide,
   type SpriteResolver,
@@ -47,6 +48,7 @@ import { createSprite } from './sprite.js';
 import { askToConfirm } from './confirm/ask.js';
 import { layoutShapes } from './layout-shapes.js';
 import { DOOR_BRUSH_ORDER, mountRoomCard } from './room-card/mount.js';
+import { mountClearButton } from './panel/mount.js';
 
 /* ---------------------------------------------------------------- placement */
 
@@ -285,10 +287,8 @@ export function buildRooms(
   title.append(count);
 
   if (interactive) {
-    const clear = el('button', 'z1r-chip-button z1r-chip-danger', 'Clear');
-    clear.type = 'button';
-    clear.title = 'Wipe this level’s room map. The other levels are untouched.';
-    clear.addEventListener('click', async () => {
+    const clearHost = el('span', 'z1r-heading-clearhost');
+    const onClear = async () => {
       const total = Object.keys(roomsOf(store.getState())).length;
       if (total === 0) return;
       // Held from the click: the level showing can change while the dialog is
@@ -304,8 +304,12 @@ export function buildRooms(
       if (!ok) return;
       if (level === asked) selected = '';
       commit(level === asked ? '' : selected, { type: 'clearRooms', level: asked });
+    };
+    mountClearButton(clearHost).render({
+      title: 'Wipe this level’s room map. The other levels are untouched.',
+      onClear: () => void onClear(),
     });
-    title.append(clear);
+    title.append(clearHost);
   }
 
   /* ------------------------------------------------------------- the sheet */
@@ -328,24 +332,61 @@ export function buildRooms(
   const grid = el('div', 'z1r-room-grid');
   grid.setAttribute('role', 'group');
   grid.setAttribute('aria-label', 'Room grid');
-  paper.append(grid);
+
+  /*
+   * LEVEL-N across the top of the sheet, one character over each column, the
+   * way the game letters its own dungeon map. Seven characters over eight
+   * columns, so the last column is left bare. Hidden from assistive tech: the
+   * heading's level buttons already say which level this is.
+   */
+  const caption = el('div', 'z1r-room-caption');
+  caption.setAttribute('aria-hidden', 'true');
+  const captionCells = Array.from({ length: ROOM_COLUMNS }, () => {
+    const cell = el('span', 'z1r-room-caption-cell');
+    caption.append(cell);
+    return cell;
+  });
+  const drawCaption = () => {
+    const text = `LEVEL-${level}`;
+    captionCells.forEach((cell, index) => {
+      cell.textContent = text[index] ?? '';
+    });
+  };
+
+  paper.append(caption, grid);
   body.append(paper);
 
-  /** A room click: drop the armed item, or mark the room walked. */
+  /**
+   * A room click: drop the armed item, or select the room — and, on the room
+   * already selected, step it through clear → visited → known → clear.
+   */
   const touchRoom = (room: string) => {
     const armed = placement.get().item;
     // An overworld-only item armed — the Letter, say — never lands in a room,
-    // and the click does nothing rather than mark the room walked: the sheet's
-    // cursor already says nothing will happen.
+    // and the click does nothing: the sheet's cursor already says nothing will
+    // happen.
     if (armed && !ROOM_ITEMS_BY_ID.has(armed)) return;
     if (!armed) {
       /*
-       * Selecting and marking visited are one click, because mapping a dungeon
-       * is mostly "I walked into this room" and that should not cost a mode.
-       * Set rather than toggled: unmarking is the strip's own toggle, so a
-       * second click here cannot undo the thing you came to record.
+       * Select first, cycle second. The first click on a room only selects it,
+       * so picking a walked room to fill in its doors or boss never changes
+       * what the sheet says about it. Clicking the room that is already
+       * selected steps it on: visited first, since mapping is mostly "I walked
+       * in here", then known — seen on the level's Map or in a guide — then
+       * back to clear. Core keeps known and visited exclusive.
        */
-      commit(room, { type: 'setRoomNote', level, room, patch: { visited: true } });
+      if (room !== selected) {
+        selected = room;
+        redraw();
+        return;
+      }
+      const note = roomsOf(store.getState())[room];
+      const patch: RoomNotePatch = note?.visited
+        ? { known: true }
+        : note?.known
+          ? { known: false, visited: false }
+          : { visited: true };
+      commit(room, { type: 'setRoomNote', level, room, patch });
       return;
     }
     const current = roomsOf(store.getState())[room]?.item ?? '';
@@ -439,6 +480,7 @@ export function buildRooms(
       cellPatches.push((state) => {
         const note = roomsOf(state)[id];
         cell.dataset.visited = String(!!note?.visited);
+        cell.dataset.known = String(!!note?.known);
 
         const isEntrance = state.levelStarts[String(level)] === id;
         renderedEntrance = memoise(renderedEntrance, isEntrance, () => {
@@ -520,7 +562,7 @@ export function buildRooms(
         const layoutDef = ROOM_LAYOUTS_BY_ID.get(layoutId);
         if (layoutDef) parts.push(`${layoutDef.name} layout`);
         if (note) {
-          parts.push(note.visited ? 'visited' : 'not visited');
+          parts.push(note.visited ? 'visited' : note.known ? 'known from the map, not visited' : 'not visited');
           if (item) {
             const name = ROOM_ITEMS_BY_ID.get(item)?.name ?? item;
             parts.push(`holds ${name}${note.collected ? ', collected' : ''}`);
@@ -582,6 +624,7 @@ export function buildRooms(
   /* ------------------------------------------------------------- the passes */
 
   own.push((state) => {
+    drawCaption();
     for (const { value, pill } of levelPills) {
       pill.setAttribute('aria-pressed', String(value === level));
       // A level with rooms recorded is drawn at full strength with a rule under

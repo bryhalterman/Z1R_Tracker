@@ -31,13 +31,13 @@ import {
   type SpriteResolver,
   type TrackerState,
 } from '@z1r/core';
-import { Button } from '#components/ui/button';
 import { Input } from '#components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#components/ui/select';
 import { Toggle } from '#components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '#components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { cn } from '#lib/utils';
+import { ClearButton } from '../panel/PanelHeading.js';
 import { SearchPicker } from '../shared/SearchPicker.js';
 import { Sprite } from '../shared/Sprite.js';
 
@@ -212,7 +212,10 @@ function Numbers({
       aria-label={label}
       variant="outline"
       size="sm"
-      spacing={0}
+      // Separate tiles that wrap, not one joined strip: nine of them are wider
+      // than the card beside the map, and a joined strip cannot break a line.
+      spacing={1}
+      className="flex-wrap"
       value={value ? [value] : []}
       onValueChange={(next) => onChange(next[0] ?? '')}
     >
@@ -495,15 +498,11 @@ export function MapHeading({ regions, onRegions, warpsFound, warpsTotal, focus, 
       </span>
       {focus ? <span className="truncate text-primary">{focus}</span> : null}
       {onClear ? (
-        <Button
-          variant="outline"
-          size="sm"
-          className="ml-auto text-destructive hover:border-destructive"
+        <ClearButton
+          className="ml-auto"
           title="Remove every mark from the map. Items and Triforce are untouched."
-          onClick={onClear}
-        >
-          Clear
-        </Button>
+          onClear={onClear}
+        />
       ) : null}
     </span>
   );

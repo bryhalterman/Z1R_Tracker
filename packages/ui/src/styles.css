@@ -1688,25 +1688,10 @@
 
 /*
  * Every panel folds by its heading, so a long dock can be cut down to the two
- * or three things a run actually needs open.
+ * or three things a run actually needs open. The caret is React; see `panel/`.
  */
-.z1r-panel-toggle {
+.z1r-panel-togglehost {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 1.1em;
-  padding: 0;
-  font: inherit;
-  font-size: var(--z1r-text-md);
-  line-height: 1;
-  color: var(--z1r-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.z1r-panel-toggle:hover {
-  color: var(--z1r-accent);
 }
 
 /* The whole heading is the hit target, so say so. */
@@ -1716,7 +1701,7 @@
 }
 
 /* Controls that live in a heading keep their own cursor. */
-.z1r-panel-title button:not(.z1r-panel-toggle),
+.z1r-panel-title button:not([data-panel-toggle]),
 .z1r-panel-title select,
 .z1r-panel-title input {
   cursor: auto;
@@ -2141,18 +2126,6 @@
   outline-offset: 2px;
 }
 
-.z1r-chip-danger {
-  color: var(--z1r-bad);
-  border-color: var(--z1r-bad);
-}
-
-.z1r-chip-danger:hover,
-.z1r-chip-danger:focus-visible {
-  color: var(--z1r-bg);
-  background: var(--z1r-bad);
-  border-color: var(--z1r-bad);
-}
-
 /* The armed cell is the one the next room click spends: full strength, a solid
    border, and a dashed ring outside it that no other item state uses. */
 .z1r-item[data-armed="true"] {
@@ -2209,9 +2182,11 @@
    * are surfaces and line weights, not new semantic colours, so they stay
    * local to this panel instead of joining the aliases in theme.css.
    */
-  --z1r-room-paper-bg: var(--z1r-field);
+  /* The page background: a step darker than the panel around the sheet, so
+     the sheet reads as set into it. Neutral, with no tint. */
+  --z1r-room-paper-bg: var(--z1r-bg);
   --z1r-room-ink: var(--z1r-text);
-  --z1r-room-rule: color-mix(in srgb, var(--z1r-text) 14%, transparent);
+  --z1r-room-glow: color-mix(in srgb, var(--z1r-accent) 45%, transparent);
   --z1r-room-rule-heavy: color-mix(in srgb, var(--z1r-text) 34%, transparent);
   /*
    * The sheet's own cap, named here because two rules need to agree on it: the
@@ -2290,32 +2265,35 @@
 .z1r-room-levels {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 5px;
+  align-items: center;
+  gap: 2px;
   margin-inline-start: var(--z1r-space-md);
 }
 
 .z1r-room-level {
   position: relative;
-  inline-size: 20px;
-  /* Fixed, because the selected numeral grows: let the button size itself and
-     every click would nudge the heading's height. */
-  block-size: 26px;
+  /* The height of the heading's Clear button, so the numerals, the count and
+     the button all share one centre line. */
+  inline-size: 22px;
+  block-size: 28px;
   padding: 0;
   font: inherit;
-  font-size: 17px;
-  font-weight: 800;
+  font-size: var(--z1r-text-lg);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 24px;
+  line-height: 28px;
+  letter-spacing: 0;
   text-align: center;
   color: var(--z1r-muted);
   background: none;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--z1r-radius);
   cursor: pointer;
-  /* Outlined rather than plated, matching the map's own numeral: the heading
-     behind it is flat, but a browser source composites this over gameplay. */
-  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+}
+
+.z1r-room-level:hover:not(:disabled) {
+  color: var(--z1r-text);
+  background: var(--z1r-inset);
 }
 
 /* A level with rooms recorded is drawn at full strength; one with nothing on it
@@ -2329,10 +2307,11 @@
   opacity: 0.8;
 }
 
-/* Bigger, brighter, and underscored — three channels, so the selected level is
-   not telling you by colour alone. */
+/* Bolder, brighter, and underscored — three channels, so the selected level is
+   not telling you by colour alone. The same size as the others: a numeral that
+   grew on selection pushed the row about and outsized the heading around it. */
 .z1r-room-level[aria-pressed="true"] {
-  font-size: 23px;
+  font-weight: 800;
   color: var(--z1r-text);
   opacity: 1;
 }
@@ -2340,8 +2319,8 @@
 .z1r-room-level[aria-pressed="true"]::after {
   content: "";
   position: absolute;
-  inset-inline: 0;
-  inset-block-end: 0;
+  inset-inline: 4px;
+  inset-block-end: 3px;
   block-size: 2px;
   background: var(--z1r-accent);
 }
@@ -2355,6 +2334,9 @@
 }
 
 .z1r-room-count {
+  /* The heading's own gap is 2px, which left the count touching Clear. 8px is
+     the gap the Overworld heading puts between its items. */
+  margin-inline-end: var(--z1r-space-md);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -2372,14 +2354,23 @@
    */
   flex: 0 1 var(--z1r-room-sheet);
   max-inline-size: var(--z1r-room-sheet);
-  padding: 6px;
+  padding: 8px;
+  /*
+   * Paper: a faint fractal-noise grain over the warmed field, with a little
+   * more light in the middle than at the edges. The grain is white at 6% alpha
+   * — a texture, not a colour — and is drawn in SVG rather than shipped as an
+   * image, so there is no asset to load or lose.
+   */
   background-color: var(--z1r-room-paper-bg);
   background-image:
-    repeating-linear-gradient(to right, var(--z1r-room-rule) 0 1px, transparent 1px 7px),
-    repeating-linear-gradient(to bottom, var(--z1r-room-rule) 0 1px, transparent 1px 7px);
-  background-position: 6px 6px;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--z1r-text) 4%, transparent), transparent 70%);
+  /* A map's frame: a thin rule, and a fainter second one just outside it. */
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius-sm);
+  outline: var(--z1r-border-width) solid color-mix(in srgb, var(--z1r-border) 50%, transparent);
+  outline-offset: 3px;
+  margin: 4px;
 }
 
 /* While an item is armed, the whole sheet says a click will place it. */
@@ -2391,6 +2382,29 @@
 /* An overworld-only item armed: a click here places nothing, as on the map. */
 .z1r-room-paper[data-refusing="true"] .z1r-room {
   cursor: not-allowed;
+}
+
+/*
+ * LEVEL-N over the sheet, one character per column. The same tracks and the
+ * same left rule as the grid below, drawn transparent, so each character sits
+ * centred over its own column rather than approximately above it.
+ */
+.z1r-room-caption {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  margin-block-end: 4px;
+  border-inline-start: var(--z1r-border-width) solid transparent;
+  font-size: var(--z1r-text-lg);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--z1r-text);
+  text-align: center;
+  user-select: none;
+}
+
+.z1r-room-caption-cell {
+  /* The right rule each room cell carries, so the centres match. */
+  border-inline-end: var(--z1r-border-width) solid transparent;
 }
 
 .z1r-room-grid {
@@ -2439,6 +2453,28 @@
   inset: 3px;
   background: color-mix(in srgb, var(--z1r-room-ink) 7%, transparent);
   border: var(--z1r-border-width) solid var(--z1r-room-ink);
+  pointer-events: none;
+}
+
+/* Walked rooms are lit: a soft warm glow around the inked box, spilling just
+   past it. Decoration on top of the box, which already says "visited" by its
+   shape. A shadow rather than a background, because at a dock's cell size the
+   box covers nearly all of the cell and a background glow hid under it. */
+.z1r-room[data-visited="true"]::before {
+  box-shadow: 0 0 7px 1px var(--z1r-room-glow);
+}
+
+/*
+ * Known but not walked — premarked from the level's Map or a guide. A dashed
+ * box, inset a little further than the walked one and fainter: the same shape
+ * family, but a dashed line against a solid one rather than a shade apart.
+ * A walked room drops it, since the solid box says more.
+ */
+.z1r-room[data-known="true"][data-visited="false"]::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: var(--z1r-border-width-thick) dashed color-mix(in srgb, var(--z1r-room-ink) 62%, transparent);
   pointer-events: none;
 }
 

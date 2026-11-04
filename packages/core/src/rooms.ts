@@ -301,6 +301,12 @@ export function resolveRoomFrom(room: Pick<RoomNote, 'from' | 'stairs'>): RoomSl
  */
 export interface RoomNote {
   visited: boolean;
+  /**
+   * Known to exist without having been walked: read off the level's Map item
+   * in game, or out of a guide. Independent of `visited` — a room can be
+   * premarked and later walked, and the sheet draws the walked state over it.
+   */
+  known: boolean;
   /** `RoomItemDef` id known to be here. Empty until identified. */
   item: string;
   /** `BossDef` id. Empty for a room with no boss in it. */
@@ -378,6 +384,7 @@ export type RoomNotePatch = Partial<Omit<RoomNote, 'doors'>> & { doors?: Partial
 export function emptyRoom(): RoomNote {
   return {
     visited: false,
+    known: false,
     item: '',
     boss: '',
     stairs: 'none',
@@ -397,6 +404,7 @@ export function emptyRoom(): RoomNote {
 export function roomIsBare(room: RoomNote): boolean {
   return (
     !room.visited &&
+    !room.known &&
     room.item === '' &&
     room.boss === '' &&
     room.stairs === 'none' &&

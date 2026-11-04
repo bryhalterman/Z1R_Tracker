@@ -55,6 +55,7 @@ import { createSprite } from './sprite.js';
 import { askToConfirm } from './confirm/ask.js';
 import { placedIndex, placedSuffix } from './placed.js';
 import { mountItemPalette, targetFor } from './palette/mount.js';
+import { mountPanelToggle } from './panel/mount.js';
 import {
   mountMapBrushes,
   mountMapHeading,
@@ -242,17 +243,9 @@ function wireCollapsing(root: HTMLElement, defaults: readonly string[] = []): vo
     if (!name) continue;
     panel.dataset.section = name;
 
-    const toggle = el('button', 'z1r-panel-toggle');
-    toggle.type = 'button';
-    const setState = (folded: boolean) => {
-      panel.dataset.collapsed = String(folded);
-      toggle.setAttribute('aria-expanded', String(!folded));
-      // Both a glyph and a label, so the state is not carried by rotation alone.
-      toggle.textContent = folded ? '▸' : '▾';
-      toggle.title = folded ? `Show ${name}` : `Hide ${name}`;
-      toggle.setAttribute('aria-label', toggle.title);
-    };
-
+    // The caret is React, see `panel/`; it draws itself from `setState`.
+    const toggleHost = el('span', 'z1r-panel-togglehost');
+    const toggle = mountPanelToggle(toggleHost);
     const flip = () => {
       const folded = panel.dataset.collapsed !== 'true';
       if (folded) collapsed.add(name);
@@ -260,9 +253,12 @@ function wireCollapsing(root: HTMLElement, defaults: readonly string[] = []): vo
       setState(folded);
       persist();
     };
+    const setState = (folded: boolean) => {
+      panel.dataset.collapsed = String(folded);
+      toggle.render({ name, folded, onToggle: flip });
+    };
 
-    toggle.addEventListener('click', flip);
-    title.prepend(toggle);
+    title.prepend(toggleHost);
 
     /*
      * The whole heading is a hit target, not just the caret — a caret alone is

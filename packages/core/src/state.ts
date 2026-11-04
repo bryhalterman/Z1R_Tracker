@@ -745,7 +745,14 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
     case 'toggleRoomVisited': {
       const target = roomTarget(state, action.level, action.room);
       if (!target) return state;
-      const next: RoomNote = { ...target.current, visited: !target.current.visited };
+      const visited = !target.current.visited;
+      // Known and visited are one three-way state: walking a room supersedes
+      // having seen it on the map.
+      const next: RoomNote = {
+        ...target.current,
+        visited,
+        known: visited ? false : target.current.known,
+      };
       const levelRooms = { ...state.rooms[target.level], [action.room]: next };
       return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
     }
@@ -888,6 +895,10 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
        * the player never described.
        */
       if (patch.visited !== undefined && typeof patch.visited !== 'boolean') return state;
+      if (patch.known !== undefined && typeof patch.known !== 'boolean') return state;
+      // Known and visited are one three-way state — clear, known, visited — so
+      // a patch claiming both is a gesture that cannot happen.
+      if (patch.known === true && patch.visited === true) return state;
       if (patch.item !== undefined && patch.item !== '' && !ROOM_ITEMS_BY_ID.has(patch.item)) {
         return state;
       }
@@ -925,6 +936,11 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         transportSeq: target.current.transportSeq,
         collected: settled.collected,
       };
+      // Setting one side of the known / visited pair clears the other. Every
+      // gesture that records a room as walked — a sheet click, a boss, a
+      // staircase — arrives here as `visited: true`, and takes the premark off.
+      if (patch.visited === true) merged.known = false;
+      if (patch.known === true) merged.visited = false;
       // Same two rules the single-field actions enforce, so a patch cannot
       // reach a state a sequence of clicks could not.
       if (merged.stairs !== 'transport') {
