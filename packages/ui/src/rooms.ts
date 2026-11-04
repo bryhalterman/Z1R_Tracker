@@ -49,6 +49,7 @@ import { askToConfirm } from './confirm/ask.js';
 import { layoutShapes } from './layout-shapes.js';
 import { DOOR_BRUSH_ORDER, mountRoomCard } from './room-card/mount.js';
 import { mountClearButton } from './panel/mount.js';
+import { previewOnMap } from './map-preview.js';
 
 /* ---------------------------------------------------------------- placement */
 
@@ -276,6 +277,12 @@ export function buildRooms(
       selected = '';
       redraw();
     });
+    // Hovering a level points at its entrance on the overworld map.
+    const preview = { kind: 'dungeon', level: value } as const;
+    pill.addEventListener('pointerenter', () => previewOnMap(pill, preview));
+    pill.addEventListener('pointerleave', () => previewOnMap(pill, null));
+    pill.addEventListener('focus', () => previewOnMap(pill, preview));
+    pill.addEventListener('blur', () => previewOnMap(pill, null));
     levels.append(pill);
     return { value, pill };
   });
@@ -539,7 +546,7 @@ export function buildRooms(
           // wherever it appears.
           if (stairs === 'item') {
             mark.append(
-              createSprite(resolver, 'mark.stairway', {
+              createSprite(resolver, 'ui.stairs', {
                 size: MARK_ART_SIZE,
                 className: 'z1r-room-stairs',
                 label: '',

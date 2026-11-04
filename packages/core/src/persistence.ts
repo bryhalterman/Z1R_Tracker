@@ -41,6 +41,7 @@ import {
 import { isRoomLayout, layoutFromChute } from './layouts.js';
 
 import {
+  conformSpot,
   DUNGEON_BLOCKS_BY_ID,
   isScreenId,
   MARKS_BY_KIND,
@@ -187,10 +188,13 @@ function conformScreenNotes(saved: unknown): Record<string, ScreenNote> {
     const item = typeof note.item === 'string' && SCREEN_ITEMS_BY_ID.has(note.item) ? note.item : '';
     // Checked against the real list: an unknown spot id renders as nothing and
     // would sit in the save forever as an invisible entry.
-    const spot =
-      typeof note.spot === 'string' && OVERWORLD_LOCATIONS.some((l) => l.id === note.spot)
-        ? note.spot
-        : '';
+    // The coast is a fixed screen, so a coast tag on any other screen — from
+    // when it was a tag — is dropped, and the coast screen's item fills it.
+    const spot = conformSpot(
+      screen,
+      typeof note.spot === 'string' && OVERWORLD_LOCATIONS.some((l) => l.id === note.spot) ? note.spot : '',
+      item,
+    );
     // New in v12, so absent from every earlier save, which reads as not
     // collected. Strictly true, and never without an item: a flag with nothing
     // to be about would attach itself to whatever item is placed next.

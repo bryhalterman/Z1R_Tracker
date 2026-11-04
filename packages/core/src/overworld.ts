@@ -199,15 +199,29 @@ export const DUNGEON_BLOCKS_BY_ID: ReadonlyMap<string, DungeonBlockDef> = new Ma
   DUNGEON_BLOCKS.map((entry) => [entry.id, entry]),
 );
 
-/**
- * The named overworld spot whose item needs the Ladder.
- *
- * This used to be a hardcoded screen id, which was a guess about where the
- * coast ledge sits and wrong the moment a seed moved it. It is keyed off the
- * spot the player tags instead, so the "you can reach it now" hint follows
- * whichever screen they actually marked.
- */
+/** The named overworld spot whose item needs the Ladder. */
 export const COAST_SPOT_ID = 'ow.coast';
+
+/**
+ * The screen the coast item is on. Fixed: the randomizer shuffles which item
+ * sits on the coast ledge, never where the ledge is.
+ *
+ * It was once a tag the player put on any screen, which let a run record the
+ * coast somewhere it cannot be. Now the spot belongs to this screen — see
+ * `conformSpot`.
+ */
+export const COAST_SCREEN = 'F16';
+
+/**
+ * The spot a screen's note may carry. On the coast screen the spot is the
+ * coast whenever there is an item to fill it; anywhere else the coast is not a
+ * spot the screen can be, so a claim to it is dropped. The other named spots
+ * are still the player's to tag.
+ */
+export function conformSpot(screen: string, spot: string, item: string): string {
+  if (screen === COAST_SCREEN) return item ? COAST_SPOT_ID : '';
+  return spot === COAST_SPOT_ID ? '' : spot;
+}
 
 /** The item the coast ledge is only reachable with. */
 export const COAST_ITEM_REQUIRES = 'ladder';

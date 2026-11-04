@@ -12,7 +12,7 @@ import {
 import { VECTORS } from './sprites/vectors.js';
 import { bundledManifest } from './index.js';
 
-import { COAST_SPOT_ID } from './overworld.js';
+import { COAST_SCREEN, COAST_SPOT_ID } from './overworld.js';
 
 function marked(screen: string, mark: MarkKind): TrackerState {
   return reduce(createInitialState(), { type: 'setMark', screen, mark });
@@ -80,18 +80,29 @@ test('clearing a mark discards its detail', () => {
   assert.equal(state.screenNotes['H8']?.dungeon ?? 0, 0);
 });
 
-test('the coast is identified by its tag, not by a screen id', () => {
+test('the coast is always F16: its item fills the spot, and no other screen can claim it', () => {
   /*
-   * It used to be a hardcoded screen, which was a guess about where the ledge
-   * sits. Tagging means the ladder hint follows whichever screen was marked.
+   * The randomizer shuffles which item sits on the coast ledge, never where
+   * the ledge is. It was once a tag the player could put on any screen.
    */
-  let state = marked('B3', 'item');
-  state = reduce(state, {
-    type: 'setScreenNote',
-    screen: 'B3',
-    patch: { spot: COAST_SPOT_ID },
-  });
-  assert.equal(state.screenNotes['B3']?.spot, COAST_SPOT_ID);
+  let state = marked(COAST_SCREEN, 'item');
+  state = reduce(state, { type: 'setScreenNote', screen: COAST_SCREEN, patch: { item: 'raft' } });
+  assert.equal(state.screenNotes[COAST_SCREEN]?.spot, COAST_SPOT_ID);
+
+  // Tagging anywhere else is not a spot that screen can be.
+  state = marked('B3', 'item');
+  state = reduce(state, { type: 'setScreenNote', screen: 'B3', patch: { spot: COAST_SPOT_ID, item: 'bow' } });
+  assert.equal(state.screenNotes['B3']?.spot, '');
+  assert.equal(state.screenNotes['B3']?.item, 'bow');
+});
+
+test('a save with the coast tagged on another screen loads with the tag dropped', () => {
+  const saved = JSON.parse(JSON.stringify(createInitialState()));
+  saved.marks = { D13: 'item' };
+  saved.screenNotes = { D13: { spot: COAST_SPOT_ID, item: 'raft' } };
+  const loaded = migrate(saved);
+  assert.equal(loaded?.screenNotes['D13']?.spot, '');
+  assert.equal(loaded?.screenNotes['D13']?.item, 'raft');
 });
 
 test('an item screen records its spot and its contents separately', () => {

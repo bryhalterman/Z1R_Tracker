@@ -27,6 +27,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { cn } from '#lib/utils';
 import { Sprite } from '../shared/Sprite.js';
+import { previewHandlers } from '../map-preview.js';
 
 export interface CompactLocationsProps {
   state: TrackerState;
@@ -131,6 +132,8 @@ function PieceHead({ level, state, resolver, dispatch }: { level: string } & Com
         aria-pressed={held}
         data-on={held}
         onClick={() => dispatch({ type: 'setDungeon', level: Number(level), patch: { triforce: !held } })}
+        // Hovering a level's piece points at its entrance on the overworld map.
+        {...previewHandlers({ kind: 'dungeon', level: Number(level) })}
         // No tile and no ring: the triangle is the control. Held is the piece
         // in full color with a dark numeral, not held the piece gray and faded
         // with a light one — two channels that are not hue.
@@ -185,6 +188,7 @@ export function CompactLocations(props: CompactLocationsProps) {
                 <span
                   className="grid size-6 place-items-center text-[10px] font-bold text-muted-foreground"
                   title={level ? `Level ${level} — Ganon, no Triforce piece` : 'Overworld locations'}
+                  {...(level ? previewHandlers({ kind: 'dungeon', level: Number(level) }) : {})}
                 >
                   {level ?? label}
                 </span>

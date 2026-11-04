@@ -181,19 +181,13 @@ body {
   /*
    * The gutter is reserved whether or not the grid overflows, and that is
    * load-bearing rather than cosmetic. `applyMapScale` sizes the cells from
-   * the grid's `clientWidth`, which is this row's less the card: with the
-   * scrollbar coming and going, a narrower box gives smaller cells, smaller
+   * the grid's `clientWidth`, which is this row's: with the scrollbar coming
+   * and going, a narrower box gives smaller cells, smaller
    * cells give a shorter grid, a shorter grid takes the scrollbar away, and the
    * resize observer sits there flipping between two cell sizes. A fixed gutter
    * means one measurement.
    */
   scrollbar-gutter: stable;
-}
-
-/* The card stays in view while a tall map scrolls under it. */
-#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel .z1r-screen-cardhost {
-  position: sticky;
-  inset-block-start: 0;
 }
 
 @media (max-width: 720px) {

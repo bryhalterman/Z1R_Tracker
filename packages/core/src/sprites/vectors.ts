@@ -21,6 +21,12 @@ export interface VectorSprite {
 
 const V = (markup: string): VectorSprite => ({ viewBox: '0 0 16 16', markup });
 
+/** A line icon on a 24px grid: light strokes, no fill, one weight for the set. */
+const LINE = (markup: string): VectorSprite => ({
+  viewBox: '0 0 24 24',
+  markup: `<g fill="none" stroke="#f2f2f2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${markup}</g>`,
+});
+
 /** One Triforce wedge — the per-dungeon toggle. */
 const TRIANGLE = 'M8 2 L14.5 13.5 L1.5 13.5 Z';
 
@@ -47,19 +53,19 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
         stroke="#c9a2e0" stroke-width="1.8" stroke-linecap="round" fill="none"/>`,
   ),
 
+  /*
+   * A staircase, for the places a staircase means stairs: a dungeon room's
+   * item basement and the stair slots in Locations. The overworld warp mark
+   * used to share it, and now draws a line icon with the other marks.
+   */
+  'ui.stairs': V(
+    `<path d="M1 1.8 L5.67 1.8 L5.67 6.26 L10.34 6.26 L10.34 10.71 L15 10.71 L15 14.8 L1 14.8 Z"
+        fill="#2fb0a6" stroke="#0f4a45" stroke-width="1.2" stroke-linejoin="round"/>
+     <path d="M5.67 6.26 L5.67 14.8 M10.34 10.71 L10.34 14.8" stroke="#0f4a45" stroke-width="1.2"
+        stroke-linecap="round" fill="none"/>`,
+  ),
+
   /* --------------------------------------------------------- overworld marks */
-
-  'mark.dungeon': V(
-    `<path d="M2.5 14 L2.5 7 A5.5 5.5 0 0 1 13.5 7 L13.5 14 Z"
-        fill="#c34a4a" stroke="#5e1d1d" stroke-width="1" stroke-linejoin="round"/>
-     <rect x="6.5" y="9" width="3" height="5" fill="#2a1010"/>`,
-  ),
-
-  'mark.shop': V(
-    `<path d="M2 6 L4 2.5 L12 2.5 L14 6 Z" fill="#3f8fd0" stroke="#1d3a5c" stroke-width="1" stroke-linejoin="round"/>
-     <rect x="2.8" y="6" width="10.4" height="7.5" fill="#dfe7ee" stroke="#1d3a5c" stroke-width="1"/>
-     <rect x="6.4" y="8.6" width="3.2" height="4.9" fill="#3f8fd0"/>`,
-  ),
 
   'mark.heart': V(
     `<path d="M8 13.6 C3.2 10 2 7.9 2 6.2 C2 4.3 3.4 3.1 4.9 3.1 C6.3 3.1 7.4 4 8 5.1
@@ -67,10 +73,6 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
         fill="#e05c7a" stroke="#7d1524" stroke-width="1" stroke-linejoin="round"/>`,
   ),
 
-  'mark.item': V(
-    `<path d="M8 1.5 L9.9 6.1 L14.8 6.4 L11 9.5 L12.2 14.3 L8 11.6 L3.8 14.3 L5 9.5 L1.2 6.4 L6.1 6.1 Z"
-        fill="#d9a441" stroke="#6d4d10" stroke-width="1" stroke-linejoin="round"/>`,
-  ),
 
   /*
    * The money-making game. A rupee, because that is what the room is.
@@ -79,23 +81,12 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
    * not read as the shop's awning at a glance — the two are next to each other
    * in the toolbar and both are "a cave that wants your money".
    */
-  'mark.gamble': V(
-    `<path d="M8 1.6 L12.6 5.2 L12.6 10.8 L8 14.4 L3.4 10.8 L3.4 5.2 Z"
-        fill="#4bb572" stroke="#1d5433" stroke-width="1" stroke-linejoin="round"/>
-     <path d="M8 4.4 L10.4 6.2 L10.4 9.8 L8 11.6 L5.6 9.8 L5.6 6.2 Z" fill="#a8e6c1"/>`,
-  ),
 
   /*
    * The old man with something to tell you. A speech bubble rather than a
    * figure: at 18px a person is an indistinct blob, whereas a bubble with a
    * tail reads immediately and says "there are words here".
    */
-  'mark.hintroom': V(
-    `<path d="M2 3 L14 3 L14 11 L8.6 11 L5.4 14 L5.4 11 L2 11 Z"
-        fill="#9b7fd4" stroke="#3f2d63" stroke-width="1" stroke-linejoin="round"/>
-     <rect x="4.4" y="5.6" width="7.2" height="1.2" fill="#efe8ff"/>
-     <rect x="4.4" y="8" width="4.8" height="1.2" fill="#efe8ff"/>`,
-  ),
 
   /*
    * A warp staircase. Three descending steps, drawn as one silhouette.
@@ -106,12 +97,6 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
    * mistaken for its neighbours at 18px. The riser lines keep the steps apart
    * once it is small enough for the notches to close up.
    */
-  'mark.stairway': V(
-    `<path d="M1 1.8 L5.67 1.8 L5.67 6.26 L10.34 6.26 L10.34 10.71 L15 10.71 L15 14.8 L1 14.8 Z"
-        fill="#2fb0a6" stroke="#0f4a45" stroke-width="1.2" stroke-linejoin="round"/>
-     <path d="M5.67 6.26 L5.67 14.8 M10.34 10.71 L10.34 14.8" stroke="#0f4a45" stroke-width="1.2"
-        stroke-linecap="round" fill="none"/>`,
-  ),
 
   'mark.bombable': V(
     `<circle cx="7.5" cy="10" r="4.6" fill="#8e8e8e" stroke="#3d3d3d" stroke-width="1"/>
@@ -136,26 +121,42 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
         fill="none" stroke="#8f5cc4" stroke-width="1.7" stroke-linecap="round"/>`,
   ),
 
-  'mark.empty': V(
-    `<path d="M4 8 L12 8" stroke="#5a5a5a" stroke-width="2" stroke-linecap="round" fill="none"/>`,
-  ),
-  // A door with a crack through it. Nothing else in the mark row is a plain
-  // upright rectangle: the dungeon is an arch, the shop an awning.
-  'mark.doorRepair': V(
-    `<rect x="3.5" y="2" width="9" height="12.5" rx="1" fill="#b8763a" stroke="#4a2c12" stroke-width="1"/>` +
-      `<path d="M7.2 2.6 L9.1 5.4 L6.6 8 L9.4 10.6 L7.6 14" stroke="#2a1708" stroke-width="1.3" fill="none" stroke-linejoin="round"/>` +
-      `<circle cx="11" cy="8.6" r=".8" fill="#2a1708"/>`,
-  ),
-  // A coin purse with a rupee on it. A bare rupee is the gambling mark, so the
-  // silhouette here is the bag.
-  'mark.rupeeSecret': V(
-    `<path d="M5.4 3.2 L10.6 3.2 L9.4 5.2 C12.6 6.4 14 9 14 11 C14 13.4 11.4 14.6 8 14.6 C4.6 14.6 2 13.4 2 11 C2 9 3.4 6.4 6.6 5.2 Z" fill="#4fa3e0" stroke="#173e5c" stroke-width="1" stroke-linejoin="round"/>` +
-      `<path d="M8 7.4 L9.6 8.7 L9.6 10.9 L8 12.2 L6.4 10.9 L6.4 8.7 Z" fill="#dff1ff"/>`,
-  ),
-  // The start pennant: one per map, drawn in a corner over whatever else the
-  // screen or room carries.
-  'mark.start': V(
-    `<path d="M3 1.5 L3 15" stroke="#f2f2f2" stroke-width="1.6" stroke-linecap="round"/>` +
-      `<path d="M3.6 2 L13.5 4.8 L3.6 7.8 Z" fill="#da9f00" stroke="#5a4100" stroke-width=".8" stroke-linejoin="round"/>`,
-  ),
+  /*
+   * Overworld marks: one line-icon family, so the brush row and the map read as
+   * a set. Light strokes on a 24px grid; the colour each mark carries is its
+   * tint, drawn behind the icon by the brush tile and the map's disc from
+   * `MARKS[].color`, never inside the shape — so the shape alone names it.
+   *
+   * Paths from Lucide (lucide.dev), used under its ISC License:
+   *
+   * Copyright (c) 2026 Lucide Icons and Contributors
+   *
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   */
+  // Clearing screens: an eraser.
+  'mark.clear': LINE(`<path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21"/><path d="m5.082 11.09 8.828 8.828"/>`),
+  'mark.dungeon': LINE(`<path d="M10 5V3"/><path d="M14 5V3"/><path d="M15 21v-3a3 3 0 0 0-6 0v3"/><path d="M18 3v8"/><path d="M18 5H6"/><path d="M22 11H2"/><path d="M22 9v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9"/><path d="M6 3v8"/>`),
+  'mark.shop': LINE(`<path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/>`),
+  'mark.item': LINE(`<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>`),
+  'mark.gamble': LINE(`<rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/>`),
+  'mark.hintroom': LINE(`<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M7 11h10"/><path d="M7 15h6"/><path d="M7 7h8"/>`),
+  'mark.doorRepair': LINE(`<path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/>`),
+  'mark.rupeeSecret': LINE(`<path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/>`),
+  // Lucide has no staircase; four linked points stands for the warp network.
+  'mark.stairway': LINE(`<path d="m10.586 5.414-5.172 5.172"/><path d="m18.586 13.414-5.172 5.172"/><path d="M6 12h12"/><circle cx="12" cy="20" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="4" cy="12" r="2"/>`),
+  // "Checked, nothing": looked at and done with.
+  'mark.empty': LINE(`<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>`),
+  // The start pennant keeps a fill: it is drawn in a corner over bare terrain,
+  // without the disc the other marks sit on.
+  'mark.start': LINE(`<path fill="#da9f00" d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/>`),
 };

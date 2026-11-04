@@ -16,6 +16,8 @@
 
 import { CheckIcon } from 'lucide-react';
 import {
+  COAST_SCREEN,
+  COAST_SPOT_ID,
   DUNGEON_BLOCKS,
   MARKS,
   MARKS_BY_KIND,
@@ -39,6 +41,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#compo
 import { cn } from '#lib/utils';
 import { ClearButton } from '../panel/PanelHeading.js';
 import { SearchPicker } from '../shared/SearchPicker.js';
+import { previewHandlers, type MapPreview } from '../map-preview.js';
 import { Sprite } from '../shared/Sprite.js';
 
 export type Armed = MarkKind | 'start' | '';
@@ -79,6 +82,10 @@ function iconTile({ armed, current }: { armed?: boolean; current?: boolean }): s
         : 'shadow-[inset_0_0_0_1px_var(--border)]',
   );
 }
+
+/** A tile tinted from `--tint`: muted at rest, a step stronger on hover. */
+const TINTED =
+  'bg-[color-mix(in_srgb,var(--tint)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--tint)_45%,transparent)]';
 
 /** A small labelled tooltip around any trigger. */
 function Tip({ text, children }: { text: string; children: React.ReactElement }) {
@@ -140,14 +147,13 @@ export function MapBrushes(props: MapBrushesProps) {
                 data-mark={mark.kind}
                 data-armed={armed}
                 data-active={current === mark.kind}
-                className={iconTile({ armed, current: current === mark.kind })}
+                // Each mark's own colour as a muted tint behind its icon — a
+                // second cue only; the icon's shape is what names it.
+                style={{ '--tint': mark.color } as React.CSSProperties}
+                className={cn(iconTile({ armed, current: current === mark.kind }), TINTED)}
                 onClick={() => actions.arm(armed ? '' : mark.kind)}
               >
-                {mark.sprite ? (
-                  <Sprite resolver={resolver} spriteKey={mark.sprite} size={18} />
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+                <Sprite resolver={resolver} spriteKey={mark.sprite ?? 'mark.clear'} size={18} />
               </TooltipTrigger>
             </Tip>
           );
@@ -159,7 +165,10 @@ export function MapBrushes(props: MapBrushesProps) {
             aria-label="Place the start screen. One per map. Click again to stop."
             aria-pressed={view.armed === 'start'}
             data-mark="start"
-            className={iconTile({ armed: view.armed === 'start', current: isStart })}
+            style={{ '--tint': 'var(--primary)' } as React.CSSProperties}
+            className={cn(iconTile({ armed: view.armed === 'start', current: isStart }), TINTED)}
+            // Hovering the start brush points at the start screen, once placed.
+            {...previewHandlers({ kind: 'start' })}
             onClick={() => actions.arm(view.armed === 'start' ? '' : 'start')}
           >
             <Sprite resolver={resolver} spriteKey="mark.start" size={18} />
@@ -201,11 +210,14 @@ function Numbers({
   value,
   options,
   onChange,
+  preview,
 }: {
   label: string;
   value: string;
   options: readonly { value: string; text: string; title?: string }[];
   onChange: (value: string) => void;
+  /** What hovering an option points the map at, if anything. */
+  preview?: (value: string) => Exclude<MapPreview, null>;
 }) {
   return (
     <ToggleGroup
@@ -225,6 +237,7 @@ function Numbers({
           value={option.value}
           title={option.title}
           className="min-w-7 data-[pressed]:border-primary data-[pressed]:underline data-[pressed]:underline-offset-4"
+          {...(preview ? previewHandlers(preview(option.value)) : {})}
         >
           {option.text}
         </ToggleGroupItem>
@@ -244,7 +257,14 @@ const SIZES = SECRET_SIZES.map((size) => ({
   title: `${size.name} — ${size.range} rupees when shop items are shuffled`,
 }));
 const ITEM_GROUPS = [{ options: [{ value: '', label: 'Item unknown' }, ...SCREEN_ITEMS.map((entry) => ({ value: entry.id, label: entry.name }))] }];
-const SPOTS = [{ value: '', label: 'Unnamed spot' }, ...OVERWORLD_LOCATIONS.map((location) => ({ value: location.id, label: location.label }))];
+// The coast is not offered: it is always `COAST_SCREEN`, never a tag.
+const SPOTS = [
+  { value: '', label: 'Unnamed spot' },
+  ...OVERWORLD_LOCATIONS.filter((location) => location.id !== COAST_SPOT_ID).map((location) => ({
+    value: location.id,
+    label: location.label,
+  })),
+];
 
 export function ScreenCard({ state, view, resolver, interactive, actions }: ScreenCardProps) {
   const { selected, armed } = view;
@@ -288,6 +308,8 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
                 value={numberValue(armed === 'dungeon' ? view.armedLevel : (note?.dungeon ?? 0))}
                 options={LEVELS}
                 onChange={(value) => actions.pickLevel(Number(value) || 0)}
+                // Hovering a number points at where that level already is.
+                preview={(value) => ({ kind: 'dungeon', level: Number(value) })}
               />
             </Row>
             {selected ? (
@@ -377,22 +399,30 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
         {showing === 'item' && selected ? (
           <>
             <Row label="Spot">
-              <Select
-                items={SPOTS}
-                value={note?.spot ?? ''}
-                onValueChange={(value) => actions.patchNote({ spot: (value as string | null) ?? '' })}
-              >
-                <SelectTrigger size="sm" className="w-full" aria-label="Which named overworld spot this screen is">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z1r-ui">
-                  {SPOTS.map((spot) => (
-                    <SelectItem key={spot.value || 'none'} value={spot.value}>
-                      {spot.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {selected === COAST_SCREEN ? (
+                // The coast is this screen and no other, so there is nothing to
+                // pick: its item fills the Coast spot.
+                <span className="pt-1.5 text-sm" title="The coast ledge is always this screen; only its item is shuffled">
+                  Coast
+                </span>
+              ) : (
+                <Select
+                  items={SPOTS}
+                  value={note?.spot ?? ''}
+                  onValueChange={(value) => actions.patchNote({ spot: (value as string | null) ?? '' })}
+                >
+                  <SelectTrigger size="sm" className="w-full" aria-label="Which named overworld spot this screen is">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z1r-ui">
+                    {SPOTS.map((spot) => (
+                      <SelectItem key={spot.value || 'none'} value={spot.value}>
+                        {spot.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </Row>
             <Row label="Item">
               <SearchPicker

@@ -10,6 +10,7 @@
 import { ITEMS, ITEMS_BY_ID, maxValue } from './items.js';
 import { DUNGEONS, holdsTriforcePiece } from './dungeons.js';
 import {
+  conformSpot,
   cycleMark,
   isScreenId,
   OVERWORLD_STAIRWAY_COUNT,
@@ -572,6 +573,9 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       }
       // An unknown size reads as unknown rather than refusing the whole patch.
       if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
+      // The coast spot belongs to its screen: set there by the item, refused
+      // anywhere else.
+      next.spot = conformSpot(action.screen, next.spot, next.item);
       // Coerced rather than refused, like the two numbers above: anything but
       // a literal `true` is not collected.
       const requested =

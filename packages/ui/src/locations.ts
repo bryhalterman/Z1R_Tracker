@@ -307,7 +307,7 @@ function buildSlot(
       }
       if (kind === 'stair') {
         face.replaceChildren(
-          createSprite(resolver, 'mark.stairway', { size: SLOT_GLYPH_ART, label: '' }),
+          createSprite(resolver, 'ui.stairs', { size: SLOT_GLYPH_ART, label: '' }),
         );
         return;
       }

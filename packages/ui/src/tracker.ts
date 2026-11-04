@@ -12,7 +12,7 @@ import {
   dungeonItems,
   safeStorage,
   COAST_ITEM_REQUIRES,
-  COAST_SPOT_ID,
+  COAST_SCREEN,
   DUNGEON_BLOCKS,
   DUNGEON_BLOCKS_BY_ID,
   DUNGEONS,
@@ -56,6 +56,7 @@ import { askToConfirm } from './confirm/ask.js';
 import { placedIndex, placedSuffix } from './placed.js';
 import { mountItemPalette, targetFor } from './palette/mount.js';
 import { mountPanelToggle } from './panel/mount.js';
+import { MAP_PREVIEW_EVENT, type MapPreview } from './map-preview.js';
 import {
   mountMapBrushes,
   mountMapHeading,
@@ -1123,6 +1124,34 @@ function buildMap(
 
   patches.push(syncToolbar);
 
+  /*
+   * Another panel pointing at a screen: the start brush, or a dungeon number
+   * in the screen card, the Levels heading or Locations — see `map-preview`.
+   * The matches carry `data-previewed`, and the map dims the rest. Matched
+   * from the state when the event arrives, so nothing needs redrawing. Only
+   * events from inside this tracker count, so two trackers stay apart.
+   */
+  const applyPreview = (preview: MapPreview) => {
+    const state = store.getState();
+    const matches = new Set<string>();
+    if (preview?.kind === 'start' && state.startScreen) matches.add(state.startScreen);
+    if (preview?.kind === 'dungeon') {
+      for (const [screen, mark] of Object.entries(state.marks)) {
+        if (mark === 'dungeon' && state.screenNotes[screen]?.dungeon === preview.level) matches.add(screen);
+      }
+    }
+    for (const cell of body.querySelectorAll<HTMLElement>('.z1r-screen')) {
+      cell.dataset.previewed = String(matches.has(cell.dataset.screen ?? ''));
+    }
+    // Nothing placed yet: leave the map alone rather than dim all of it.
+    body.dataset.preview = String(matches.size > 0);
+  };
+  document.addEventListener(MAP_PREVIEW_EVENT, (event) => {
+    const tracker = body.closest('.z1r-tracker');
+    if (!tracker || !(event.target instanceof Node) || !tracker.contains(event.target)) return;
+    applyPreview((event as CustomEvent<MapPreview>).detail);
+  });
+
   for (let row = 1; row <= OVERWORLD_ROWS; row++) {
     for (let col = 1; col <= OVERWORLD_COLUMNS; col++) {
       const id = screenId(col, row);
@@ -1356,7 +1385,9 @@ function buildMap(
           if (!first) badge.replaceChildren();
           else badge.replaceChildren(createSprite(resolver, first.sprite, { size: 16, label: first.name }));
         });
-        const isCoast = note?.spot === COAST_SPOT_ID;
+        // The coast is a fixed screen, so its notch is there from the start —
+        // you can find the ledge before you can reach it.
+        const isCoast = id === COAST_SCREEN;
         // The coast ledge is reachable the moment the Ladder is in hand — and
         // that is exactly when you have forgotten it is there.
         const coastReady = isCoast && (state.items[COAST_ITEM_REQUIRES] ?? 0) >= 1;

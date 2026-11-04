@@ -641,20 +641,58 @@
 }
 
 /*
- * The start pennant: top-left, over whatever the screen is marked as.
+ * The start screen: a box around the whole tile, and the flag in its corner.
  *
- * Sized from the cell like the warp staircase, so it tracks the map's zoom.
- * The shape is the channel, not its colour — nothing else on the map is a
- * flag. The region code shares this corner, so it steps right while the
- * pennant is there rather than being drawn underneath it.
+ * The flag alone was a 13px glyph and easy to lose; a box on the whole tile is
+ * a shape, which is what makes the start findable from across the map. Accent
+ * gold, with a 1px dark edge inside it, because the gold is close to the sand
+ * tiles' own colour and would otherwise melt into them. The flag stays: a
+ * focused hint also draws an accent border, and the flag is what says which.
+ *
+ * Sizes come from the cell, like the warp staircase, so they track the map's
+ * zoom. The region code shares this corner, so it steps right while the flag
+ * is there rather than being drawn underneath it.
  */
 .z1r-screen-start {
+  /* 2px at the 30px-tall cells a 1600px window draws; 1px at the smallest. */
+  --start-band: max(1px, calc(var(--map-cell-height, 34px) * 0.07));
   position: absolute;
   z-index: 4;
-  inset-block-start: 1px;
-  inset-inline-start: 1px;
+  inset: 0;
+  /* Flex, so the flag sits in the corner: as a block, the map cell's centred
+     button text pulled it into the middle of the tile. */
   display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
   pointer-events: none;
+  box-shadow:
+    inset 0 0 0 var(--start-band) var(--z1r-accent),
+    inset 0 0 0 calc(var(--start-band) + 1px) var(--z1r-bg);
+}
+
+/*
+ * Another panel pointing at a screen — the start brush, or a dungeon number in
+ * the screen card, the Levels heading or Locations (see `map-preview`). Every
+ * other screen dims and the match gets a white ring outside the tile: a change
+ * in brightness and a ring, so it does not lean on colour.
+ */
+.z1r-map[data-preview="true"] .z1r-screen:not([data-previewed="true"]) {
+  filter: brightness(0.45);
+}
+
+.z1r-map[data-preview="true"] .z1r-screen[data-previewed="true"] {
+  outline: 3px solid var(--z1r-text);
+  outline-offset: 2px;
+  z-index: 3;
+}
+
+/* Selected as well: the usual ring would sit on the box, so the selection
+   moves outside the tile as a dashed ring instead. Still a ring, still white,
+   and dashed so it does not read as part of the box. */
+.z1r-screen[data-selected="true"][data-start="true"] {
+  outline: 2px dashed var(--z1r-text);
+  outline-offset: 1px;
+  z-index: 3;
 }
 
 .z1r-screen-start:empty {
@@ -662,13 +700,14 @@
 }
 
 .z1r-screen-start > .z1r-sprite {
-  inline-size: calc(var(--map-cell-height, 34px) * 0.45);
-  block-size: calc(var(--map-cell-height, 34px) * 0.45);
-  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+  margin: calc(var(--start-band) + 2px);
+  inline-size: calc(var(--map-cell-height, 34px) * 0.4);
+  block-size: calc(var(--map-cell-height, 34px) * 0.4);
+  filter: drop-shadow(0 0 1px var(--z1r-bg)) drop-shadow(0 0 1px var(--z1r-bg));
 }
 
 .z1r-screen[data-start="true"] .z1r-screen-region {
-  inset-inline-start: calc(var(--map-cell-height, 34px) * 0.45 + 2px);
+  inset-inline-start: calc(var(--map-cell-height, 34px) * 0.5 + 4px);
 }
 
 /* A focused hint labels its own region even with the codes switched off —
@@ -699,9 +738,11 @@
    */
   padding: calc(var(--map-cell-height, 34px) * 0.07);
   border-radius: 50%;
-  /* A constant dark disc under the icon: terrain art underneath varies wildly,
-     and a mark that disappears over forest is worse than no mark. */
-  background: color-mix(in srgb, var(--z1r-bg) 80%, transparent);
+  /* A dark disc under the icon, tinted with the mark's own colour: terrain art
+     underneath varies wildly, and a mark that disappears over forest is worse
+     than no mark. The tint matches the brush tile; the light line icon on top
+     is what names the mark. */
+  background: color-mix(in srgb, var(--mark-color, transparent) 35%, var(--z1r-bg));
   box-shadow: 0 0 0 calc(var(--map-cell-height, 34px) * 0.045) var(--mark-color, transparent);
   pointer-events: none;
 }
@@ -1445,14 +1486,13 @@
 }
 
 /*
- * The marker brushes above the grid, and the grid and the screen card side by
- * side below them. The controls themselves are React; see `overworld/`.
+ * The marker brushes above the grid, the grid, and the screen card under it.
+ * The controls themselves are React; see `overworld/`.
  *
- * The row wraps rather than squeezing: a large flex-grow on the map and a small
- * one on the card means that beside each other the card keeps its basis and
- * the map takes the rest, and wrapped onto its own line the card takes the
- * full width. The card's width never depends on its content, so the map's
- * width — which `applyMapScale` measures — only moves when the panel does.
+ * The card sits below the map at every width. Beside it, the card's 256px
+ * came straight out of the map: at a 1600px window the screens drew 27px wide
+ * instead of 44. The map takes the whole row, so its width — which
+ * `applyMapScale` measures — only moves when the panel does.
  */
 .z1r-map-brushes {
   margin-block-end: var(--z1r-space-sm);
@@ -1471,13 +1511,9 @@
   gap: var(--z1r-space-md);
 }
 
-.z1r-map-row > .z1r-map {
-  flex: 999 1 var(--z1r-map-min, 448px);
-  min-inline-size: 0;
-}
-
+.z1r-map-row > .z1r-map,
 .z1r-screen-cardhost {
-  flex: 1 1 var(--z1r-screen-aside, 256px);
+  flex: 1 1 100%;
   min-inline-size: 0;
 }
 
@@ -1945,20 +1981,15 @@
   display: none;
 }
 
-/*
- * A light halo around the staircase.
- *
- * The glyph is teal with a dark outline, which vanishes against the dark cave
- * mouths and mountain tiles it most often sits on. The same problem the dungeon
- * numeral solves with a black outline, solved the other way round because this
- * shape is already dark-edged.
- */
+/* The warp mark in its corner, with a halo so it reads over any terrain. */
 .z1r-screen-warp > .z1r-sprite {
   /* Sized here rather than at the call site so it tracks the cell as the panel
      is resized, the same way the dungeon numeral does. */
   inline-size: calc(var(--map-cell-height, 40px) * 0.95);
   block-size: calc(var(--map-cell-height, 40px) * 0.95);
-  filter: drop-shadow(0 0 1px var(--z1r-text)) drop-shadow(0 0 1px var(--z1r-text));
+  /* The warp is a light line icon now, so its halo is dark: it sits over cave
+     mouths and pale sand alike. */
+  filter: drop-shadow(0 0 1px var(--z1r-bg)) drop-shadow(0 0 1px var(--z1r-bg));
 }
 
 /*

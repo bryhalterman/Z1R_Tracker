@@ -335,11 +335,11 @@ test('collecting a screen item raises the inventory, and changing it resets the 
   state = reduce(state, {
     type: 'setScreenNote',
     screen: 'C2',
-    patch: { spot: 'ow.coast', item: 'raft' },
+    patch: { spot: 'ow.armos', item: 'raft' },
   });
   state = reduce(state, { type: 'collectScreen', screen: 'C2', collected: true });
   assert.equal(state.items['raft'], 1);
-  assert.equal(slot(state, 'ow.coast')?.collected, true);
+  assert.equal(slot(state, 'ow.armos')?.collected, true);
 
   state = reduce(state, { type: 'collectScreen', screen: 'C2', collected: false });
   assert.equal(state.items['raft'], 1, 'un-collecting never revokes');
