@@ -166,13 +166,13 @@ body {
 }
 
 #tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel > * {
-  /* Only the grid gives up height. The title, the marker toolbar and the warp
-     routes are each a fixed handful of rows, and a toolbar that scrolled away
-     from the map it edits would be worse than a shorter map. */
+  /* Only the row holding the grid and the screen card gives up height. The
+     title and the marker brushes are a fixed handful of rows, and brushes that
+     scrolled away from the map they stamp would be worse than a shorter map. */
   flex: none;
 }
 
-#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel > .z1r-map {
+#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel > .z1r-map-row {
   flex: 0 1 auto;
   /* Flex items floor at their content height without this, so the cap above
      would be ignored and the panel would overflow instead of scrolling. */
@@ -181,12 +181,19 @@ body {
   /*
    * The gutter is reserved whether or not the grid overflows, and that is
    * load-bearing rather than cosmetic. `applyMapScale` sizes the cells from
-   * this element's `clientWidth`: with the scrollbar coming and going, a
-   * narrower box gives smaller cells, smaller cells give a shorter grid, a
-   * shorter grid takes the scrollbar away, and the resize observer sits there
-   * flipping between two cell sizes. A fixed gutter means one measurement.
+   * the grid's `clientWidth`, which is this row's less the card: with the
+   * scrollbar coming and going, a narrower box gives smaller cells, smaller
+   * cells give a shorter grid, a shorter grid takes the scrollbar away, and the
+   * resize observer sits there flipping between two cell sizes. A fixed gutter
+   * means one measurement.
    */
   scrollbar-gutter: stable;
+}
+
+/* The card stays in view while a tall map scrolls under it. */
+#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel .z1r-screen-cardhost {
+  position: sticky;
+  inset-block-start: 0;
 }
 
 @media (max-width: 720px) {

@@ -671,11 +671,6 @@
   inset-inline-start: calc(var(--map-cell-height, 34px) * 0.45 + 2px);
 }
 
-/* Set apart from the marks it follows, since it is not one of them. */
-.z1r-tool-start {
-  margin-inline-start: var(--z1r-space-sm);
-}
-
 /* A focused hint labels its own region even with the codes switched off —
    that is the moment the label is worth the space. */
 .z1r-map[data-regions="false"] .z1r-screen[data-focused="true"] .z1r-screen-region {
@@ -932,23 +927,6 @@
   font-weight: 800;
   background: var(--z1r-accent);
   color: var(--z1r-bg);
-}
-
-.z1r-map-focus {
-  margin-inline-start: 10px;
-  font-size: var(--z1r-text-xs);
-  letter-spacing: 0.04em;
-  color: var(--z1r-accent);
-}
-
-/* Warp staircases found, out of four. Sits between Regions and Clear. */
-.z1r-map-stairs {
-  margin-inline-start: 8px;
-  font-size: var(--z1r-text-xs);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--z1r-muted);
 }
 
 /* ------------------------------------------------------------- hint tracker */
@@ -1467,191 +1445,40 @@
 }
 
 /*
- * Pick a marker directly instead of cycling through nine to reach the one you
- * want. Doubles as the map's legend: every marker is listed with its name, so
- * the icons never have to be decoded from memory or from colour.
- */
-/*
- * Marker toolbar, above the map.
+ * The marker brushes above the grid, and the grid and the screen card side by
+ * side below them. The controls themselves are React; see `overworld/`.
  *
- * Was a popover anchored to the clicked cell, which covered the map, could not
- * be dismissed without choosing something, and scrolled the page when the cell
- * was low on screen. Fixed in the flow, it costs one row and never moves.
+ * The row wraps rather than squeezing: a large flex-grow on the map and a small
+ * one on the card means that beside each other the card keeps its basis and
+ * the map takes the rest, and wrapped onto its own line the card takes the
+ * full width. The card's width never depends on its content, so the map's
+ * width — which `applyMapScale` measures — only moves when the panel does.
  */
-.z1r-map-tools {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.z1r-map-brushes {
   margin-block-end: var(--z1r-space-sm);
-  padding: var(--z1r-space-sm);
-  background: var(--z1r-inset);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
 }
 
-.z1r-tool-row {
+.z1r-map-heading {
+  display: flex;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.z1r-map-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
+  align-items: flex-start;
+  gap: var(--z1r-space-md);
 }
 
-.z1r-tool-row[hidden] {
-  display: none;
+.z1r-map-row > .z1r-map {
+  flex: 999 1 var(--z1r-map-min, 448px);
+  min-inline-size: 0;
 }
 
-/*
- * Icon-only buttons, sized to the touch minimum and no larger.
- *
- * The names are on `title` and `aria-label`: five buttons that never change are
- * learned once, after which the words are only taking up room above a map that
- * wants every pixel.
- */
-.z1r-tool-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: var(--spectrum-component-height-100);
-  block-size: var(--spectrum-component-height-100);
-  padding: 0;
-  font: inherit;
-  color: var(--z1r-text);
-  background: var(--z1r-field);
-  /* The marker's own colour rides on a left bar rather than the icon, so the
-     legend does not depend on telling the icons' colours apart. */
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-inline-start: 3px solid var(--mark-color, transparent);
-  border-radius: var(--z1r-radius);
-  cursor: pointer;
-}
-
-.z1r-tool-mark:hover {
-  border-color: var(--z1r-accent);
-  border-inline-start-color: var(--mark-color, var(--z1r-accent));
-}
-
-/*
- * The selected brush is what the next click places, so it has to be
- * unmistakable with no label to help: filled *and* ringed, two channels neither
- * of which is the icon's own colour.
- */
-.z1r-tool-mark[data-active="true"] {
-  background: var(--z1r-accent);
-  border-color: var(--z1r-accent);
-  outline: 2px solid var(--z1r-text);
-  outline-offset: 1px;
-}
-
-.z1r-tool-mark-clear {
-  font-size: var(--z1r-text-lg);
-  line-height: 1;
-  color: var(--z1r-muted);
-}
-
-.z1r-tool-mark[data-active="true"] .z1r-tool-mark-clear {
-  color: var(--z1r-bg);
-}
-
-.z1r-tool-select {
-  min-inline-size: 9em;
-}
-
-.z1r-mark-level {
-  inline-size: var(--spectrum-component-height-75);
-  min-block-size: var(--spectrum-component-height-75);
-  font: inherit;
-  font-size: var(--z1r-text-md);
-  font-variant-numeric: tabular-nums;
-  color: var(--z1r-text);
-  background: var(--z1r-field);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
-  cursor: pointer;
-}
-
-/*
- * One stock item: the toggle, and the price under it.
- *
- * Stacked rather than side by side. The row carries eight of these, and eight
- * icon-and-box pairs laid out horizontally wrap into an unreadable ribbon in a
- * dock-width panel.
- */
-.z1r-mark-stock {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  inline-size: var(--spectrum-component-height-100);
-}
-
-.z1r-mark-stock-price {
-  block-size: calc(var(--spectrum-component-height-100) * 0.7);
-  padding-inline: 2px;
-  font-size: var(--z1r-text-xs);
-  text-align: center;
-  /* Spinners would take most of a 32px box and there is nothing to step
-     through — prices are typed once, off the shop's own sign. */
-  appearance: textfield;
-}
-
-.z1r-mark-stock-price::-webkit-outer-spin-button,
-.z1r-mark-stock-price::-webkit-inner-spin-button {
-  appearance: none;
-  margin: 0;
-}
-
-/* Matches the unticked toggle above it: dimmed *and* dashed, never colour
-   alone. An item that is not stocked has no price to record. */
-.z1r-mark-stock-price:disabled {
-  border-style: dashed;
-  /* 0.4 measured 3.50:1 for the typed price against the composited well. The
-     text starts at 14.21:1 on its own field, so 0.6 clears AA at 5.97:1 and
-     the box still reads as the dimmer of the two states. */
-  opacity: 0.6;
-  cursor: default;
-}
-
-.z1r-mark-stock-option {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: var(--spectrum-component-height-100);
-  block-size: var(--spectrum-component-height-100);
-  padding: 0;
-  font: inherit;
-  color: var(--z1r-text);
-  background: var(--z1r-field);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
-  cursor: pointer;
-}
-
-/*
- * Chosen reads as filled, solid-bordered and bold; unchosen as dimmed with a
- * dashed border. Three channels, none of them hue.
- */
-.z1r-mark-level[data-active="true"],
-.z1r-mark-stock-option[data-active="true"] {
-  color: var(--z1r-bg);
-  background: var(--z1r-accent);
-  border-color: var(--z1r-accent);
-  font-weight: 700;
-}
-
-/* No label to embolden, so the stock buttons carry the ring instead. */
-.z1r-mark-stock-option[data-active="true"] {
-  outline: 2px solid var(--z1r-text);
-  outline-offset: 1px;
-}
-
-.z1r-mark-stock-option[data-active="false"] {
-  border-style: dashed;
-  opacity: 0.65;
-}
-
-.z1r-mark-level:hover,
-.z1r-mark-stock-option:hover {
-  border-color: var(--z1r-accent);
+.z1r-screen-cardhost {
+  flex: 1 1 var(--z1r-screen-aside, 256px);
+  min-inline-size: 0;
 }
 
 /*
@@ -1907,27 +1734,6 @@
   margin-block-end: 0;
 }
 
-/*
- * Clearing the map is destructive, so it says so.
- *
- * `--z1r-bad` is the palette's red and is already contrast-checked against the
- * panel as "destructive actions", so this reads as a warning without inventing
- * a colour. It is not carried by hue alone: the button also sits apart from the
- * Regions toggle, so a misclick cannot reach it, and asks before it fires.
- */
-.z1r-map-clear {
-  margin-inline-start: auto;
-  color: var(--z1r-bad);
-  border-color: var(--z1r-bad);
-}
-
-.z1r-map-clear:hover,
-.z1r-map-clear:focus-visible {
-  color: var(--z1r-bg);
-  background: var(--z1r-bad);
-  border-color: var(--z1r-bad);
-}
-
 /* ------------------------------------------------- selected screen editing */
 
 /*
@@ -1942,63 +1748,7 @@
   z-index: 2;
 }
 
-/* Which screen is being edited, or an instruction when none is. */
-/*
- * A fixed width, not a minimum: the text changes with every click — a screen
- * id, "Pick a level", "Placing Medium rupee secret" — and its weight with the
- * toolbar's state, and a box that sized itself to it pushed the marker buttons
- * along the row each time. 14em holds the longest of them; anything longer is
- * cut with an ellipsis rather than moving the row.
- */
-.z1r-tool-target {
-  flex: none;
-  inline-size: 14em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--z1r-text-md);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--z1r-text);
-}
-
-/*
- * Idle, the toolbar is still the map's legend — so it dims rather than
- * disappearing, and the prompt says what to do about it.
- */
-.z1r-map-tools[data-active="false"] .z1r-tool-target {
-  font-weight: 400;
-  color: var(--z1r-muted);
-}
-
-.z1r-tool-mark:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
 /* -------------------------------------------------------- armed marker */
-
-/*
- * A marker that is armed: the next tile you click becomes this.
- *
- * Deliberately distinct from `[data-active]`, which means "the selected tile
- * already is this". One says a click will change something, the other says it
- * would not — conflating them would leave the toolbar unable to tell you which.
- *
- * Armed reads as a dashed ring plus a lifted background; active stays the solid
- * fill. Two different shapes, so the difference is not the colour.
- */
-.z1r-tool-mark[data-armed="true"] {
-  outline: 2px dashed var(--z1r-accent);
-  outline-offset: 2px;
-  background: var(--z1r-inset);
-  border-color: var(--z1r-accent);
-}
-
-/* Both at once — armed, and the selected tile already carries it. */
-.z1r-tool-mark[data-armed="true"][data-active="true"] {
-  background: var(--z1r-accent);
-}
 
 /*
  * The cursor says the map is in stamping mode, on every cell at once. Cheaper
@@ -2069,11 +1819,6 @@
 
 .z1r-screen-badge:empty {
   display: none;
-}
-
-/* Armed, but waiting for a level before it can place anything. */
-.z1r-map-tools[data-waiting="true"] .z1r-tool-target {
-  color: var(--z1r-accent);
 }
 
 /* --------------------------------------- triforce piece as a column heading */
@@ -2261,74 +2006,6 @@
 
 .z1r-screen-warp-num:empty {
   display: none;
-}
-
-/*
- * The warp routing table, above the grid.
- *
- * One row per warp: which screen it is on, then its three staircases in the
- * order they stand in the room.
- */
-.z1r-warp-routes {
-  display: grid;
-  gap: 2px;
-  margin-block-end: 6px;
-  font-size: var(--z1r-text-2xs);
-  font-variant-numeric: tabular-nums;
-}
-
-.z1r-warp-route {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* An unmarked warp still shows its row — the routing holds whether or not you
-   have found it, and a row that disappeared would move the others.
-   The dim is the only conditional part of the treatment: the exit boxes below
-   are dashed on every row, found or not. The second channel is the "—" the row
-   prints in place of the screen it has not been found on. */
-.z1r-warp-route[data-found="false"] {
-  opacity: 0.55;
-}
-
-.z1r-warp-route-from {
-  min-width: 14px;
-  padding-inline: 3px;
-  border: 1px solid var(--z1r-text);
-  border-radius: var(--z1r-radius);
-  font-weight: 800;
-  text-align: center;
-  color: var(--z1r-text);
-}
-
-.z1r-warp-route-at {
-  min-width: 24px;
-  color: var(--z1r-text);
-  font-weight: 700;
-}
-
-.z1r-warp-route-exit {
-  display: flex;
-  align-items: baseline;
-  gap: 2px;
-  padding: 1px 4px;
-  border: 1px dashed var(--z1r-border);
-  border-radius: var(--z1r-radius);
-  color: var(--z1r-muted);
-}
-
-.z1r-warp-route-side {
-  color: var(--z1r-text);
-}
-
-.z1r-warp-route-to {
-  font-weight: 800;
-  color: var(--z1r-text);
-}
-
-.z1r-warp-route-screen {
-  color: var(--z1r-muted);
 }
 
 /* ---------------------------------------------------------------- palette */

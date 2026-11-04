@@ -24,7 +24,7 @@ import {
 import { Button } from '#components/ui/button';
 import { Input } from '#components/ui/input';
 import { Toggle } from '#components/ui/toggle';
-import { SearchPicker, type PickerGroup } from './SearchPicker.js';
+import { SearchPicker, type PickerGroup } from '../shared/SearchPicker.js';
 
 export interface HintListProps {
   state: TrackerState;

@@ -55,6 +55,14 @@ import { createSprite } from './sprite.js';
 import { askToConfirm } from './confirm/ask.js';
 import { placedIndex, placedSuffix } from './placed.js';
 import { mountItemPalette, targetFor } from './palette/mount.js';
+import {
+  mountMapBrushes,
+  mountMapHeading,
+  mountScreenCard,
+  type Armed,
+  type MapActions,
+  type MapView,
+} from './overworld/mount.js';
 import { memoise, runPatches, type Patch } from './patch.js';
 import { buildSeedPanel } from './seed-panel.js';
 import { buildLocations } from './locations.js';
@@ -803,68 +811,47 @@ function buildMap(
   body.style.setProperty('--map-columns', String(OVERWORLD_COLUMNS));
   const heading = root.querySelector('.z1r-panel-title');
 
-  // Hint regions are baked into the grid rather than left in a reference
-  // image: a hint names a region, so the map should be able to answer "which
-  // screens is that?" directly.
-  const regionToggle = el('button', 'z1r-chip-button z1r-regions-toggle', 'Regions');
-  regionToggle.type = 'button';
-  regionToggle.dataset.open = 'false';
-  regionToggle.title = 'Label every screen with its hint region code';
-  regionToggle.addEventListener('click', () => {
-    const on = regionToggle.dataset.open !== 'true';
-    regionToggle.dataset.open = String(on);
-    body.dataset.regions = String(on);
-  });
+  /*
+   * The heading's controls: Regions, the warp count, which region a hint is
+   * showing, and Clear — React, see `overworld/`.
+   *
+   * Regions labels every screen with its hint region code: a hint names a
+   * region, so the map should answer "which screens is that?" directly. It is
+   * view state, held here, and Clear asks before wiping a run's worth of marks.
+   */
+  let regionsOn = false;
   body.dataset.regions = 'false';
-  heading?.append(regionToggle);
-
-  /*
-   * How many of the four warp staircases have been found.
-   *
-   * A stairway cell says which of the four it is; what it cannot say is how
-   * many are still missing, and a map with a hundred marks on it does not
-   * answer that by being looked at. Counted from the marks rather than from the
-   * numbers, so a stairway cycled onto a tile without one still counts, and not
-   * capped: a fifth shows as 5/4 rather than being refused.
-   *
-   * Ahead of the Clear button, whose `margin-inline-start: auto` keeps it at
-   * the far end regardless of what sits before it.
-   */
-  const stairCount = el('span', 'z1r-map-stairs');
-  stairCount.title = 'Warp staircases marked, out of the four a seed has';
-  heading?.append(stairCount);
-  patches.push((state) => {
-    const found = Object.values(state.marks).filter((mark) => mark === 'stairway').length;
-    stairCount.textContent = `Warps ${found}/${OVERWORLD_STAIRWAY_COUNT}`;
-  });
-
-  /*
-   * Clear every mark in one go.
-   *
-   * A finished run leaves most of 128 screens marked and none of it carries
-   * into the next seed. Unmarking them by hand is a chore nobody does, so the
-   * map ends up starting a seed with the last one still on it.
-   *
-   * Confirmed, because it is a lot of work to lose to a misclick, and scoped to
-   * the map alone — items and the Triforce have their own controls, and wiping
-   * those here would make this a second Reset wearing a friendlier label.
-   */
-  if (interactive) {
-    const clear = el('button', 'z1r-chip-button z1r-map-clear', 'Clear');
-    clear.type = 'button';
-    clear.title = 'Remove every mark from the map. Items and Triforce are untouched.';
-    clear.addEventListener('click', async () => {
-      const marked = Object.keys(store.getState().marks).length;
-      if (marked === 0) return;
-      const ok = await askToConfirm({
-        title: 'Clear the overworld map?',
-        description: `All ${marked} marked screens are cleared. Items and the Triforce are not affected.`,
-        confirm: 'Clear map',
-      });
-      if (ok) store.dispatch({ type: 'clearMap' });
+  const headingHost = el('span', 'z1r-map-heading');
+  heading?.append(headingHost);
+  const mapHeading = mountMapHeading(headingHost);
+  const clearMap = async () => {
+    const marked = Object.keys(store.getState().marks).length;
+    if (marked === 0) return;
+    const ok = await askToConfirm({
+      title: 'Clear the overworld map?',
+      description: `All ${marked} marked screens are cleared. Items and the Triforce are not affected.`,
+      confirm: 'Clear map',
     });
-    heading?.append(clear);
-  }
+    if (ok) store.dispatch({ type: 'clearMap' });
+  };
+  const drawHeading = (state: TrackerState) => {
+    const def = state.focusRegion ? REGIONS_BY_ID.get(state.focusRegion) : undefined;
+    mapHeading.render({
+      regions: regionsOn,
+      onRegions: (on) => {
+        regionsOn = on;
+        body.dataset.regions = String(on);
+        drawHeading(store.getState());
+      },
+      // Counted from the marks, so a stairway without its number still counts,
+      // and not capped: a fifth shows as 5/4 rather than being refused.
+      warpsFound: Object.values(state.marks).filter((mark) => mark === 'stairway').length,
+      warpsTotal: OVERWORLD_STAIRWAY_COUNT,
+      focus: def ? `showing ${def.code} · ${def.name}` : '',
+      onClear: interactive ? () => void clearMap() : undefined,
+    });
+  };
+  patches.push(drawHeading);
 
   /*
    * Each cell shows its own screen from the real overworld map.
@@ -889,77 +876,23 @@ function buildMap(
   };
 
   /*
-   * Marker toolbar, fixed above the map.
+   * The marker brushes, fixed above the map, and the screen card beside it.
    *
-   * This was a popover anchored to whichever cell you clicked. In play that was
-   * the wrong shape entirely: it covered a big piece of the map, it could not be
-   * dismissed without picking something, and choosing a screen in the lower half
-   * scrolled the page to fit the popover on screen — mid-run, one-handed.
-   *
-   * It works like a brush now. Pick what you are placing here, then click
-   * screens to place it, as many as you like. Marking a row of dead ends takes
-   * one selection and a few clicks rather than a popover each.
+   * The brushes were once a popover anchored to the clicked cell, which
+   * covered the map and scrolled the page when the cell was low on screen.
+   * Fixed in the flow they cost one row and never move. The selected screen's
+   * settings, and the warp routes, sit in a card beside the grid — the same
+   * shape as the room card beside the dungeon sheet.
    */
-  const toolbar = el('div', 'z1r-map-tools');
-  // Into the panel, ahead of the grid — *not* into `body`, which is the grid
-  // itself. Appending it there made it a grid item one column wide, so every
-  // button stacked vertically and the first row of screens filled in beside it.
-  root.insertBefore(toolbar, body);
+  const brushHost = el('div', 'z1r-map-brushes');
+  root.insertBefore(brushHost, body);
+  const brushes = mountMapBrushes(brushHost);
 
-  /*
-   * Which staircase in a warp room takes you where.
-   *
-   * The routing is fixed — see `warpRoutes` — so this is not a thing the player
-   * records, it is a thing they should not have to hold in their head. What
-   * they want mid-run is "I am standing in warp 3 and I want to get to the
-   * screen with Level 6 on it", and the answer is a staircase, not a number.
-   *
-   * Screens fill in as the four get marked, and each row stays put whether or
-   * not its warp is found yet, so the shape of the table does not move around
-   * under a player who has learned where to look on it.
-   */
-  const routes = el('div', 'z1r-warp-routes');
-  const routeRows = warpRoutes(store.getState()).map((route) => {
-    const row = el('div', 'z1r-warp-route');
-    const from = el('span', 'z1r-warp-route-from', String(route.warp));
-    const at = el('span', 'z1r-warp-route-at');
-    row.append(from, at);
-    const exits = route.exits.map((exit) => {
-      // The staircase's initial, then where it lands. Written out rather than
-      // drawn, because "left" is a position in a room and no icon says that
-      // better than the word does.
-      const cell = el('span', 'z1r-warp-route-exit');
-      cell.append(
-        el('b', 'z1r-warp-route-side', exit.position[0]?.toUpperCase() ?? ''),
-        el('span', 'z1r-warp-route-to', String(exit.warp)),
-        el('span', 'z1r-warp-route-screen'),
-      );
-      return cell;
-    });
-    row.append(...exits);
-    routes.append(row);
-    return { row, at, exits };
-  });
-  root.insertBefore(routes, body);
-  patches.push((state) => {
-    const model = warpRoutes(state);
-    for (const [index, entry] of routeRows.entries()) {
-      const route = model[index];
-      if (!route) continue;
-      entry.at.textContent = route.screen ?? '—';
-      entry.row.dataset.found = String(!!route.screen);
-      for (const [slot, exit] of route.exits.entries()) {
-        const cell = entry.exits[slot];
-        const screen = cell?.querySelector('.z1r-warp-route-screen');
-        if (screen) screen.textContent = exit.screen ?? '—';
-        cell?.setAttribute(
-          'title',
-          `From warp ${route.warp}, the ${exit.position} staircase comes out at warp ${exit.warp}` +
-            (exit.screen ? ` on ${exit.screen}` : ', which is not marked yet'),
-        );
-      }
-    }
-  });
+  const mapRow = el('div', 'z1r-map-row');
+  root.insertBefore(mapRow, body);
+  const cardHost = el('div', 'z1r-screen-cardhost');
+  mapRow.append(body, cardHost);
+  const screenCard = mountScreenCard(cardHost);
 
   /*
    * Select a screen, then edit it.
@@ -994,7 +927,7 @@ function buildMap(
    * flow rather than a switch: stamp, refine, stamp the next.
    */
   /** A mark, or the start pennant, which is one per map rather than a mark. */
-  let armed: MarkKind | 'start' | '' = '';
+  let armed: Armed = '';
   /** Which level the armed Dungeon marker will place. 0 means none chosen. */
   let armedLevel = 0;
   /** Which of the four the armed Stairway marker will place. 0 means none. */
@@ -1096,7 +1029,7 @@ function buildMap(
     body.dataset.refusing = String(!!paletteItem && !SCREEN_ITEMS_BY_ID.has(paletteItem));
   };
 
-  const setArmed = (kind: MarkKind | 'start' | '') => {
+  const setArmed = (kind: Armed) => {
     armed = kind;
     if (kind !== 'dungeon') armedLevel = 0;
     if (kind !== 'stairway') armedStairway = 0;
@@ -1121,404 +1054,61 @@ function buildMap(
     store.dispatch({ type: 'setScreenNote', screen: selected, patch });
   };
 
-  const kindRow = el('div', 'z1r-tool-row z1r-tool-kinds');
-  toolbar.append(kindRow);
-  const kindButtons: HTMLButtonElement[] = [];
-
-  /** Detail rows appear only for the mark the selected screen carries. */
-  const detailRows: { row: HTMLElement; forKind: MarkKind }[] = [];
-  const detailRow = (forKind: MarkKind, label: string) => {
-    const row = el('div', 'z1r-tool-row z1r-tool-detail');
-    // Labelled for screen readers rather than on screen. Only one detail row is
-    // ever visible, and which one is already answered by the mark.
-    row.setAttribute('role', 'group');
-    row.setAttribute('aria-label', label);
-    toolbar.append(row);
-    detailRows.push({ row, forKind });
-    return row;
-  };
-
-  /** Names the screen being edited, so the toolbar is never ambiguous. */
-  const target = el('span', 'z1r-tool-target');
-  kindRow.append(target);
-
-  const syncToolbar = (state: TrackerState) => {
-    const mark = selected ? (state.marks[selected] ?? 'none') : 'none';
-    const note = selected ? state.screenNotes[selected] : undefined;
-
-    toolbar.dataset.active = String(!!selected || !!armed);
-    const armedName =
-      armed === 'start' ? 'the start' : armed ? MARKS_BY_KIND.get(armed)?.name : '';
-    // Two markers are placed by number and neither can be stamped without one.
-    const needsLevel = armed === 'dungeon' && !armedLevel;
-    const needsStairway = armed === 'stairway' && !armedStairway;
-    const placing =
-      armed === 'dungeon'
-        ? `Level ${armedLevel}`
-        : armed === 'stairway'
-          ? `Warp ${armedStairway}`
-          : armed === 'rupeeSecret' && armedSecret
-            ? `${SECRET_SIZES_BY_ID.get(armedSecret)?.name ?? ''} rupee secret`
-            : armedName;
-    // Says what the next click does, in the order the toolbar reads: pick the
-    // marker, pick the number, then place it.
-    target.textContent = needsLevel
-      ? 'Pick a level'
-      : needsStairway
-        ? 'Pick a warp'
-        : armed
-          ? `Placing ${placing}`
-          : selected || 'Pick a screen';
-    // The box is a fixed width and clips; the whole line is on hover.
-    target.title = target.textContent;
-    toolbar.dataset.waiting = String(needsLevel || needsStairway);
-
-    // The pennant is not a mark, so "already this" means "is the start".
-    startButton.dataset.active = String(!!selected && state.startScreen === selected);
-    startButton.dataset.armed = String(armed === 'start');
-    startButton.setAttribute(
-      'aria-pressed',
-      String(armed === 'start' || (!!selected && state.startScreen === selected)),
-    );
-
-    for (const button of kindButtons) {
-      const kind = button.dataset.mark as MarkKind;
-      /*
-       * Two states, kept apart on purpose. `active` is "the selected tile is
-       * already this", `armed` is "the next tile you click becomes this".
-       * Conflating them would make the toolbar unable to say whether a click
-       * is about to change anything.
-       */
-      const active = !!selected && kind === mark;
-      button.dataset.active = String(active);
-      button.dataset.armed = String(armed === kind);
-      button.setAttribute('aria-pressed', String(armed === kind || active));
-      // Never disabled now: with nothing selected the buttons still arm, which
-      // is how a palette is supposed to work.
-      button.disabled = false;
-    }
-    // Shown for whichever the toolbar is describing: the marker being armed, or
-    // the tile being edited.
-    const showing = armed || (selected ? mark : '');
-    for (const { row, forKind } of detailRows) row.hidden = forKind !== showing;
-    for (const control of [spotSelect, itemSelect]) control.disabled = !selected && !armed;
-
-    for (const button of levelButtons) {
-      // While arming, the buttons show what is about to be placed; otherwise
-      // they show what the selected tile already is.
-      const shown = armed === 'dungeon' ? armedLevel : (note?.dungeon ?? 0);
-      button.dataset.active = String(Number(button.dataset.level) === shown);
-    }
-    for (const button of stairwayButtons) {
-      const shown = armed === 'stairway' ? armedStairway : (note?.stairway ?? 0);
-      button.dataset.active = String(Number(button.dataset.stairway) === shown);
-    }
-    for (const button of secretButtons) {
-      const shown = armed === 'rupeeSecret' ? armedSecret : (note?.secret ?? '');
-      button.dataset.active = String(button.dataset.secret === shown);
-    }
-    for (const button of stockButtons) {
-      button.dataset.active = String(!!note?.shop.includes(button.dataset.stock ?? ''));
-    }
-    for (const input of stockPriceInputs) {
-      const id = input.dataset.stock ?? '';
-      const stocked = !!note?.shop.includes(id);
-      // Disabled rather than hidden: the boxes keep their places under the
-      // toggles, so the row does not reflow every time an item is ticked.
-      input.disabled = !stocked || !interactive;
-      const recorded = note?.shopPrices[id] ?? 0;
-      // Never overwritten mid-edit, or typing fights the patch loop.
-      if (document.activeElement !== input) input.value = recorded ? String(recorded) : '';
-    }
-    for (const button of blockButtons) {
-      button.dataset.active = String(!!note?.blocks.includes(button.dataset.block ?? ''));
-    }
-    if (document.activeElement !== spotSelect) spotSelect.value = note?.spot ?? '';
-    if (document.activeElement !== itemSelect) itemSelect.value = note?.item ?? '';
-
-    const placed = note?.item ? SCREEN_ITEMS_BY_ID.get(note.item) : undefined;
-    const got = !!placed && !!note?.collected;
-    collectedToggle.disabled = !interactive || !selected || !placed;
-    collectedToggle.dataset.on = String(got);
-    collectedToggle.setAttribute('aria-pressed', String(got));
-    const label = got ? '✓ Collected' : 'Collected';
-    if (collectedToggle.textContent !== label) collectedToggle.textContent = label;
-    collectedToggle.title = placed
-      ? got
-        ? `Mark ${placed.name} not picked up. The inventory keeps what collecting gave it.`
-        : `Mark ${placed.name} picked up, which marks it held`
-      : 'Nothing on this screen to collect';
-  };
-
-  for (const mark of MARKS) {
-    const button = el('button', 'z1r-tool-mark');
-    button.type = 'button';
-    button.dataset.mark = mark.kind;
-    button.style.setProperty('--mark-color', mark.color);
-    if (mark.sprite) {
-      button.append(createSprite(resolver, mark.sprite, { size: 18, label: mark.name }));
-    } else {
-      button.append(el('span', 'z1r-tool-mark-clear', '—'));
-    }
-    /*
-     * Icon only. The name rides on `title` and `aria-label` instead — the row
-     * is seven buttons that never change, so it is learned in one glance and
-     * then only costs space. Selection is still shown by fill *and* by an
-     * outline, so it is not carried by colour.
-     */
-    button.title =
-      mark.kind === 'none'
-        ? 'Clear screens. Click again to stop.'
-        : `Place ${mark.name}. Click again to stop.`;
-    button.setAttribute('aria-label', button.title);
-    button.addEventListener('click', () => {
-      /*
-       * Arming only. This used to also stamp the selected tile, which made the
-       * button do two different things depending on invisible state and was
-       * impossible to explain. One job: choose what you are about to place.
-       */
-      setArmed(armed === mark.kind ? '' : mark.kind);
-    });
-    kindButtons.push(button);
-    kindRow.append(button);
-  }
-
-  /*
-   * The start pennant, after the marks and set apart from them.
-   *
-   * Not a mark: there is one per map, and the screen it goes on usually has a
-   * cave of its own that still wants marking. So it arms like a marker but
-   * draws in a corner of the tile, over whatever the screen already is.
-   */
-  const startButton = el('button', 'z1r-tool-mark z1r-tool-start');
-  startButton.type = 'button';
-  startButton.dataset.mark = 'start';
-  startButton.append(createSprite(resolver, 'mark.start', { size: 18, label: 'Start' }));
-  startButton.title = 'Place the start screen. One per map. Click again to stop.';
-  startButton.setAttribute('aria-label', startButton.title);
-  startButton.addEventListener('click', () => setArmed(armed === 'start' ? '' : 'start'));
-  kindRow.append(startButton);
-
-  /*
-   * Which level this is. 1-9 only.
-   *
-   * There used to be a `?` for "found but not identified". There is no such
-   * state in practice: the level number is painted on the wall of the entrance,
-   * so anyone marking a dungeon already knows which one it is.
-   */
-  const levelRow = detailRow('dungeon', 'Level');
-  const levelButtons: HTMLButtonElement[] = [];
-  for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
-    const button = el('button', 'z1r-mark-level', String(level));
-    button.type = 'button';
-    button.dataset.level = String(level);
-    button.title = `Level ${level}`;
-    button.addEventListener('click', () => {
+  const actions: MapActions = {
+    arm: (kind) => setArmed(kind),
+    pickLevel: (level) => {
       if (armed === 'dungeon') {
         // Arming half of the flow: marker, then number, then click the map.
-        armedLevel = armedLevel === level ? 0 : level;
+        armedLevel = level;
         syncToolbar(store.getState());
         return;
       }
-      // Editing a tile already on the map. Goes through `placeDungeon` too, so
-      // renumbering one still moves the level off wherever it used to be.
-      if (selected) store.dispatch({ type: 'placeDungeon', screen: selected, level });
-    });
-    levelButtons.push(button);
-    levelRow.append(button);
-  }
-
-  /*
-   * What turned you back last time.
-   *
-   * The question this answers is "can I finish that one yet?", asked from the
-   * overworld with a new item in hand — and without it the only way to find out
-   * is to walk back in. Same row as the level, because you learn both on the
-   * same trip.
-   */
-  const blockRow = detailRow('dungeon', 'Blocked by');
-  const blockButtons: HTMLButtonElement[] = [];
-  for (const block of DUNGEON_BLOCKS) {
-    const button = el('button', 'z1r-mark-stock-option');
-    button.type = 'button';
-    button.dataset.block = block.id;
-    button.title = block.name;
-    button.setAttribute('aria-label', block.name);
-    button.append(createSprite(resolver, block.sprite, { size: 18, label: block.name }));
-    button.addEventListener('click', () => {
-      if (selected) store.dispatch({ type: 'toggleDungeonBlock', screen: selected, block: block.id });
-    });
-    blockButtons.push(button);
-    blockRow.append(button);
-  }
-
-  /*
-   * Which of the four warp staircases this is.
-   *
-   * The same shape as the level row, for the same reason: the four are
-   * identical to look at, so the number is the whole of what there is to record
-   * about one, and a stairway cannot be placed without it.
-   */
-  const stairwayRow = detailRow('stairway', 'Warp');
-  const stairwayButtons: HTMLButtonElement[] = [];
-  for (let stairway = 1; stairway <= OVERWORLD_STAIRWAY_COUNT; stairway++) {
-    const button = el('button', 'z1r-mark-level', String(stairway));
-    button.type = 'button';
-    button.dataset.stairway = String(stairway);
-    button.title = `Warp ${stairway}`;
-    button.addEventListener('click', () => {
+      // Editing a screen already on the map. Through `placeDungeon`, so a
+      // renumbered one still moves the level off wherever it used to be.
+      if (selected && level) store.dispatch({ type: 'placeDungeon', screen: selected, level });
+    },
+    pickStairway: (number) => {
       if (armed === 'stairway') {
-        // Arming half of the flow: marker, then number, then click the map.
-        armedStairway = armedStairway === stairway ? 0 : stairway;
+        armedStairway = number;
         syncToolbar(store.getState());
         return;
       }
-      // Editing a tile already on the map. Goes through `placeStairway` too, so
-      // renumbering one still moves the number off wherever it used to be.
-      if (selected) {
-        store.dispatch({ type: 'placeStairway', screen: selected, number: stairway });
-      }
-    });
-    stairwayButtons.push(button);
-    stairwayRow.append(button);
-  }
-
-  /*
-   * How big a rupee secret is.
-   *
-   * Optional, unlike a level or a warp number: the mark alone already says
-   * "money here", and the size is only known once you have walked in. A
-   * second click on the active size takes it back off.
-   */
-  const secretRow = detailRow('rupeeSecret', 'Size');
-  const secretButtons: HTMLButtonElement[] = [];
-  for (const size of SECRET_SIZES) {
-    const button = el('button', 'z1r-mark-level', size.code);
-    button.type = 'button';
-    button.dataset.secret = size.id;
-    button.title = `${size.name} — ${size.range} rupees when shop items are shuffled`;
-    button.setAttribute('aria-label', button.title);
-    button.addEventListener('click', () => {
+      if (selected && number) store.dispatch({ type: 'placeStairway', screen: selected, number });
+    },
+    pickSecret: (size) => {
       if (armed === 'rupeeSecret') {
-        armedSecret = armedSecret === size.id ? '' : size.id;
+        armedSecret = size;
         syncToolbar(store.getState());
         return;
       }
+      // Optional, unlike a level: the same size again takes it back off.
+      patchSelected({ secret: size });
+    },
+    toggleBlock: (block) => {
+      if (selected) store.dispatch({ type: 'toggleDungeonBlock', screen: selected, block });
+    },
+    toggleStock: (stock) => {
+      if (selected) store.dispatch({ type: 'toggleShopStock', screen: selected, stock });
+    },
+    setPrice: (stock, price) => {
+      // An empty box is 0, which the reducer reads as "no price recorded".
+      if (selected) store.dispatch({ type: 'setShopPrice', screen: selected, stock, price });
+    },
+    patchNote: patchSelected,
+    toggleCollected: () => {
       if (!selected) return;
-      const current = store.getState().screenNotes[selected]?.secret ?? '';
-      patchSelected({ secret: current === size.id ? '' : size.id });
-    });
-    secretButtons.push(button);
-    secretRow.append(button);
-  }
+      const note = store.getState().screenNotes[selected];
+      if (!note?.item) return;
+      store.dispatch({ type: 'collectScreen', screen: selected, collected: !note.collected });
+    },
+  };
 
-  /*
-   * What the shop sells, and for how much.
-   *
-   * Multi-select, since most sell more than one thing. The price box under each
-   * toggle is optional everywhere — the question the map answers is still "did
-   * I see arrows anywhere", and a price is only worth typing for the ones you
-   * are saving up for. It stays disabled until the item is ticked, so the box
-   * can never hold a number for something this shop does not stock.
-   */
-  const stockRow = detailRow('shop', 'Sells');
-  const stockButtons: HTMLButtonElement[] = [];
-  const stockPriceInputs: HTMLInputElement[] = [];
-  for (const stock of SHOP_STOCK) {
-    const group = el('div', 'z1r-mark-stock');
-    const button = el('button', 'z1r-mark-stock-option');
-    button.type = 'button';
-    button.dataset.stock = stock.id;
-    button.title = stock.name;
-    button.setAttribute('aria-label', stock.name);
-    button.append(createSprite(resolver, stock.sprite, { size: 18, label: stock.name }));
-    button.addEventListener('click', () => {
-      if (selected) store.dispatch({ type: 'toggleShopStock', screen: selected, stock: stock.id });
-    });
-
-    const price = document.createElement('input');
-    price.type = 'number';
-    price.className = 'z1r-input z1r-mark-stock-price';
-    price.dataset.stock = stock.id;
-    price.min = '0';
-    price.step = '1';
-    price.placeholder = '–';
-    // Named per item: the row is eight identical-looking boxes, so "Price"
-    // alone would leave a screen reader unable to say which one it is on.
-    price.title = `Price of ${stock.name}`;
-    price.setAttribute('aria-label', `Price of ${stock.name}`);
-    price.addEventListener('input', () => {
-      if (!selected) return;
-      // An empty box is 0, which the reducer reads as "no price recorded" and
-      // deletes. Clearing the field is how you take a price back.
-      store.dispatch({
-        type: 'setShopPrice',
-        screen: selected,
-        stock: stock.id,
-        price: Number(price.value),
-      });
-    });
-
-    stockButtons.push(button);
-    stockPriceInputs.push(price);
-    group.append(button, price);
-    stockRow.append(group);
-  }
-
-  /*
-   * Item screens: which spot it is, and what is sitting in it.
-   *
-   * Two questions, because they are answered at different times. You find the
-   * White Sword cave long before you can afford the hearts to open it, and the
-   * Coast is visible from the first lap and unreachable until the Ladder.
-   */
-  const itemRow = detailRow('item', 'Item spot');
-  const spotSelect = document.createElement('select');
-  spotSelect.className = 'z1r-input z1r-tool-select';
-  spotSelect.title = 'Which named overworld spot this screen is';
-  const anySpot = document.createElement('option');
-  anySpot.value = '';
-  anySpot.textContent = 'Unnamed spot';
-  spotSelect.append(anySpot);
-  for (const location of OVERWORLD_LOCATIONS) {
-    const option = document.createElement('option');
-    option.value = location.id;
-    option.textContent = location.label;
-    spotSelect.append(option);
-  }
-  spotSelect.addEventListener('change', () => patchSelected({ spot: spotSelect.value }));
-
-  const itemSelect = document.createElement('select');
-  itemSelect.className = 'z1r-input z1r-tool-select';
-  itemSelect.title = 'Which item is in it';
-  const unknownItem = document.createElement('option');
-  unknownItem.value = '';
-  unknownItem.textContent = 'Item unknown';
-  itemSelect.append(unknownItem);
-  for (const entry of SCREEN_ITEMS) {
-    const option = document.createElement('option');
-    option.value = entry.id;
-    option.textContent = entry.name;
-    itemSelect.append(option);
-  }
-  itemSelect.addEventListener('change', () => patchSelected({ item: itemSelect.value }));
-
-  /*
-   * Picked up, or only seen.
-   *
-   * The one gesture that grants a screen's item, beside the item it is about.
-   * A check mark in the label is the state's non-colour channel; the dashed
-   * ring the pressed chip also draws is a shape, not a hue.
-   */
-  const collectedToggle = el('button', 'z1r-chip-button z1r-tool-collected', 'Collected');
-  collectedToggle.type = 'button';
-  collectedToggle.addEventListener('click', () => {
-    if (!selected) return;
-    const note = store.getState().screenNotes[selected];
-    if (!note?.item) return;
-    store.dispatch({ type: 'collectScreen', screen: selected, collected: !note.collected });
-  });
-  itemRow.append(spotSelect, itemSelect, collectedToggle);
+  /** Draws the brushes and the screen card from the map's view state. */
+  const syncToolbar = (state: TrackerState) => {
+    const view: MapView = { selected, armed, armedLevel, armedStairway, armedSecret };
+    brushes.render({ state, view, resolver, actions });
+    screenCard.render({ state, view, resolver, interactive, actions });
+  };
 
   // Escape lets go of the screen without having to find somewhere safe to click.
   body.addEventListener('keydown', (event) => {
@@ -1536,14 +1126,6 @@ function buildMap(
   });
 
   patches.push(syncToolbar);
-
-  const focusNote = el('span', 'z1r-map-focus');
-  heading?.append(focusNote);
-  patches.push((state) => {
-    const def = state.focusRegion ? REGIONS_BY_ID.get(state.focusRegion) : undefined;
-    focusNote.textContent = def ? `showing ${def.code} · ${def.name}` : '';
-    focusNote.hidden = !def;
-  });
 
   for (let row = 1; row <= OVERWORLD_ROWS; row++) {
     for (let col = 1; col <= OVERWORLD_COLUMNS; col++) {
