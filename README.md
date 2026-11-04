@@ -63,7 +63,7 @@ dungeon hold more floor items than the base tables list.
 ## Hints
 
 A Z1R hint pairs a subject with an overworld region — "Digdogger gazes… By a Lake" — so the
-**Hints** panel is a row per hint: the dungeon (listed by the phrase you actually hear) or item, and
+**Hints** log, opened from the header, is a row per hint: the dungeon (listed by the phrase you actually hear) or item, and
 the region. Hit **show** and those screens light up on the overworld grid.
 
 The regions are built into the tiled map rather than left in a reference image: every screen carries

@@ -119,7 +119,7 @@ colours — every screen resolved at ≥92% agreement, so this isn't eyeballed.
 
 ### The hint log
 
-Each row in the **Hints** panel is one hint:
+Each row in the **Hints** log is one hint:
 
 1. **Subject** — a dungeon, listed by the phrase you actually hear (`Digdogger gazes… (L5)`), or an
    item from the shuffle pool.

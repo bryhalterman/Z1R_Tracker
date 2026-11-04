@@ -104,16 +104,16 @@ export interface MountOptions {
 }
 
 /*
- * Seed is not among the defaults: the page and the desktop build open the seed
- * settings from the toolbar's sheet instead (`mountControls`). It is still a
- * section for the windows that have no toolbar to open it from and ask for it
- * by name — the OBS map dock and the overlay.
+ * Seed and the hint log are not among the defaults: the page and the desktop
+ * build open both from the toolbar's sheets instead (`mountControls`). Both
+ * are still sections for the windows that ask for them by name — the OBS map
+ * dock, which has no toolbar and keeps its hints beside its map, and the
+ * overlay.
  */
 const DEFAULT_SECTIONS: readonly TrackerSection[] = [
   'items',
   'dungeons',
   'locations',
-  'hintlog',
   'map',
   // Last, below the overworld. The room sheet is the panel you lean into for a
   // level at a time; the overworld is the one that stays put and gets glanced

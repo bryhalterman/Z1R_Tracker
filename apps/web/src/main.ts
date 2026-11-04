@@ -23,18 +23,11 @@ async function main(): Promise<void> {
   const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
 
   mountControls(controlsRoot, { store });
-  /*
-   * Hints starts folded on the page.
-   *
-   * The hint log is empty until a hint is heard, and open it cost a good share
-   * of the first screen. Folded only until this browser saves a folded set of
-   * its own, so someone who opens Hints finds it open next time. The seed
-   * settings, which used to start folded beside it, open from the toolbar.
-   */
+  // The seed settings and the hint log open from the toolbar's sheets, so no
+  // panel needs to start folded.
   mountTracker(trackerRoot, {
     store,
     resolver,
-    defaultCollapsed: ['Hints'],
     // Small enough to sit beside the panels it shares a column with. The
     // inventory is scanned for what is missing, not studied, and the art is
     // 16px of NES sprite however large the cell around it is.

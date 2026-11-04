@@ -1,5 +1,5 @@
 /**
- * Toolbar: the seed settings, reset, and save file import/export.
+ * Toolbar: the seed settings, the hint log, reset, and save file import/export.
  *
  * Kept out of `tracker.ts` because the OBS browser source renders the tracker
  * without any of it — viewers should never see a Reset button.
@@ -7,6 +7,7 @@
 
 import { exportState, importState, type Store } from '@z1r/core';
 import { mountSeedSheet } from './seed-form/mount.js';
+import { mountHintSheet } from './hint-log/mount.js';
 
 export interface ControlsOptions {
   readonly store: Store;
@@ -96,7 +97,12 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
   seedHost.className = 'z1r-controls-seed';
   const unmountSeed = mountSeedSheet(seedHost, store);
 
-  root.append(seedHost, exportButton, importButton, resetButton, filePicker, status);
+  // The hint log rises from the bottom — see `hint-log/HintSheet.tsx`.
+  const hintsHost = document.createElement('span');
+  hintsHost.className = 'z1r-controls-hints';
+  const unmountHints = mountHintSheet(hintsHost, store);
+
+  root.append(seedHost, hintsHost, exportButton, importButton, resetButton, filePicker, status);
 
   if (footnote) {
     const note = document.createElement('span');
@@ -107,6 +113,7 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
 
   return () => {
     unmountSeed();
+    unmountHints();
     root.replaceChildren();
   };
 }

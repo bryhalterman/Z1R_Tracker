@@ -953,73 +953,16 @@
 
 /* ------------------------------------------------------------- hint tracker */
 
+/* The rows inside are React and lay themselves out; see `hint-log/`. */
 .z1r-hint-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.z1r-hint-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 2px 4px;
-  border: var(--z1r-border-width) solid transparent;
-  border-radius: var(--z1r-radius);
-  background: var(--z1r-inset);
-}
-
-.z1r-hint-row[data-focused="true"] {
-  border-color: var(--z1r-accent);
-  background: color-mix(in srgb, var(--z1r-accent) 12%, transparent);
-}
-
-/*
- * One height for all six controls in the row.
- *
- * A row is as tall as the tallest thing in it, and these rows mixed the 32px
- * field height every input and select on the page uses with the 24px chip the
- * show-on-map and remove buttons are drawn at — so eight of those pixels were
- * paid by the row and used by nothing. The two buttons set the height because
- * they are the ones with a size of their own; the fields follow them down.
- *
- * Scoped to this row rather than changed on `.z1r-input`, which is the shared
- * field: the seed panel's inputs are the page's main typing surface and have
- * no 24px control beside them to agree with. Here the fields carry a pool name
- * or a region, both of them picked rather than typed.
- */
-.z1r-hint-row .z1r-input {
-  block-size: var(--spectrum-component-height-75);
-}
-
-.z1r-hint-row .z1r-hint-subject {
-  flex: 2 1 190px;
-  min-inline-size: 0;
-}
-
-.z1r-hint-row .z1r-hint-region {
-  flex: 1 1 130px;
-  min-inline-size: 0;
-}
-
-.z1r-hint-row .z1r-hint-screen {
-  flex: none;
-  inline-size: 62px;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.z1r-hint-row .z1r-hint-note {
-  flex: 2 1 120px;
   min-inline-size: 0;
 }
 
 /*
  * One chip.
  *
- * A panel heading's chip, the hint tracker's show-on-map button and the Rooms
- * strip's word buttons were three drawings of the same 24px control — 10px
+ * A panel heading's chip, the hint tracker's old show-on-map button and the
+ * Rooms strip's word buttons were three drawings of the same 24px control — 10px
  * upper at a 3px radius with no fill, 11px mixed case at 3px, and 9px upper at
  * 4px over a filled well. Two of them sit in the same panel a few hundred
  * pixels apart, which is where three treatments stop reading as a style and
@@ -1029,7 +972,6 @@
  * border against a solid one, and that difference carries state.
  */
 .z1r-chip-button,
-.z1r-hint-show,
 .z1r-room-pick.z1r-room-word {
   flex: none;
   min-block-size: var(--spectrum-component-height-75);
@@ -1048,47 +990,6 @@
   border: var(--z1r-border-width) solid var(--z1r-border);
   border-radius: var(--z1r-radius);
   cursor: pointer;
-}
-
-/* Dashed until this hint is the one highlighted on the map; the focused rule
-   below turns it solid. That is the state, and it is not a colour. */
-.z1r-hint-show {
-  border-style: dashed;
-}
-
-.z1r-hint-row[data-focused="true"] .z1r-hint-show {
-  color: var(--z1r-accent);
-  border-style: solid;
-  border-color: var(--z1r-accent);
-}
-
-.z1r-hint-show:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.z1r-hint-remove {
-  flex: none;
-  inline-size: var(--spectrum-component-height-75);
-  block-size: var(--spectrum-component-height-75);
-  padding: 0;
-  font: inherit;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--z1r-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.z1r-hint-remove:hover {
-  color: var(--z1r-bad);
-}
-
-.z1r-hint-empty {
-  margin: 0;
-  font-size: var(--z1r-text-md);
-  color: var(--z1r-muted);
 }
 
 /* Everything but the gap comes from the shared chip rule above. */
@@ -1424,14 +1325,6 @@
   color: var(--z1r-text);
 }
 
-/* The seed button and its summary, which gives way first when the bar is narrow. */
-.z1r-controls-seed {
-  display: inline-flex;
-  flex: 0 1 auto;
-  min-inline-size: 0;
-  max-inline-size: 28rem;
-}
-
 .z1r-action {
   padding: 5px 12px;
   font: inherit;
@@ -1509,8 +1402,6 @@
   }
 }
 
-/* Below roughly a dock's width the six hint controls cannot share one line
-   legibly, so they wrap to two rather than shrinking into ellipsis. */
 /*
  * Width-band rules.
  *
@@ -1519,17 +1410,6 @@
  * lays out at a fixed composition width inside whatever size the Browser
  * Source happens to be, so viewport-keyed rules describe the wrong box.
  */
-.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-subject,
-.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-region {
-  flex: 1 1 45%;
-  min-inline-size: 8ch;
-}
-
-.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-screen,
-.z1r-tracker[data-width="xs"] .z1r-hint-row .z1r-hint-note {
-  flex: 1 1 30%;
-}
-
 /* The items grid and the Triforce share a row: the triangle is naturally narrow
    and left most of its own panel blank. */
 .z1r-pair {

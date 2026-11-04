@@ -25,12 +25,11 @@ The tracker remembers which panels you collapsed.
 
 ## Know the page layout
 
-The page stacks four areas from top to bottom:
+The page stacks three areas from top to bottom:
 
 | Area | What it holds |
 | --- | --- |
-| Header | Seed, with a one-line summary of the seed beside it, then Export, Import, and Reset |
-| Hints | One row per hint you hear in the game |
+| Header | Seed, Hints, Export, Import, and Reset |
 | Items | The item palette, with the Locations panel and Triforce beside it |
 | Overworld and Levels | The overworld map on the left, the dungeon room map on the right |
 
@@ -41,7 +40,6 @@ On a narrow window the areas wrap so the page still fits the window width.
 Click **Seed** in the header before you start playing.
 The seed settings slide in from the right;
 press Esc, click ×, or click outside them to close them.
-The header keeps a summary of the seed number, Dungeon Quest, and Item Shuffle.
 Only the fields that change what the tracker shows are controls;
 everything else goes in **Flags** or **Notes**.
 
@@ -435,18 +433,26 @@ Level 9 holds Ganon and has no piece.
 
 ## Log hints
 
-The **Hints** panel holds one row per hint.
-Click **+ Hint** to add a row, and **×** to remove one.
+Click **Hints** in the header to open the hint log from the bottom of the window.
+The button shows how many hints you have.
+The page stays visible and usable while the hints are open;
+press Esc, click ×, or click **Hints** again to close them.
+
+The hint log holds one row per hint.
+Click **Add hint** to add a row, and **×** to remove one.
 
 Each row has five fields:
 
 1. **Subject** is the dungeon, listed by the phrase you hear,
    such as "Digdogger gazes… (L5)",
    or an item from the shuffle pool.
+   Type in its list to narrow it.
 1. **Region** is where the hint points, such as "LK · By a Lake".
+   Type in its list to narrow it.
    Picking a region also shows it on the map.
-1. **Show** highlights the region's screens on the overworld map.
-   It reads "◉ on map" while the region is shown,
+1. **Show** highlights the region's screens on the overworld map
+   and closes the hint log, so the map is in view.
+   It reads "On map" with a filled circle while the region is shown,
    and the map title names the region.
    Click it again to hide the highlight.
 1. **Heard at** is the screen where you heard the hint, for example `H2`.

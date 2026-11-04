@@ -1,6 +1,6 @@
 /*
- * Tailwind and the shadcn theme, for the panels drawn in React: the room card
- * and the seed form. Each React root carries `z1r-ui`, as does every popup
+ * Tailwind and the shadcn theme, for the panels drawn in React: the room card,
+ * the seed form and the hint log. Each React root carries `z1r-ui`, as does every popup
  * they portal out, and that class is the scope for everything below.
  *
  * The rest of the tracker is plain DOM styled by `styles.css`, so Tailwind is
@@ -15,6 +15,7 @@
 
 @source "./room-card";
 @source "./seed-form";
+@source "./hint-log";
 @source "./components";
 
 /* The tracker is dark-only, so shadcn's `dark:` styles always apply. */

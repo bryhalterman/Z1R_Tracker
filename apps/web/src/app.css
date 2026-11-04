@@ -52,12 +52,12 @@ body {
  */
 
 /*
- * Three rows: Hints; the Items card (the palette with Item locations and the
- * Triforce inside it); the Overworld beside Levels. The seed settings open
- * from the toolbar's sheet rather than taking a row.
+ * Two rows: the Items card (the palette with Item locations and the Triforce
+ * inside it); the Overworld beside Levels. The seed settings and the hint log
+ * open from the toolbar's sheets rather than taking a row.
  *
  * The Items card sits directly above the two maps because it is the tool that
- * places onto them. Hints, which are read rather than used, sit above it.
+ * places onto them.
  *
  * Done here, in CSS, on the panels `mountTracker` already appends — the OBS
  * dock, map dock and overlay mount the same DOM and must keep the layouts they
@@ -66,10 +66,6 @@ body {
  * `order` applies at every width, so the single column below the `md` band
  * reads in the same order as the rows above it.
  */
-#tracker.z1r-tracker[data-mode="full"] > .z1r-hint-tracker {
-  order: 2;
-}
-
 #tracker.z1r-tracker[data-mode="full"] > .z1r-palette-panel {
   order: 3;
 }
@@ -102,7 +98,6 @@ body {
   gap: var(--z1r-space-md);
 }
 
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-hint-tracker,
 #tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-palette-panel {
   flex: 1 1 100%;
   min-inline-size: 0;
