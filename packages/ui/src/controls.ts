@@ -2,12 +2,12 @@
  * Toolbar: the seed settings, the hint log, reset, and save file import/export.
  *
  * Kept out of `tracker.ts` because the OBS browser source renders the tracker
- * without any of it — viewers should never see a Reset button.
+ * without any of it — viewers should never see a Reset button. The bar itself
+ * is React — see `toolbar/`.
  */
 
-import { exportState, importState, type Store } from '@z1r/core';
-import { mountSeedSheet } from './seed-form/mount.js';
-import { mountHintSheet } from './hint-log/mount.js';
+import type { Store } from '@z1r/core';
+import { mountToolbar } from './toolbar/mount.js';
 
 export interface ControlsOptions {
   readonly store: Store;
@@ -16,104 +16,13 @@ export interface ControlsOptions {
 }
 
 export function mountControls(root: HTMLElement, options: ControlsOptions): () => void {
-  const { store, footnote } = options;
   // Mounted separately from the tracker, so it needs the Spectrum theme
   // classes of its own — see the note in `mountTracker`.
   root.classList.add('z1r-controls', 'spectrum', 'spectrum--dark', 'spectrum--medium');
   root.replaceChildren();
-
-  const action = (label: string, onClick: () => void, className = '') => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `z1r-action ${className}`.trim();
-    button.textContent = label;
-    button.addEventListener('click', onClick);
-    return button;
-  };
-
-  const status = document.createElement('span');
-  status.className = 'z1r-controls-status';
-  const say = (message: string) => {
-    status.textContent = message;
-    // Clear after a beat so a stale error doesn't sit on screen all run.
-    window.setTimeout(() => {
-      if (status.textContent === message) status.textContent = '';
-    }, 4000);
-  };
-
-  const exportButton = action('Export', () => {
-    const blob = new Blob([exportState(store.getState())], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `z1r-tracker-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  });
-
-  const filePicker = document.createElement('input');
-  filePicker.type = 'file';
-  filePicker.accept = 'application/json,.json';
-  filePicker.hidden = true;
-  filePicker.addEventListener('change', async () => {
-    const file = filePicker.files?.[0];
-    if (!file) return;
-    try {
-      const loaded = importState(await file.text());
-      // Import discards the current run exactly as Reset does, so it asks the
-      // same question once there is something to lose.
-      if (store.getState().rev > 0 && !window.confirm('Load this save? The current run is replaced.')) {
-        filePicker.value = '';
-        return;
-      }
-      store.dispatch({ type: 'import', state: loaded });
-      say('Save loaded.');
-    } catch (error) {
-      say(error instanceof Error ? error.message : 'Could not read that file.');
-    } finally {
-      filePicker.value = '';
-    }
-  });
-
-  const importButton = action('Import', () => filePicker.click());
-
-  const resetButton = action(
-    'Reset',
-    () => {
-      // A misclick here wipes a whole run, so make it deliberate.
-      if (!window.confirm('Reset the tracker? This clears the current run.')) return;
-      store.dispatch({ type: 'reset' });
-      say('Tracker reset.');
-    },
-    'z1r-action-danger',
-  );
-
-  /*
-   * The seed settings open from here in a sheet rather than holding a panel
-   * on the page — see `seed-form/SeedSheet.tsx`. First in the bar, since they
-   * are the first thing set for a run.
-   */
-  const seedHost = document.createElement('span');
-  seedHost.className = 'z1r-controls-seed';
-  const unmountSeed = mountSeedSheet(seedHost, store);
-
-  // The hint log rises from the bottom — see `hint-log/HintSheet.tsx`.
-  const hintsHost = document.createElement('span');
-  hintsHost.className = 'z1r-controls-hints';
-  const unmountHints = mountHintSheet(hintsHost, store);
-
-  root.append(seedHost, hintsHost, exportButton, importButton, resetButton, filePicker, status);
-
-  if (footnote) {
-    const note = document.createElement('span');
-    note.className = 'z1r-controls-note';
-    note.textContent = footnote;
-    root.append(note);
-  }
-
+  const unmount = mountToolbar(root, { store: options.store, footnote: options.footnote });
   return () => {
-    unmountSeed();
-    unmountHints();
+    unmount();
     root.replaceChildren();
   };
 }

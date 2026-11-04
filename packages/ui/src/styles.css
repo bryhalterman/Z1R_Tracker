@@ -1325,36 +1325,6 @@
   color: var(--z1r-text);
 }
 
-.z1r-action {
-  padding: 5px 12px;
-  font: inherit;
-  color: var(--z1r-text);
-  background: var(--z1r-panel);
-  border: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: var(--z1r-radius);
-  cursor: pointer;
-}
-
-.z1r-action:hover {
-  border-color: var(--z1r-accent);
-}
-
-.z1r-action-danger:hover {
-  border-color: var(--z1r-bad);
-  color: var(--z1r-bad);
-}
-
-.z1r-controls-status {
-  font-size: var(--z1r-text-md);
-  color: var(--z1r-accent);
-}
-
-.z1r-controls-note {
-  margin-inline-start: auto;
-  font-size: var(--z1r-text-md);
-  color: var(--z1r-muted);
-}
-
 /* --------------------------------------------------------- overlay variant */
 
 .z1r-tracker[data-mode="overlay"] {
