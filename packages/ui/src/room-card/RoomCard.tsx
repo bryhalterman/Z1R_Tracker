@@ -54,7 +54,7 @@ import {
 } from '#components/ui/command';
 import { cn } from '#lib/utils';
 import { LayoutArt } from './LayoutArt.js';
-import { Sprite } from './Sprite.js';
+import { Sprite } from '../shared/Sprite.js';
 
 /** Most-met first, so the keys under the left hand are the common ones. */
 export const DOOR_BRUSH_ORDER: readonly DoorState[] = ['open', 'locked', 'shutter', 'wall', 'bombed', 'unknown'];

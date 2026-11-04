@@ -28,6 +28,7 @@ import {
 } from '@z1r/core';
 import { createSprite } from './sprite.js';
 import { memoise, runPatches, type Patch } from './patch.js';
+import { mountCompactLocations } from './locations/mount.js';
 
 /**
  * What a slot shows before its item is known.
@@ -348,7 +349,7 @@ function slotCode(kind: string, location: LocationDef | null): string {
 }
 
 /**
- * Dense variant for the OBS dock and overlay.
+ * Dense variant for the page's Items card, the OBS dock and the overlay.
  *
  * On stream the game capture is the premium space, so this is built to take as
  * little of it as possible: one column per level, each slot a 20px chip. The
@@ -403,6 +404,26 @@ function buildCompactLocations(
     triforce.dataset.ready = String(open);
   });
   root.append(title);
+
+  /*
+   * Where the panel can be clicked — the page's Items card and the OBS dock —
+   * the columns are React (`locations/`). The read-only overlay keeps the
+   * plain-DOM columns below: they draw synchronously, and the overlay sizes
+   * itself from its first paint.
+   */
+  if (interactive) {
+    const host = document.createElement('div');
+    host.className = 'z1r-locations-compact-react';
+    root.append(host);
+    const columns = mountCompactLocations(host);
+    patches.push((state) => {
+      const derived = deriveItemLocations(state);
+      const collected = derived.slots.filter((slot) => slot.placement?.collected).length;
+      summary.textContent = `${collected}/${derived.slots.length}`;
+      columns.render({ state, resolver, dispatch: store.dispatch });
+    });
+    return root;
+  }
 
   const body = document.createElement('div');
   body.className = 'z1r-locations-compact';

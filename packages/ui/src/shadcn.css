@@ -1,6 +1,7 @@
 /*
  * Tailwind and the shadcn theme, for the parts drawn in React: the toolbar,
- * the room card, the seed form and the hint log. Each React root carries `z1r-ui`, as does every popup
+ * the room card, the seed form, the hint log, the item palette and the item
+ * locations columns. Each React root carries `z1r-ui`, as does every popup
  * they portal out, and that class is the scope for everything below.
  *
  * The rest of the tracker is plain DOM styled by `styles.css`, so Tailwind is
@@ -18,6 +19,9 @@
 @source "./hint-log";
 @source "./toolbar";
 @source "./confirm";
+@source "./palette";
+@source "./locations";
+@source "./shared";
 @source "./components";
 
 /* The tracker is dark-only, so shadcn's `dark:` styles always apply. */
@@ -93,6 +97,13 @@
     font: inherit;
     color: inherit;
     background: transparent;
+  }
+
+  /* The browser's own button padding (about 1px by 6px) pushed anything
+     smaller than the button off center — the Triforce pieces sat 4px right of
+     their columns. Buttons that want padding say so with a utility. */
+  :where(.z1r-ui) :where(button) {
+    padding: 0;
   }
 }
 
