@@ -200,8 +200,35 @@ function Segmented<T extends string>({
 
 export function RoomCard(props: RoomCardProps) {
   const { state, level, selected, interactive, resolver, commit, canDrop, onDropItem } = props;
-  /** A palette drag is over the item slot. */
+  /** A palette drag that can land is over the card. */
   const [dropping, setDropping] = useState(false);
+
+  /*
+   * The whole card takes a palette drag for the selected room — the same
+   * placement a drop on the room's cell makes — so the drop does not have to
+   * find the small Item box. The box shows where it will land. Entering is
+   * accepted as well as hovering, which is what the drag-and-drop model asks
+   * of a drop target.
+   */
+  const accept = (event: React.DragEvent) => {
+    if (off || !canDrop()) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDropping(true);
+  };
+  const dropTarget = {
+    onDragEnter: accept,
+    onDragOver: accept,
+    onDragLeave: (event: React.DragEvent) => {
+      // Moving between the card's own children fires a leave as well.
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
+    },
+    onDrop: (event: React.DragEvent) => {
+      event.preventDefault();
+      setDropping(false);
+      if (!off) onDropItem();
+    },
+  };
   const rooms = state.rooms[String(level)] ?? {};
   const note = selected ? rooms[selected] : undefined;
   const off = !interactive || !selected;
@@ -256,7 +283,10 @@ export function RoomCard(props: RoomCardProps) {
   };
 
   return (
-    <div className="z1r-ui z1r-card grid gap-3 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground">
+    <div
+      className="z1r-ui z1r-card grid gap-3 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground"
+      {...dropTarget}
+    >
       {/* The room, and the things you do to a room as a whole. */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className={cn('mr-1 tabular-nums', selected ? 'text-base font-semibold' : 'text-muted-foreground')}>
@@ -371,22 +401,10 @@ export function RoomCard(props: RoomCardProps) {
               dropping && 'outline-2 outline-offset-2 outline-dashed outline-primary',
             )}
             title={
-              itemDef ? itemDef.name : 'Nothing placed — drag an item here, or arm one in the palette and click this room'
+              itemDef
+                ? itemDef.name
+                : 'Nothing placed — drag an item onto this card, or arm one in the palette and click this room'
             }
-            // The slot takes a palette drag for the selected room, the same
-            // placement a drop on the room's cell makes.
-            onDragOver={(event) => {
-              if (off || !canDrop()) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = 'copy';
-              setDropping(true);
-            }}
-            onDragLeave={() => setDropping(false)}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDropping(false);
-              onDropItem();
-            }}
           >
             {itemDef ? <Sprite resolver={resolver} spriteKey={itemDef.sprite} size={18} /> : null}
           </span>

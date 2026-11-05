@@ -13,7 +13,7 @@
  * does; this only draws.
  */
 
-import { memo } from 'react';
+import { memo, useLayoutEffect, useRef, useState } from 'react';
 import {
   COAST_ITEM_REQUIRES,
   DUNGEON_BLOCKS_BY_ID,
@@ -30,7 +30,9 @@ import {
   dungeonItems,
   regionForScreen,
   screenId,
+  warpRoutes,
   type MarkKind,
+  type WarpRoute,
   type RegionDef,
   type ScreenNote,
   type SpriteResolver,
@@ -39,6 +41,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { SpriteArt } from '../shared/Sprite.js';
 import { CellTip } from '../room-grid/CellTip.js';
+import { previewHandlers } from '../map-preview.js';
 
 /**
  * Where one map image sits inside every cell.
@@ -90,6 +93,8 @@ export interface ScreenGridProps {
   readonly selected: string;
   /** Screens another panel is pointing at — see `map-preview`. */
   readonly previewed: ReadonlySet<string>;
+  /** A warp being hovered or focused: its routes are drawn over the map. */
+  readonly warpFrom: string;
   /** The map image for the seed's quest and orientation, or '' when it did not resolve. */
   readonly mapUrl: string;
   readonly interactive: boolean;
@@ -104,7 +109,9 @@ export interface ScreenGridProps {
 }
 
 export function ScreenGrid(props: ScreenGridProps) {
-  const { state, selected, previewed, mapUrl, interactive, resolver, onTouch, onClear, onCycle, canDrop } = props;
+  const { state, selected, previewed, warpFrom, mapUrl, interactive, resolver, onTouch, onClear, onCycle, canDrop } =
+    props;
+  const routes = warpRoutes(state);
   const mirrored = state.seed.mirroredOverworld;
   const coast = coastScreen(mirrored);
   // The coast ledge is reachable the moment the Ladder is in hand — and that
@@ -126,6 +133,10 @@ export function ScreenGrid(props: ScreenGridProps) {
          */
         const inside =
           mark === 'dungeon' && note?.dungeon ? dungeonItems(state, note.dungeon).join(',') : '';
+        // Where a warp's three staircases lead, as tooltip lines — joined, so
+        // the memo compares it by value.
+        const route = mark === 'stairway' ? routes.find((r) => r.screen === id) : undefined;
+        const exits = route ? exitLines(route).join('|') : '';
         return (
           <ScreenCell
             key={id}
@@ -137,6 +148,7 @@ export function ScreenGrid(props: ScreenGridProps) {
             region={region}
             focused={!!region && region.id === state.focusRegion}
             inside={inside}
+            exits={exits}
             isStart={state.startScreen === id}
             isCoast={id === coast}
             coastReady={id === coast && ladderHeld}
@@ -155,7 +167,86 @@ export function ScreenGrid(props: ScreenGridProps) {
           />
         );
       })}
+      {warpFrom ? <WarpGuides from={warpFrom} routes={routes} /> : null}
     </TooltipProvider>
+  );
+}
+
+const EXIT_NAME = { left: 'Left', middle: 'Middle', right: 'Right' } as const;
+
+/** "Left → warp 2 (B4)", or "… not marked yet" for a warp not on the map. */
+function exitLines(route: WarpRoute): string[] {
+  return route.exits.map(
+    (exit) =>
+      `${EXIT_NAME[exit.position]} → warp ${exit.warp}` + (exit.screen ? ` (${exit.screen})` : ', not marked yet'),
+  );
+}
+
+/**
+ * Guides from a hovered warp to the warps its staircases lead to: a dashed line
+ * to each, and a plate on each destination with the staircase's letter. The map
+ * rings the destinations and dims the rest (`previewed`), so the line, the
+ * letter and the ring carry it, none of them a colour. A destination not yet on
+ * the map has nothing to draw to; the warp's tooltip lists it.
+ *
+ * Measured from the cells rather than worked out from the grid, which is
+ * centered in its panel at a cell size set from script.
+ */
+function WarpGuides({ from, routes }: { from: string; routes: readonly WarpRoute[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const route = routes.find((r) => r.screen === from);
+  const key = route ? route.exits.map((exit) => exit.screen ?? '').join('|') : '';
+  const [geometry, setGeometry] = useState<{
+    from: { x: number; y: number };
+    exits: { letter: string; x: number; y: number; top: number }[];
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const host = ref.current?.parentElement;
+    if (!host || !route) {
+      setGeometry(null);
+      return;
+    }
+    const box = host.getBoundingClientRect();
+    const at = (screen: string) => {
+      const cell = host.querySelector(`[data-screen="${screen}"]`)?.getBoundingClientRect();
+      return cell
+        ? { x: cell.left - box.left + cell.width / 2, y: cell.top - box.top + cell.height / 2, top: cell.top - box.top }
+        : null;
+    };
+    const start = at(from);
+    if (!start) {
+      setGeometry(null);
+      return;
+    }
+    const exits = route.exits.flatMap((exit) => {
+      const end = exit.screen ? at(exit.screen) : null;
+      return end ? [{ letter: EXIT_NAME[exit.position][0]!, ...end }] : [];
+    });
+    setGeometry({ from: start, exits });
+    // `key` stands for `route`: the routes are rebuilt on every render.
+  }, [from, key]);
+
+  return (
+    <div ref={ref} className="z1r-warp-guides" aria-hidden="true">
+      {geometry ? (
+        <>
+          <svg>
+            {geometry.exits.map((exit) => (
+              <g key={exit.letter}>
+                <line className="z1r-warp-guide-under" x1={geometry.from.x} y1={geometry.from.y} x2={exit.x} y2={exit.y} />
+                <line className="z1r-warp-guide" x1={geometry.from.x} y1={geometry.from.y} x2={exit.x} y2={exit.y} />
+              </g>
+            ))}
+          </svg>
+          {geometry.exits.map((exit) => (
+            <span key={exit.letter} className="z1r-warp-guide-tag" style={{ left: exit.x, top: exit.top }}>
+              {exit.letter}
+            </span>
+          ))}
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -169,6 +260,8 @@ interface ScreenCellProps {
   readonly focused: boolean;
   /** Comma-joined `POOL_BY_ID` ids known to be inside this dungeon. */
   readonly inside: string;
+  /** A warp's staircase lines for its tooltip, `|`-joined; '' for other screens. */
+  readonly exits: string;
   readonly isStart: boolean;
   readonly isCoast: boolean;
   readonly coastReady: boolean;
@@ -296,6 +389,7 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
     if (isCoast) facts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');
   } else if (mark === 'stairway') {
     facts.push(note?.stairway ? `Warp ${note.stairway}` : 'Warp (unnumbered)');
+    if (props.exits) facts.push(...props.exits.split('|'));
   } else if (mark === 'rupeeSecret') {
     const size = note?.secret ? SECRET_SIZES_BY_ID.get(note.secret) : undefined;
     facts.push(size ? `${size.name} rupee secret` : 'Rupee secret (size unknown)');
@@ -332,6 +426,8 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
         }
         aria-label={label}
         disabled={!interactive}
+        // Hovering or focusing a numbered warp draws its routes — see `WarpGuides`.
+        {...(props.exits ? previewHandlers({ kind: 'warp', screen: id }) : {})}
         onClick={interactive ? () => onTouch(id) : undefined}
         // Right-click clears outright — the common correction, and faster than
         // picking "Unmarked".
@@ -356,6 +452,7 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
         }
         // A palette drag lands like a click with the item armed: the drag
         // armed it, so the click handler places it.
+        onDragEnter={interactive ? (event) => canDrop() && event.preventDefault() : undefined}
         onDragOver={
           interactive
             ? (event) => {

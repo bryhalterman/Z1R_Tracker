@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   // art pack can be swapped by editing one file on the Pages branch.
   const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
 
-  mountControls(controlsRoot, { store });
+  mountControls(controlsRoot, { store, mapsToggle: true });
   // The seed settings and the hint log open from the toolbar's sheets, so no
   // panel needs to start folded.
   mountTracker(trackerRoot, {
@@ -32,6 +32,7 @@ async function main(): Promise<void> {
     // inventory is scanned for what is missing, not studied, and the art is
     // 16px of NES sprite however large the cell around it is.
     itemSize: 16,
+    mapsLayout: true,
   });
 }
 

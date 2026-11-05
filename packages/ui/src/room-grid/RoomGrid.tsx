@@ -208,6 +208,7 @@ const RoomCell = memo(function RoomCell({
         onClick={interactive ? () => onTouch(id) : undefined}
         // A palette drag lands like a click with the item armed: the drag
         // armed it, so the click handler places it.
+        onDragEnter={interactive ? (event) => canDrop() && event.preventDefault() : undefined}
         onDragOver={
           interactive
             ? (event) => {

@@ -13,6 +13,8 @@ export interface ControlsOptions {
   readonly store: Store;
   /** Shown next to the toolbar; used for the OBS browser-source URL hint. */
   readonly footnote?: string;
+  /** Offer the Overworld / Levels layout choice — see `mapsLayout` on `mountTracker`. */
+  readonly mapsToggle?: boolean;
 }
 
 export function mountControls(root: HTMLElement, options: ControlsOptions): () => void {
@@ -20,7 +22,11 @@ export function mountControls(root: HTMLElement, options: ControlsOptions): () =
   // classes of its own — see the note in `mountTracker`.
   root.classList.add('z1r-controls', 'spectrum', 'spectrum--dark', 'spectrum--medium');
   root.replaceChildren();
-  const unmount = mountToolbar(root, { store: options.store, footnote: options.footnote });
+  const unmount = mountToolbar(root, {
+    store: options.store,
+    footnote: options.footnote,
+    mapsToggle: options.mapsToggle,
+  });
   return () => {
     unmount();
     root.replaceChildren();

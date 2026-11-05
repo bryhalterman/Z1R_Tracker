@@ -472,6 +472,8 @@
   grid-template-columns: repeat(var(--map-columns, 16), var(--map-cell, 1fr));
   justify-content: center;
   gap: 2px;
+  /* The warp guides are drawn over it — see `.z1r-warp-guides`. */
+  position: relative;
 }
 
 .z1r-screen {
@@ -606,6 +608,56 @@
   outline: 3px solid var(--z1r-text);
   outline-offset: 2px;
   z-index: 3;
+}
+
+/*
+ * A hovered warp's routes, drawn over the map — see `WarpGuides`. A dashed
+ * line in the text color over a wider line in the page color, so it reads on
+ * bright terrain and on dimmed screens alike, and a plate on each destination
+ * with the staircase's letter. Takes no pointer events: the cells under it
+ * stay clickable. Positioned against the map grid.
+ */
+.z1r-warp-guides {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.z1r-warp-guides > svg {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+}
+
+.z1r-warp-guide-under {
+  stroke: var(--z1r-bg);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.z1r-warp-guide {
+  stroke: var(--z1r-text);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+}
+
+.z1r-warp-guide-tag {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 4px));
+  min-inline-size: 16px;
+  padding-inline: 3px;
+  font-size: var(--z1r-text-xs);
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--z1r-bg);
+  background: var(--z1r-text);
+  border-radius: var(--z1r-radius-cell);
+  box-shadow: 0 0 0 1px var(--z1r-bg);
 }
 
 /* Selected as well: the usual ring would sit on the box, so the selection
@@ -1677,6 +1729,43 @@
   flex-direction: column;
   gap: 8px;
   min-inline-size: 0;
+}
+
+/*
+ * The Overworld and Levels side by side, when the toolbar's Maps choice says
+ * so — `data-maps` is set by `mountTracker` from that choice and, for Auto,
+ * from the width band. Anything else in the column keeps a line to itself.
+ *
+ * Both maps size their contents from the width they are given, so the split
+ * is a share rather than a measurement of either: half the line less half the
+ * gap. `min-inline-size: 0` because a flex item floors at its content's
+ * minimum otherwise, and both hold a grid wide enough to push past the share.
+ */
+.z1r-main[data-maps="side"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.z1r-main[data-maps="side"] > * {
+  flex: 1 1 100%;
+  min-inline-size: 0;
+}
+
+.z1r-main[data-maps="side"] > .z1r-map-panel,
+.z1r-main[data-maps="side"] > .z1r-rooms-panel {
+  flex: 1 1 calc(50% - 8px / 2);
+}
+
+/*
+ * A smaller sheet beside the map, so the room card fits beside the sheet in
+ * half a row: at a 1233px row each half leaves about 308px for the sheet once
+ * the card's 272px and the gap are paid, and 300 clears that rather than
+ * sitting on the boundary, where a pixel of rounding would drop the card back
+ * under the sheet. Stacked, the sheet has the room for its full size.
+ */
+.z1r-main[data-maps="side"] > .z1r-rooms-panel {
+  --z1r-room-sheet: 300px;
 }
 
 /*

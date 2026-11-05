@@ -45,6 +45,7 @@ import { mountItemPalette, targetFor } from './palette/mount.js';
 import { mountHelpTip, mountPanelToggle } from './panel/mount.js';
 import { mountDockItems } from './items/mount.js';
 import { MAP_PREVIEW_EVENT, type MapPreview } from './map-preview.js';
+import { mapsLayout } from './maps-layout.js';
 import {
   mountMapBrushes,
   mountMapHeading,
@@ -103,6 +104,12 @@ export interface MountOptions {
    * because the page wanted to.
    */
   readonly defaultCollapsed?: readonly string[];
+  /**
+   * Lay the Overworld and Levels out side by side or stacked as the toolbar's
+   * Maps choice says (`mapsLayout`), in the page's main column. Off, the two
+   * stack, which is what the desktop build has always done.
+   */
+  readonly mapsLayout?: boolean;
 }
 
 /*
@@ -254,6 +261,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     itemSize = 40,
     compact = false,
     defaultCollapsed = [],
+    mapsLayout: followMapsLayout = false,
   } = options;
 
   // Spectrum scopes its tokens to these classes, so the mount root carries them
@@ -404,7 +412,20 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     // describe the room the panels have, not the page.
     const width = (main ?? root).offsetWidth;
     root.dataset.width = width < 640 ? 'xs' : width < 720 ? 'sm' : 'md';
+    applyMapsLayout();
   };
+
+  /*
+   * Side by side or stacked, from the toolbar's Maps choice; Auto is the width
+   * rule, so it is resolved here, beside the band it reads. The stylesheet
+   * only ever sees the answer.
+   */
+  const applyMapsLayout = () => {
+    if (!main || !followMapsLayout) return;
+    const choice = mapsLayout.get();
+    main.dataset.maps = choice === 'auto' ? (root.dataset.width === 'md' ? 'side' : 'stacked') : choice;
+  };
+  if (followMapsLayout) mapsLayout.watch(applyMapsLayout);
 
   /*
    * Balance each item grid so the last row is never a stray remainder.
@@ -766,7 +787,7 @@ function buildPalette(
       label: 'How to use Items',
       lines: [
         ...(armedLine ? [armedLine] : []),
-        "Drag an item onto a room, an overworld screen, or the room card's Item slot to place it.",
+        'Drag an item onto a room, an overworld screen, or the room card to place it.',
         'Or right-click an item to arm it, then click where you found it. Esc puts it down.',
         'Click an item to mark it held.',
       ],
@@ -924,6 +945,8 @@ function buildMap(
 
   /** Screens another panel is pointing at — see `applyPreview` below. */
   let previewed: ReadonlySet<string> = new Set();
+  /** The warp whose routes the grid is drawing, or ''. */
+  let warpFrom = '';
 
   /*
    * The 128 cells, drawn by React — see `overworld/ScreenGrid.tsx`. What a
@@ -936,6 +959,7 @@ function buildMap(
       state,
       selected,
       previewed,
+      warpFrom,
       // A missing or unreachable map leaves the cells blank; the codes and
       // marks carry the tracker's own information regardless.
       mapUrl: resolved.kind === 'image' ? resolved.url : '',
@@ -1152,6 +1176,16 @@ function buildMap(
     const state = store.getState();
     const matches = new Set<string>();
     if (preview?.kind === 'start' && state.startScreen) matches.add(state.startScreen);
+    // A warp: itself and the warps its three staircases lead to. The guides
+    // between them are drawn by the grid — see `warpFrom`.
+    warpFrom = preview?.kind === 'warp' ? preview.screen : '';
+    if (preview?.kind === 'warp') {
+      const route = warpRoutes(state).find((r) => r.screen === preview.screen);
+      if (route) {
+        matches.add(preview.screen);
+        for (const exit of route.exits) if (exit.screen) matches.add(exit.screen);
+      }
+    }
     if (preview?.kind === 'dungeon') {
       for (const [screen, mark] of Object.entries(state.marks)) {
         if (mark === 'dungeon' && state.screenNotes[screen]?.dungeon === preview.level) matches.add(screen);

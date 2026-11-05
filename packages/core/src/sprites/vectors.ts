@@ -152,8 +152,10 @@ export const VECTORS: Readonly<Record<string, VectorSprite>> = {
   'mark.hintroom': LINE(`<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M7 11h10"/><path d="M7 15h6"/><path d="M7 7h8"/>`),
   'mark.doorRepair': LINE(`<path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/>`),
   'mark.rupeeSecret': LINE(`<path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/>`),
-  // Lucide has no staircase; four linked points stands for the warp network.
-  'mark.stairway': LINE(`<path d="m10.586 5.414-5.172 5.172"/><path d="m18.586 13.414-5.172 5.172"/><path d="M6 12h12"/><circle cx="12" cy="20" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="4" cy="12" r="2"/>`),
+  // Lucide has no staircase, so this one is drawn for the set: a flight of
+  // stairs in the same stroke on the same grid, which says "warp staircase"
+  // the way the dungeon sheet's stairs do, rather than an abstract network.
+  'mark.stairway': LINE(`<path d="M3 21h5v-5h5v-5h5V6h3"/>`),
   // "Checked, nothing": looked at and done with.
   'mark.empty': LINE(`<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>`),
   // The start pennant keeps a fill: it is drawn in a corner over bare terrain,

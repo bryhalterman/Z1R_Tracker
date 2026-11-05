@@ -41,7 +41,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { cn } from '#lib/utils';
 import { Sprite } from '../shared/Sprite.js';
-import { placedSuffix } from '../placed.js';
+import { CellTip } from '../room-grid/CellTip.js';
 
 /**
  * One tile: a placeable item by its pool or room id, or — for the two tiers
@@ -196,7 +196,7 @@ export function ItemPalette(props: ItemPaletteProps) {
 
     const target = bought ? '' : targetFor(spec, placeInto);
     const isArmed = !bought && armed === spec;
-    const where = bought ? '' : placedSuffix([spec], placedAt);
+    const where = bought ? '' : (placedAt.get(spec) ?? []).join(', ');
     const held: Held = inventory && stage > 0 ? (value >= stage ? 'held' : 'unheld') : 'none';
 
     /*
@@ -211,16 +211,19 @@ export function ItemPalette(props: ItemPaletteProps) {
       if (target) arm(isArmed ? '' : spec as string);
     };
 
-    const heldText = held === 'none' ? '' : held === 'held' ? ' — held' : ' — not held';
-    const how = bought
-      ? ' — bought, not found, so never placed; click marks it held'
-      : target
-        ? isArmed
-          ? ' — armed; right-click puts it down'
-          : ` — right-click to arm, or drag onto ${target}`
-        : ' — nowhere in this window to place it';
-    const heldHint = held === 'none' || bought ? '' : '; click marks it held';
-    const text = `${name}${heldText}${where}${how}${heldHint}`;
+    // What the tile is, a fact per line. How to use the palette is behind the
+    // ? in the heading; the accessible name keeps it, since a screen reader
+    // reaches the tile without passing the ?.
+    const facts: string[] = [];
+    if (held !== 'none') facts.push(held === 'held' ? 'held' : 'not held');
+    if (where) facts.push(`placed at ${where}`);
+    if (isArmed) facts.push('armed');
+    if (bought) facts.push('bought in a shop, never placed');
+    else if (!target) facts.push('nowhere in this window to place it');
+    const hints: string[] = [];
+    if (target) hints.push(isArmed ? 'right-click to put it down' : `right-click to arm, or drag onto ${target}`);
+    if (held !== 'none') hints.push(held === 'held' ? 'click to mark it not held' : 'click to mark it held');
+    const text = [name, ...facts, ...hints].join(' — ');
 
     return (
       <Tooltip key={id}>
@@ -268,7 +271,9 @@ export function ItemPalette(props: ItemPaletteProps) {
           {sprite ? <Sprite resolver={resolver} spriteKey={sprite} size={itemSize} /> : null}
           {where ? <PlacedTick /> : null}
         </TooltipTrigger>
-        <TooltipContent className="z1r-ui max-w-64">{text}</TooltipContent>
+        <TooltipContent className="z1r-ui max-w-64">
+          <CellTip heading={name} lines={facts} />
+        </TooltipContent>
       </Tooltip>
     );
   };

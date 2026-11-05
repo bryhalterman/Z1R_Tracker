@@ -26,7 +26,6 @@ import {
   SCREEN_ITEMS_BY_ID,
   SECRET_SIZES,
   SHOP_STOCK,
-  warpRoutes,
   type MarkKind,
   type ScreenNote,
   type SecretSize,
@@ -276,7 +275,6 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
   const markName = showing && showing !== 'start' && showing !== 'none' ? MARKS_BY_KIND.get(showing)?.name : '';
   const placed = note?.item ? SCREEN_ITEMS_BY_ID.get(note.item) : undefined;
   const got = !!placed && !!note?.collected;
-  const routes = warpRoutes(state);
 
   /*
    * The card names the screen it edits. Arming does not take the editor away:
@@ -461,36 +459,6 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
           <p className="text-xs text-muted-foreground">Nothing more to record for {markName.toLowerCase()}.</p>
         ) : null}
 
-        {/*
-         * Which staircase in a warp room takes you where. The routing is fixed,
-         * so this is what you should not have to hold in your head: standing in
-         * warp 3, which staircase gets you to the screen you want.
-         */}
-        <div className="grid gap-1 border-t border-border pt-2">
-          <span className={LABEL}>Warps</span>
-          <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-3 gap-y-0.5 text-xs tabular-nums">
-            {routes.map((route) => (
-              <div key={route.warp} className="contents" data-found={!!route.screen}>
-                <span className={cn(route.screen ? 'text-foreground' : 'text-muted-foreground')}>
-                  <b className="font-semibold">{route.warp}</b> {route.screen ?? '—'}
-                </span>
-                {route.exits.map((exit) => (
-                  <span
-                    key={exit.position}
-                    className="text-muted-foreground"
-                    title={
-                      `From warp ${route.warp}, the ${exit.position} staircase comes out at warp ${exit.warp}` +
-                      (exit.screen ? ` on ${exit.screen}` : ', which is not marked yet')
-                    }
-                  >
-                    <b className="font-semibold text-foreground">{exit.position[0]?.toUpperCase()}</b> {exit.warp}{' '}
-                    {exit.screen ?? '—'}
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </TooltipProvider>
   );

@@ -13,14 +13,17 @@ import { Button } from '#components/ui/button';
 import { ConfirmLoss } from '../confirm/ConfirmLoss.js';
 import { SeedSheet } from '../seed-form/SeedSheet.js';
 import { HintSheet } from '../hint-log/HintSheet.js';
+import { MapsLayoutToggle } from './MapsLayoutToggle.js';
 
 export interface ToolbarProps {
   store: Store;
   /** Shown at the far end of the bar; the OBS dock uses it for its build id. */
   footnote?: string;
+  /** Offer the Overworld / Levels layout choice — only where both are drawn. */
+  mapsToggle?: boolean;
 }
 
-export function Toolbar({ store, footnote }: ToolbarProps) {
+export function Toolbar({ store, footnote, mapsToggle = false }: ToolbarProps) {
   const filePicker = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState('');
   const [pendingImport, setPendingImport] = useState<TrackerState | null>(null);
@@ -100,6 +103,11 @@ export function Toolbar({ store, footnote }: ToolbarProps) {
         <span className="text-xs text-primary" role="status">
           {status}
         </span>
+      ) : null}
+      {mapsToggle ? (
+        <div className="ml-auto">
+          <MapsLayoutToggle />
+        </div>
       ) : null}
       {footnote ? <span className="ml-auto text-xs text-muted-foreground">{footnote}</span> : null}
 

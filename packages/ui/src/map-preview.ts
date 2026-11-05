@@ -1,5 +1,6 @@
 /**
- * "Show me where that is on the map", from any panel.
+ * "Show me where that is on the map", from any panel — or from the map itself,
+ * for a warp's routes.
  *
  * A control that names something the overworld map holds — the start brush, a
  * dungeon number in the screen card, the Levels heading or the Locations
@@ -11,7 +12,12 @@
  * inside its own tracker, which keeps two trackers on one page apart.
  */
 
-export type MapPreview = { kind: 'start' } | { kind: 'dungeon'; level: number } | null;
+export type MapPreview =
+  | { kind: 'start' }
+  | { kind: 'dungeon'; level: number }
+  /** A warp on the map itself: the map rings where its three staircases lead. */
+  | { kind: 'warp'; screen: string }
+  | null;
 
 export const MAP_PREVIEW_EVENT = 'z1r:map-preview';
 

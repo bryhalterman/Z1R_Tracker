@@ -45,100 +45,10 @@ body {
 /*
  * No width cap: the page fills the window.
  *
- * The rows below are built to use whatever width they get — the palette wraps
- * into the Items card's spare width, and the two maps share the last row and
- * size their contents from it — so a wider window is a bigger map rather than
- * empty margin.
+ * The maps size their contents from whatever width they get — side by side or
+ * stacked, by the toolbar's Maps choice — so a wider window is a bigger map
+ * rather than empty margin.
  */
-
-/*
- * Two rows: the Items card (the palette with Item locations and the Triforce
- * inside it); the Overworld beside Levels. The seed settings and the hint log
- * open from the toolbar's sheets rather than taking a row.
- *
- * The Items card sits directly above the two maps because it is the tool that
- * places onto them.
- *
- * Done here, in CSS, on the panels `mountTracker` already appends — the OBS
- * dock, map dock and overlay mount the same DOM and must keep the layouts they
- * have, and this stylesheet belongs to the page alone.
- *
- * `order` applies at every width, so the single column below the `md` band
- * reads in the same order as the rows above it.
- */
-#tracker.z1r-tracker[data-mode="full"] > .z1r-palette-panel {
-  order: 3;
-}
-
-#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel {
-  order: 4;
-}
-
-#tracker.z1r-tracker[data-mode="full"] > .z1r-rooms-panel {
-  order: 5;
-}
-
-/*
- * Keyed off `data-width`, which the tracker publishes from its own width, so a
- * narrow window keeps the single column rather than squeezing rows into it.
- */
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] {
-  /*
-   * A wrapping flex row: each line sizes itself from its own items, and the
-   * three full-width panels below take a line each, which is what breaks the
-   * page into rows.
-   */
-  display: flex;
-  /* Stated, not inherited: the single-column tracker is a flex column already,
-     and a column that wraps resolves every `100%` basis against its height. */
-  flex-direction: row;
-  flex-wrap: wrap;
-  /* Panels draw at their own height. */
-  align-items: flex-start;
-  gap: var(--z1r-space-md);
-}
-
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-palette-panel {
-  flex: 1 1 100%;
-  min-inline-size: 0;
-}
-
-/*
- * The last row, halved.
- *
- * Both panels size their own contents from the width they are given —
- * `applyMapScale` re-derives the map's cell size, and the room sheet's cap
- * decides whether its detail strip fits beside the sheet — so the split is a
- * share rather than a measurement of either. Half the line less half the gap
- * is what makes two of them exactly fill it.
- *
- * `min-inline-size: 0` because a flex item floors at its content's minimum
- * otherwise, and both of these hold a grid wide enough to push past the share.
- */
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-map-panel,
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-rooms-panel {
-  flex: 1 1 calc(50% - var(--z1r-space-md) / 2);
-  min-inline-size: 0;
-}
-
-#tracker.z1r-tracker[data-mode="full"][data-width="md"] > .z1r-rooms-panel {
-  /*
-   * A smaller sheet, so the detail strip fits beside it in half a row.
-   *
-   * The panel's own stylesheet caps the sheet at 460px, which is what it is
-   * worth drawing at. Half of this row is not enough for that plus the strip:
-   * at a 1233px tracker each half is 612px and the panel's content box 592px,
-   * which after the 12px gap and the strip's 272px leaves 308px for the sheet —
-   * 307px in a window with a wider scrollbar. 300 clears both rather than
-   * sitting on the boundary, where a pixel of rounding would drop the strip
-   * back under the sheet and add a hundred pixels to the panel.
-   *
-   * Here rather than in the shared sheet, because this row is the only place
-   * that forces the trade. The one-column page below this band, and the OBS
-   * map dock, both have room for the larger sheet and keep it.
-   */
-  --z1r-room-sheet: 300px;
-}
 
 /*
  * The Overworld never grows past the screen; its grid scrolls instead.
@@ -147,32 +57,30 @@ body {
  * part at a time — eight rows of screens, of which the half you are working in
  * is the half you are looking at.
  *
- * Levels sits beside the map rather than under it, so what the cap protects is
- * the row rather than one panel: a flex line is as tall as the taller of the
- * two, and without the cap a long window would let the Overworld set that
- * height and push the dungeon sheet's own detail rows down with it. The part
- * of the map that goes is the part the scrollbar brings back. At a window tall
- * enough to read either panel it does not bind at all, because the map's cells
- * are sized from the half-row it gets and sixteen screens of that are nowhere
- * near a screen tall.
+ * Side by side, what the cap protects is the row rather than one panel: a flex
+ * line is as tall as the taller of the two, and without the cap a long window
+ * would let the Overworld set that height and push the dungeon sheet's own
+ * detail rows down with it. Stacked, it keeps Levels a scroll away rather than
+ * a page away. The part of the map that goes is the part the scrollbar brings
+ * back; at a window tall enough to read the whole map it does not bind.
  *
  * The subtraction is the page's own chrome: 16px of body padding top and
  * bottom, the 61px header, and the footer line.
  */
-#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel {
+#tracker.z1r-tracker[data-mode="full"] > .z1r-main > .z1r-map-panel {
   display: flex;
   flex-direction: column;
   max-block-size: calc(100vh - 128px);
 }
 
-#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel > * {
+#tracker.z1r-tracker[data-mode="full"] > .z1r-main > .z1r-map-panel > * {
   /* Only the row holding the grid and the screen card gives up height. The
      title and the marker brushes are a fixed handful of rows, and brushes that
      scrolled away from the map they stamp would be worse than a shorter map. */
   flex: none;
 }
 
-#tracker.z1r-tracker[data-mode="full"] > .z1r-map-panel > .z1r-map-row {
+#tracker.z1r-tracker[data-mode="full"] > .z1r-main > .z1r-map-panel > .z1r-map-row {
   flex: 0 1 auto;
   /* Flex items floor at their content height without this, so the cap above
      would be ignored and the panel would overflow instead of scrolling. */

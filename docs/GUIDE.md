@@ -31,11 +31,18 @@ and the maps to its right:
 
 | Area | What it holds |
 | --- | --- |
-| Header | Seed, Hints, Export, Import, and Reset |
+| Header | Seed, Hints, Export, Import, Reset, and the Maps layout choice |
 | Left column | Item locations, one row per level, above the item palette |
-| Overworld and Levels | The overworld map on the left, the dungeon room map on the right |
+| Overworld and Levels | The overworld map and the dungeon room map |
 
-On a narrow window the maps wrap so the page still fits the window width.
+The **Maps** choice in the header sets how the two maps sit:
+
+- **Auto** puts them side by side when the window is wide enough,
+  and stacks them when it is not.
+- **Side by side** keeps them side by side at every width.
+- **Stacked** puts the overworld above the dungeon room map at every width.
+
+The choice is remembered in this browser.
 
 ## Set up the seed
 
@@ -88,7 +95,7 @@ Drag the item from the palette onto any of these:
 
 - The room on the dungeon map where you found it
 - The screen on the overworld map where you found it
-- The **Item** slot on the room card, for the selected room
+- The room card, for the selected room
 
 To place it with clicks instead:
 
@@ -241,10 +248,12 @@ A map has one start screen, so placing it again moves it.
 
 The Warp mark carries a number from 1 to 4.
 The panel title counts them, for example "Warps 2/4".
-The table above the map shows, for each warp, its screen and where its left,
-middle,
-and right staircases come out.
-Rows fill in as you mark the warps.
+Hover over or focus a numbered warp on the map to see where its staircases lead.
+A dashed line runs to each warp it reaches,
+with a plate reading L, M, or R for the left, middle, or right staircase,
+and the rest of the map dims.
+The warp's tooltip lists all three,
+including any that lead to a warp you have not marked yet.
 
 ### Show hint regions
 
@@ -311,7 +320,7 @@ loads as the Vertical chute or Horizontal chute layout.
 
 ### Record the room's item
 
-Drag an item from the palette onto the room or onto the **Item** slot,
+Drag an item from the palette onto the room or onto the room card,
 or arm it and click the room.
 The **Item** row then shows it, with two buttons:
 
@@ -492,7 +501,7 @@ The tracker has these mouse and keyboard shortcuts:
 
 | Where | Input | Effect |
 | --- | --- | --- |
-| Palette | Drag onto a room, screen, or Item slot | Place the item |
+| Palette | Drag onto a room, screen, or room card | Place the item |
 | Palette | Right-click | Arm the item, or put it down |
 | Palette | Enter or Space | Arm the focused item |
 | Palette | Click | Mark the item held at that tier, or drop it a tier |
