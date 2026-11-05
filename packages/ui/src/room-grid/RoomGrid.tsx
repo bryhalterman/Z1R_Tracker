@@ -89,13 +89,15 @@ export interface RoomGridProps {
   readonly resolver: SpriteResolver;
   /** A click on a room: the panel decides whether that selects, cycles or drops. */
   readonly onTouch: (room: string) => void;
+  /** Whether what is being dragged from the palette can land in a room. */
+  readonly canDrop: () => boolean;
 }
 
 const ROOM_IDS: readonly string[] = Array.from({ length: ROOM_ROWS * ROOM_COLUMNS }, (_, index) =>
   roomId((index % ROOM_COLUMNS) + 1, Math.floor(index / ROOM_COLUMNS) + 1),
 );
 
-export function RoomGrid({ state, level, selected, interactive, resolver, onTouch }: RoomGridProps) {
+export function RoomGrid({ state, level, selected, interactive, resolver, onTouch, canDrop }: RoomGridProps) {
   const rooms = state.rooms[String(level)] ?? {};
   const entrance = state.levelStarts[String(level)];
   const ladderHeld = (state.items['ladder'] ?? 0) >= 1;
@@ -113,6 +115,7 @@ export function RoomGrid({ state, level, selected, interactive, resolver, onTouc
           interactive={interactive}
           resolver={resolver}
           onTouch={onTouch}
+          canDrop={canDrop}
         />
       ))}
     </TooltipProvider>
@@ -129,6 +132,7 @@ interface RoomCellProps {
   readonly interactive: boolean;
   readonly resolver: SpriteResolver;
   readonly onTouch: (room: string) => void;
+  readonly canDrop: () => boolean;
 }
 
 /**
@@ -146,6 +150,7 @@ const RoomCell = memo(function RoomCell({
   interactive,
   resolver,
   onTouch,
+  canDrop,
 }: RoomCellProps) {
   /*
    * Water in the way: the Ladder's sprite in the top-right corner. Once the
@@ -201,6 +206,25 @@ const RoomCell = memo(function RoomCell({
         aria-label={label}
         disabled={!interactive}
         onClick={interactive ? () => onTouch(id) : undefined}
+        // A palette drag lands like a click with the item armed: the drag
+        // armed it, so the click handler places it.
+        onDragOver={
+          interactive
+            ? (event) => {
+                if (!canDrop()) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+              }
+            : undefined
+        }
+        onDrop={
+          interactive
+            ? (event) => {
+                event.preventDefault();
+                onTouch(id);
+              }
+            : undefined
+        }
       >
         {/*
          * The doorways, drawn and nothing more. The compass on the room card is

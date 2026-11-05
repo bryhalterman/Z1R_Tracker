@@ -109,8 +109,10 @@ export function buildLocations(
   resolver: SpriteResolver,
   patches: Patch[],
   interactive: boolean,
+  /** One row per level rather than one column — the page's left column. */
+  rows = false,
 ): HTMLElement {
-  return buildCompactLocations(store, resolver, patches, interactive);
+  return buildCompactLocations(store, resolver, patches, interactive, rows);
 }
 
 /** Single letter per slot kind — the whole label will not fit at this size. */
@@ -166,6 +168,7 @@ function buildCompactLocations(
   resolver: SpriteResolver,
   patches: Patch[],
   interactive: boolean,
+  rows: boolean,
 ): HTMLElement {
   const root = document.createElement('section');
   root.className = 'z1r-panel z1r-locations-compact-panel';
@@ -212,7 +215,7 @@ function buildCompactLocations(
       const derived = deriveItemLocations(state);
       const collected = derived.slots.filter((slot) => slot.placement?.collected).length;
       summary.textContent = `${collected}/${derived.slots.length}`;
-      columns.render({ state, resolver, dispatch: store.dispatch });
+      columns.render({ state, resolver, dispatch: store.dispatch, rows });
     });
     return root;
   }

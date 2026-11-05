@@ -1634,122 +1634,120 @@
 /* ---------------------------------------------------------------- palette */
 
 /*
- * The page's Items panel: an always-on placement palette.
- *
- * One wrapping line of cells in three groups — the shuffle pool, the dungeon
- * pickups, and the inventory items nothing ever places. A rule between groups
- * and the last group's caption are what set them apart, not a tint. The cells
- * keep the inventory's own treatment, so held still reads the way it always
- * has: solid and full strength, against dashed and dimmed.
+ * The page's left column: Item locations above the placement palette, sticky
+ * as the page scrolls, so both stay beside whichever map you are dropping onto. The panels stack in
+ * the main column to its right, which is the width the layout bands measure.
+ */
+.z1r-tracker[data-rail="true"] {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+/*
+ * Fixed width, worked out from the palette's tile size rather than taken from
+ * the column's contents: folded, the panels would otherwise shrink to their
+ * headings, and the maps beside them would widen and reflow under you.
+ */
+.z1r-rail {
+  --z1r-palette-cells: calc(
+    4 * var(--z1r-item-min, 44px) + 3px + 2 * (2px + 2 * 1px + 2 * var(--z1r-border-width))
+  );
+  inline-size: calc(
+    var(--z1r-palette-cells) + var(--z1r-space-md) + var(--z1r-space-sm) + 2 * var(--z1r-border-width)
+  );
+  position: sticky;
+  inset-block-start: var(--z1r-space-md);
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  max-block-size: calc(100vh - 2 * var(--z1r-space-md));
+  overflow-y: auto;
+}
+
+/* Lean on the right: the column is as wide as its tiles and no wider. The
+   headings wrap inside that width rather than widening it. */
+.z1r-rail > .z1r-panel {
+  padding-inline: var(--z1r-space-md) var(--z1r-space-sm);
+}
+
+.z1r-main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+/*
+ * The palette itself: the shuffle pool, the items you carry, and the dungeon
+ * pickups, stacked, each under its caption with a rule between them — a shape
+ * that sets them apart, not a tint. Held still reads the way it always has:
+ * solid and full strength, against hollow and dimmed.
  *
  * Only the page builds this; the OBS dock and overlay keep the inventory grid.
  */
 .z1r-palette {
   display: flex;
-  flex-wrap: wrap;
-  /* Centered, so the balanced groups below sit in the middle of the space the
-     card gives them rather than against one edge of it. */
-  justify-content: center;
-  align-items: flex-end;
-  gap: var(--z1r-space-sm) 0;
+  flex-direction: column;
+  gap: var(--z1r-space-sm);
 }
 
 .z1r-palette-group {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
 }
 
 /* A rule between groups, drawn as a border so it is a shape and not a gap. */
 .z1r-palette-group + .z1r-palette-group {
-  margin-inline-start: var(--z1r-space-md);
-  padding-inline-start: var(--z1r-space-md);
-  border-inline-start: var(--z1r-border-width) solid var(--z1r-border);
+  padding-block-start: var(--z1r-space-sm);
+  border-block-start: var(--z1r-border-width) solid var(--z1r-border);
 }
 
 /*
- * A group's cells, in rows of `--cols` whole cells.
+ * A group's tiles. A family strip and the single tiles wrap together, so a
+ * strip starts a new line only when it does not fit on this one.
  *
- * `--cols` is set by `buildPalette` so every group takes the same number of
- * rows; the box is exactly that many cells wide, and a short last row is
- * centered under the full ones.
+ * `--z1r-palette-cells`, set on the left column, is wide enough for two
+ * two-tier strips side by side — four tiles, the gap between the strips, and
+ * each strip's inner gap, padding and border — so Arrow and Candle share a
+ * line rather than taking one each. Four single tiles fit in the same width.
  */
 .z1r-palette-cells {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 3px;
-  inline-size: calc(
-    var(--cols, 1) * var(--z1r-item-min, 44px) + (var(--cols, 1) - 1) * 3px
-  );
+  inline-size: var(--z1r-palette-cells);
 }
 
 /*
- * The Items card: the palette on the left, Item locations and the Triforce to
- * its right, as one panel.
- *
- * The palette takes whatever width the other two leave and wraps into it; the
- * two on the right keep their own size. Below the `md` band there is not room
- * for three across, so the card stacks: palette, then the other two.
+ * An item's tiers as one joined strip — Wooden, White and Magical Sword —
+ * the way the Levels strip joins its numbers: a control-cornered box holding
+ * cell-cornered tiles.
  */
-.z1r-items-card {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--z1r-space-md);
+.z1r-palette-family {
+  display: inline-flex;
+  gap: 2px;
+  padding: 1px;
+  border: var(--z1r-border-width) solid var(--z1r-border);
+  border-radius: var(--z1r-radius);
 }
 
-.z1r-items-card > .z1r-palette {
-  flex: 1 1 0;
-  min-inline-size: 0;
-}
-
-/* The two nested panels lose their own card and keep a rule on their left,
-   the same divider the palette's groups use. */
-.z1r-items-card > .z1r-panel {
-  flex: none;
-  margin: 0;
-  padding: 0 0 0 var(--z1r-space-md);
-  background: none;
-  border: 0;
-  border-inline-start: var(--z1r-border-width) solid var(--z1r-border);
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.z1r-items-card > .z1r-triforce-panel {
-  inline-size: 240px;
-}
-
-.z1r-tracker[data-width="xs"] .z1r-items-card,
-.z1r-tracker[data-width="sm"] .z1r-items-card {
-  flex-wrap: wrap;
-}
-
-.z1r-tracker[data-width="xs"] .z1r-items-card > .z1r-palette,
-.z1r-tracker[data-width="sm"] .z1r-items-card > .z1r-palette {
-  flex-basis: 100%;
-}
-
-/* Stacked, the divider runs above each nested panel instead of beside it. */
-.z1r-tracker[data-width="xs"] .z1r-items-card > .z1r-panel,
-.z1r-tracker[data-width="sm"] .z1r-items-card > .z1r-panel {
-  padding: var(--z1r-space-sm) 0 0;
-  border-inline-start: 0;
-  border-block-start: var(--z1r-border-width) solid var(--z1r-border);
-}
-
-/* What the next click does, in words, at the end of the heading. */
-.z1r-palette-status {
+/* The ? at the end of the Items heading. */
+.z1r-heading-helphost {
+  display: inline-flex;
   margin-inline-start: auto;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--z1r-muted);
 }
 
-.z1r-palette-panel[data-armed="true"] .z1r-palette-status {
-  color: var(--z1r-text);
+/* Read by a screen reader, drawn nowhere. */
+.z1r-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* The armed cell is the one the next room click spends: full strength, a solid

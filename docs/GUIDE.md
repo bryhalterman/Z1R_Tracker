@@ -25,15 +25,17 @@ The tracker remembers which panels you collapsed.
 
 ## Know the page layout
 
-The page stacks three areas from top to bottom:
+The page has a header across the top,
+a column down the left edge that stays in view as the page scrolls,
+and the maps to its right:
 
 | Area | What it holds |
 | --- | --- |
 | Header | Seed, Hints, Export, Import, and Reset |
-| Items | The item palette, with the Locations panel and Triforce beside it |
+| Left column | Item locations, one row per level, above the item palette |
 | Overworld and Levels | The overworld map on the left, the dungeon room map on the right |
 
-On a narrow window the areas wrap so the page still fits the window width.
+On a narrow window the maps wrap so the page still fits the window width.
 
 ## Set up the seed
 
@@ -76,19 +78,28 @@ the [seeds and item locations notes](SEEDS.md).
 ## Track items with the palette
 
 The **Items** panel is a palette.
-You arm an item, then click where you found it.
-The line beside the panel title always says what your next click does.
+You drag an item to where you found it, or arm it and then click there.
+Hover over or focus the **?** at the end of the panel title
+for a reminder of how the palette works and which item is armed.
 
 ### Place an item you found
 
-1. Click the item in the palette.
-   It gets a ring, and the panel title reads, for example, "Bow armed —
-   click a room or an overworld screen."
-1. Click the room on the dungeon map, or the screen on the overworld map,
-   where you found it.
+Drag the item from the palette onto any of these:
+
+- The room on the dungeon map where you found it
+- The screen on the overworld map where you found it
+- The **Item** slot on the room card, for the selected room
+
+To place it with clicks instead:
+
+1. Right-click the item in the palette, or focus it and press **Enter**.
+   It gets a thicker ring, and the **?** tooltip reads, for example,
+   "Bow armed — click a room or an overworld screen."
+1. Click the room or the overworld screen where you found it.
 
 The item lands there and the palette puts it down, so one find is one placement.
-To put an armed item down without placing it, click it again or press **Esc**.
+To put an armed item down without placing it,
+right-click it again or press **Esc**.
 Placing the same item on the same room or screen again removes it.
 
 Each item only lands where it can appear in the game:
@@ -96,33 +107,34 @@ Each item only lands where it can appear in the game:
 - Rooms take shuffle-pool items, Bombs, and the dungeon pickups.
 - Overworld screens take shuffle-pool items, Bombs,
   and the overworld-only items.
-- A click on a place that cannot hold the armed item does nothing.
+- A room or screen that cannot hold the item refuses the drop,
+  and a click on it does nothing.
 
-### Pick a tier for an item that upgrades
+### Find each tier of an item that upgrades
 
-Sword, Boomerang, Candle,
-and Potion each have one palette cell that shows the tier you hold.
-Click the cell to open a small picker of the tiers you can find,
-then pick the one you just found to arm it:
+Every tier has its own tile,
+and the tiers of one item sit together in a bordered strip:
 
 - Sword: Wooden Sword, White Sword, Magical Sword
 - Boomerang: Boomerang, Magical Boomerang
+- Arrow: Wooden Arrow, Silver Arrow
 - Candle: Blue Candle, Red Candle
+- Ring: Blue Ring, Red Ring
 - Potion: Blue Potion, Red Potion
 
-Click outside the picker or press **Esc** to close it.
-The Arrow and Ring cells have one findable tier each,
-so a click arms the Silver Arrow or the Red Ring directly.
+The Wooden Arrow and the Blue Ring are bought in shops rather than found,
+so their tiles have a dashed border and cannot be armed or dragged.
 
-### Mark an item held without placing it
+### Mark an item held
 
-Some items are never found on a map, such as what you buy or start with.
-Right-click a palette cell to raise that item one stage,
-and Shift+right-click to lower it.
-With the keyboard, focus the cell and use the Right or Up arrow to raise it,
+Click a tile to mark that item held.
+For an item that upgrades, the click sets the item to that tier;
+clicking a tier you already hold drops the item to the tier below.
+With the keyboard, focus the tile and use the Right or Up arrow to raise it,
 and the Left or Down arrow to lower it.
 
-Held items have a solid border; items you do not hold have a dashed border.
+Held items are filled with a solid ring;
+items you do not hold are hollow and gray.
 An item that has been placed somewhere lists where in its tooltip.
 
 ### Know the palette groups
@@ -131,11 +143,11 @@ The palette has three groups:
 
 | Group | Items |
 | --- | --- |
-| Main | Sword, Boomerang, Bow, Arrow, Candle, Ring, Recorder, Wand, Magical Key, Bombs, Potion |
+| Pool | Sword, Boomerang, Bow, Arrow, Candle, Ring, Recorder, Wand, Magical Key, Bombs, Potion |
 | Held | Book, Magical Shield, Ladder, Raft, Power Bracelet, Meat, Letter |
 | Dungeon | Heart Container, Map, Compass, Triforce piece |
 
-The dungeon pickups have no held state, so right-click does nothing on them.
+The dungeon pickups have no held state, so a click does nothing on them.
 The game's own HUD already shows your hearts.
 
 ## Map the overworld
@@ -208,7 +220,8 @@ The size is optional.
 
 ### Record an overworld item
 
-Arm an item in the palette and click the screen,
+Drag an item from the palette onto the screen,
+or arm it and click the screen,
 or select an Item screen and use the toolbar:
 
 - **Item spot** names which of the three shuffled spots the screen is:
@@ -298,7 +311,8 @@ loads as the Vertical chute or Horizontal chute layout.
 
 ### Record the room's item
 
-Place an item in a room from the palette.
+Drag an item from the palette onto the room or onto the **Item** slot,
+or arm it and click the room.
 The **Item** row then shows it, with two buttons:
 
 - **Collected** marks it picked up, which also marks it held in the palette.
@@ -478,12 +492,13 @@ The tracker has these mouse and keyboard shortcuts:
 
 | Where | Input | Effect |
 | --- | --- | --- |
-| Palette | Click | Arm the item, or open its tier picker |
-| Palette | Right-click | Raise the item one stage |
-| Palette | Shift+right-click | Lower the item one stage |
+| Palette | Drag onto a room, screen, or Item slot | Place the item |
+| Palette | Right-click | Arm the item, or put it down |
+| Palette | Enter or Space | Arm the focused item |
+| Palette | Click | Mark the item held at that tier, or drop it a tier |
 | Palette | Right or Up arrow | Raise the focused item |
 | Palette | Left or Down arrow | Lower the focused item |
-| Anywhere | Esc | Put the armed item down, or close the tier picker |
+| Anywhere | Esc | Put the armed item down |
 | Overworld | Right-click a screen | Clear its mark |
 | Overworld | Left or Right arrow on a screen | Step through the marks |
 | Overworld | Esc | Let go of the selected screen |

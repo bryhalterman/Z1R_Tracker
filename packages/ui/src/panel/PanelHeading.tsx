@@ -7,8 +7,9 @@
  * into it as islands.
  */
 
-import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon, CircleHelpIcon } from 'lucide-react';
 import { Button } from '#components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { cn } from '#lib/utils';
 
 export interface PanelToggleProps {
@@ -60,5 +61,44 @@ export function ClearButton({ title, onClear, className }: ClearButtonProps) {
     >
       Clear
     </Button>
+  );
+}
+
+export interface HelpTipProps {
+  /** What the button is called to assistive tech, for example "How to use Items". */
+  label: string;
+  /** The tooltip's text, one paragraph per entry. */
+  lines: readonly string[];
+}
+
+/**
+ * A ? in a heading that explains the panel on hover or focus, so the
+ * instructions stop costing a line of the panel's height.
+ */
+export function HelpTip({ label, lines }: HelpTipProps) {
+  return (
+    <TooltipProvider delay={200}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={label}
+              className="z1r-ui cursor-help text-muted-foreground hover:text-primary"
+            />
+          }
+        >
+          <CircleHelpIcon />
+        </TooltipTrigger>
+        <TooltipContent className="z1r-ui max-w-64 normal-case tracking-normal">
+          <div className="flex flex-col gap-1 text-left font-normal">
+            {lines.map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

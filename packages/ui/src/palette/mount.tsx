@@ -7,14 +7,14 @@ import '../shadcn.css';
 export { targetFor } from './ItemPalette.js';
 
 export interface ItemPaletteHost {
-  render(props: Omit<ItemPaletteProps, 'container'>): void;
+  render(props: ItemPaletteProps): void;
 }
 
 export function mountItemPalette(container: HTMLElement): ItemPaletteHost {
   const root = createRoot(container);
   return {
     render(props) {
-      root.render(<ItemPalette {...props} container={container} />);
+      root.render(<ItemPalette {...props} />);
     },
   };
 }

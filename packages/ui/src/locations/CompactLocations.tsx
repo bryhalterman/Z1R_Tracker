@@ -1,6 +1,7 @@
 /**
- * Item locations, compact: one column per level and one for the overworld, in
- * React with shadcn/ui. Built for the page's Items card and the OBS dock; the
+ * Item locations, compact: one column per level and one for the overworld —
+ * or, in the page's left column, one row each — in React with shadcn/ui.
+ * Built for the page and the OBS dock; the
  * read-only overlay keeps its plain-DOM columns, which draw synchronously so
  * the overlay can size itself on its first paint.
  *
@@ -33,6 +34,12 @@ export interface CompactLocationsProps {
   state: TrackerState;
   resolver: SpriteResolver;
   dispatch: (action: Action) => void;
+  /**
+   * One row per level instead of one column: the page's left column, which is
+   * narrow and tall where the dock is wide and short. Each row is the piece,
+   * then the level's slots.
+   */
+  rows?: boolean;
 }
 
 const KIND_TITLE: Record<string, string> = {
@@ -159,7 +166,7 @@ function PieceHead({ level, state, resolver, dispatch }: { level: string } & Com
 }
 
 export function CompactLocations(props: CompactLocationsProps) {
-  const { state, resolver, dispatch } = props;
+  const { state, resolver, dispatch, rows = false } = props;
   const derived = deriveItemLocations(state);
 
   // The level groups in listed order, keyed `L1`-`L9` and `OW`.
@@ -173,18 +180,23 @@ export function CompactLocations(props: CompactLocationsProps) {
 
   return (
     <TooltipProvider delay={400}>
-      <div className="z1r-ui grid auto-cols-max grid-flow-col items-start justify-start gap-1">
+      <div
+        className={cn(
+          'z1r-ui',
+          rows ? 'flex flex-col gap-1' : 'grid auto-cols-max grid-flow-col items-start justify-start gap-1',
+        )}
+      >
         {[...groups].map(([label, list]) => {
           const level = /^L([1-9])$/.exec(label)?.[1];
           const groupLevel = list[0]?.level;
           const overflow = groupLevel === undefined ? derived.overworldOverflow : (derived.overflow.get(groupLevel) ?? []);
           return (
-            <div key={label} className="flex flex-col items-center gap-1">
+            <div key={label} className={cn('flex items-center gap-1', rows ? 'flex-row flex-wrap' : 'flex-col')}>
               {level && Number(level) <= TRIFORCE_REQUIRED_FOR_L9 ? (
                 <PieceHead level={level} {...props} />
               ) : (
                 // Level 9 holds Ganon and has no piece, and the overworld is not
-                // a level: a label in the same box, so the rows still line up.
+                // a level: a label in the same box, so the slots still line up.
                 <span
                   className="grid size-6 place-items-center text-[10px] font-bold text-muted-foreground"
                   title={level ? `Level ${level} — Ganon, no Triforce piece` : 'Overworld locations'}

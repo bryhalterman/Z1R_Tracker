@@ -42,7 +42,7 @@ import { createSprite } from './sprite.js';
 import { askToConfirm } from './confirm/ask.js';
 import { placedIndex, placedSuffix } from './placed.js';
 import { mountItemPalette, targetFor } from './palette/mount.js';
-import { mountPanelToggle } from './panel/mount.js';
+import { mountHelpTip, mountPanelToggle } from './panel/mount.js';
 import { mountDockItems } from './items/mount.js';
 import { MAP_PREVIEW_EVENT, type MapPreview } from './map-preview.js';
 import {
@@ -298,11 +298,10 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    */
   const palette = interactive && !compact && (placeInto.rooms || placeInto.map);
   /*
-   * Whether Item locations goes in the palette's card — see the card below.
-   * When it does, it is the compact panel, whose columns carry the Triforce
-   * pieces, so the Triforce panel is not built at all.
+   * Whether the page shows Item locations beside the palette. Its columns
+   * carry the Triforce pieces, so the Triforce panel is not built at all.
    */
-  const inCard = palette && sections.includes('items') && sections.includes('locations');
+  const piecesInLocations = palette && sections.includes('items') && sections.includes('locations');
 
   const builders: Record<TrackerSection, () => HTMLElement> = {
     seed: () => buildSeedPanel(store, patches, interactive),
@@ -318,7 +317,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     dungeons: () => buildTriforce(store, resolver, patches, interactive),
     // A column per level headed by its Triforce piece — which, in the page's
     // Items card, covers the Triforce panel as well.
-    locations: () => buildLocations(store, resolver, patches, interactive),
+    locations: () => buildLocations(store, resolver, patches, interactive, palette),
     hintlog: () => buildHintTracker(store, patches, interactive),
     map: () => buildMap(store, resolver, patches, interactive, placement),
     rooms: () => buildRooms(store, resolver, patches, interactive, placement),
@@ -343,53 +342,50 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     document.addEventListener('keydown', onEscape, true);
   }
 
-  // Items and the Triforce share a row when both are shown — the triangle is
-  // narrow and was leaving most of its own panel empty.
   const built = new Map<TrackerSection, HTMLElement>();
   for (const name of sections) {
-    if (name === 'dungeons' && inCard) continue;
+    if (name === 'dungeons' && piecesInLocations) continue;
     // An unknown `?sections=` value must not take the whole overlay down.
     const build = builders[name];
     if (build) built.set(name, build());
   }
   const items = built.get('items');
   const triforce = built.get('dungeons');
-  const locations = built.get('locations');
 
   /*
-   * On the page, the palette's card also holds Item locations: the palette
-   * wraps on the left, the compact locations panel sits to its right, its
-   * columns headed by each level's Triforce piece.
-   *
-   * It is what the palette's placements fill in, so the two read as one tool.
-   * It keeps its own heading and fold; folding Items folds both, because the
-   * card is one child of the Items panel and a folded panel hides everything
-   * but its title.
+   * On the page the palette is a column of its own down the left edge, sticky
+   * as the page scrolls, so it is beside whichever map you are dropping onto.
+   * Item locations sits above it, a row per level, so what the palette fills
+   * in is in the same column as the palette. Everything else stacks in the
+   * main column in its usual order.
    */
-  const card = palette && items ? [locations, triforce].filter((n): n is HTMLElement => !!n) : [];
-  if (items && card.length) {
-    const body = items.querySelector<HTMLElement>('.z1r-palette');
-    const row = el('div', 'z1r-items-card');
-    if (body) row.append(body);
-    for (const node of card) {
-      node.dataset.nested = 'true';
-      row.append(node);
+  let main: HTMLElement | null = null;
+  if (palette && items) {
+    const rail = el('aside', 'z1r-rail');
+    // The column's width is worked out from the tile size — see `.z1r-rail`.
+    rail.style.setProperty('--z1r-item-min', items.style.getPropertyValue('--z1r-item-min'));
+    const locations = built.get('locations');
+    if (locations) rail.append(locations);
+    rail.append(items);
+    main = el('div', 'z1r-main');
+    for (const [name, node] of built) if (name !== 'items' && name !== 'locations') main.append(node);
+    root.dataset.rail = 'true';
+    root.append(rail, main);
+  } else {
+    // Items and the Triforce share a row when both are shown — the triangle
+    // is narrow and was leaving most of its own panel empty.
+    const paired = !!items && !!triforce;
+    if (paired) items.classList.add('z1r-items-panel');
+    for (const [name, node] of built) {
+      if (name === 'dungeons' && paired) continue;
+      if (name === 'items' && paired) {
+        const pair = el('div', 'z1r-pair');
+        pair.append(items, triforce);
+        root.append(pair);
+        continue;
+      }
+      root.append(node);
     }
-    items.append(row);
-  }
-
-  if (items && triforce && !card.length) items.classList.add('z1r-items-panel');
-  for (const [name, node] of built) {
-    if (card.includes(node)) continue;
-    const paired = !!items && !!triforce && !card.includes(triforce);
-    if (name === 'dungeons' && paired) continue;
-    if (name === 'items' && paired) {
-      const pair = el('div', 'z1r-pair');
-      pair.append(items, triforce);
-      root.append(pair);
-      continue;
-    }
-    root.append(node);
   }
 
   // Isolated per panel: the store has already committed this state, so a throw
@@ -404,7 +400,9 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    * some other size — so the viewport describes the wrong box entirely.
    */
   const applyWidthBand = () => {
-    const width = root.offsetWidth;
+    // The panels' own column when the palette has the left edge: the bands
+    // describe the room the panels have, not the page.
+    const width = (main ?? root).offsetWidth;
     root.dataset.width = width < 640 ? 'xs' : width < 720 ? 'sm' : 'md';
   };
 
@@ -721,27 +719,58 @@ function buildPalette(
   const heading = root.querySelector('.z1r-panel-title');
 
   /*
-   * One line saying what the next click does.
-   *
-   * In the heading rather than under the grid, so the panel is no taller for
-   * it, and in words — the armed tile's ring is the other channel.
+   * How the palette works, and what is armed, behind a ? at the end of the
+   * heading rather than as a line under it, so the column spends no height on
+   * instructions. On screen the armed tile's thicker ring says what is armed;
+   * a hidden live region says it in words to a screen reader.
    */
-  const status = el('span', 'z1r-palette-status');
+  const helpHost = el('span', 'z1r-heading-helphost');
+  heading?.append(helpHost);
+  const help = mountHelpTip(helpHost);
+  const status = el('span', 'z1r-visually-hidden');
   status.setAttribute('aria-live', 'polite');
   heading?.append(status);
 
   const palette = mountItemPalette(body);
   const arm = (item: string) => placement.set({ item });
   const step = (id: string, direction: 1 | -1) => store.dispatch({ type: 'cycleItem', id, direction });
+  const setHeld = (id: string, value: number) => store.dispatch({ type: 'setItem', id, value });
+
+  /*
+   * A drag arms the item for as long as it is in the air, so the room sheet
+   * and the map show what will take it the way they do for a right-click arm,
+   * and the drop lands through the same click handlers. Dropped somewhere,
+   * the landing has already put it down; dropped nowhere, whatever was armed
+   * before the drag is armed again.
+   */
+  let beforeDrag = '';
+  const dragStart = (item: string) => {
+    beforeDrag = placement.get().item;
+    placement.set({ item });
+  };
+  const dragEnd = (dropped: boolean) => {
+    if (!dropped) placement.set({ item: beforeDrag });
+    beforeDrag = '';
+  };
 
   const draw = (state: TrackerState) => {
     const armed = placement.get().item;
     // Either list: the overworld-only items are not room items.
     const def = armed ? (ROOM_ITEMS_BY_ID.get(armed) ?? SCREEN_ITEMS_BY_ID.get(armed)) : undefined;
     root.dataset.armed = String(!!def);
-    status.textContent = def
+    const armedLine = def
       ? `${def.name} armed — click ${targetFor(def.id, placeInto)}. Esc puts it down.`
-      : 'Click an item to place it. Right-click marks it held.';
+      : '';
+    status.textContent = armedLine;
+    help.render({
+      label: 'How to use Items',
+      lines: [
+        ...(armedLine ? [armedLine] : []),
+        "Drag an item onto a room, an overworld screen, or the room card's Item slot to place it.",
+        'Or right-click an item to arm it, then click where you found it. Esc puts it down.',
+        'Click an item to mark it held.',
+      ],
+    });
     palette.render({
       state,
       armed,
@@ -750,7 +779,10 @@ function buildPalette(
       itemSize,
       placeInto,
       arm,
+      setHeld,
       step,
+      dragStart,
+      dragEnd,
     });
   };
 
@@ -912,9 +944,12 @@ function buildMap(
       onTouch: touchScreen,
       onClear: clearScreen,
       onCycle: cycleScreen,
+      canDrop: screenCanTake,
     });
   };
   const highlightSelection = () => drawGrid(store.getState());
+  /** Whether the armed item — or the one being dragged — can land on a screen. */
+  const screenCanTake = () => SCREEN_ITEMS_BY_ID.has(placement.get().item);
   const clearScreen = (screen: string) => store.dispatch({ type: 'setMark', screen, mark: 'none' });
   const cycleScreen = (screen: string, direction: 1 | -1) =>
     store.dispatch({ type: 'cycleMark', screen, direction });

@@ -99,10 +99,12 @@ export interface ScreenGridProps {
   readonly onClear: (screen: string) => void;
   /** Arrow keys: step through the marks. */
   readonly onCycle: (screen: string, direction: 1 | -1) => void;
+  /** Whether what is being dragged from the palette can land on a screen. */
+  readonly canDrop: () => boolean;
 }
 
 export function ScreenGrid(props: ScreenGridProps) {
-  const { state, selected, previewed, mapUrl, interactive, resolver, onTouch, onClear, onCycle } = props;
+  const { state, selected, previewed, mapUrl, interactive, resolver, onTouch, onClear, onCycle, canDrop } = props;
   const mirrored = state.seed.mirroredOverworld;
   const coast = coastScreen(mirrored);
   // The coast ledge is reachable the moment the Ladder is in hand — and that
@@ -149,6 +151,7 @@ export function ScreenGrid(props: ScreenGridProps) {
             onTouch={onTouch}
             onClear={onClear}
             onCycle={onCycle}
+            canDrop={canDrop}
           />
         );
       })}
@@ -178,6 +181,7 @@ interface ScreenCellProps {
   readonly onTouch: (screen: string) => void;
   readonly onClear: (screen: string) => void;
   readonly onCycle: (screen: string, direction: 1 | -1) => void;
+  readonly canDrop: () => boolean;
 }
 
 /**
@@ -206,6 +210,7 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
     onTouch,
     onClear,
     onCycle,
+    canDrop,
   } = props;
   const def = MARKS_BY_KIND.get(mark);
   const inside = props.inside
@@ -346,6 +351,25 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
                 if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                 event.preventDefault();
                 onCycle(id, event.key === 'ArrowRight' ? 1 : -1);
+              }
+            : undefined
+        }
+        // A palette drag lands like a click with the item armed: the drag
+        // armed it, so the click handler places it.
+        onDragOver={
+          interactive
+            ? (event) => {
+                if (!canDrop()) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+              }
+            : undefined
+        }
+        onDrop={
+          interactive
+            ? (event) => {
+                event.preventDefault();
+                onTouch(id);
               }
             : undefined
         }

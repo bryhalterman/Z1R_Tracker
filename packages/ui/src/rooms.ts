@@ -307,6 +307,9 @@ export function buildRooms(
     placement.set({ item: '' });
   };
 
+  /** Whether the armed item — or the one being dragged — can land in a room. */
+  const roomCanTake = () => ROOM_ITEMS_BY_ID.has(placement.get().item);
+
   // The 64 cells, drawn by React — see `room-grid/`. `touchRoom` above is
   // still what a click does; the grid only draws.
   const cells = mountRoomGrid(grid);
@@ -340,7 +343,7 @@ export function buildRooms(
   });
 
   own.push((state) =>
-    cells.render({ state, level, selected, interactive, resolver, onTouch: touchRoom }),
+    cells.render({ state, level, selected, interactive, resolver, onTouch: touchRoom, canDrop: roomCanTake }),
   );
 
   own.push((state) => {
@@ -357,6 +360,11 @@ export function buildRooms(
       resolver,
       commit: (action) => {
         if (selected) commit(selected, action);
+      },
+      canDrop: roomCanTake,
+      // The drag armed the item, so this is a click on the selected room.
+      onDropItem: () => {
+        if (selected) touchRoom(selected);
       },
     });
   });

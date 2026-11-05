@@ -67,6 +67,10 @@ export interface RoomCardProps {
   resolver: SpriteResolver;
   /** Dispatches against the selected room and keeps it selected. */
   commit: (action: Action) => void;
+  /** Whether what is being dragged from the palette can land in a room. */
+  canDrop: () => boolean;
+  /** A palette drag dropped on the item slot: place it in the selected room. */
+  onDropItem: () => void;
 }
 
 const SIDE_CLASS: Record<RoomSide, string> = { north: 'n', east: 'e', south: 's', west: 'w' };
@@ -195,7 +199,9 @@ function Segmented<T extends string>({
 }
 
 export function RoomCard(props: RoomCardProps) {
-  const { state, level, selected, interactive, resolver, commit } = props;
+  const { state, level, selected, interactive, resolver, commit, canDrop, onDropItem } = props;
+  /** A palette drag is over the item slot. */
+  const [dropping, setDropping] = useState(false);
   const rooms = state.rooms[String(level)] ?? {};
   const note = selected ? rooms[selected] : undefined;
   const off = !interactive || !selected;
@@ -360,8 +366,27 @@ export function RoomCard(props: RoomCardProps) {
             className={cn(
               'inline-grid size-7 place-items-center rounded-md border',
               itemDef ? 'border-border' : 'border-dashed border-border',
+              // A shape, not a tint: a dashed ring outside the slot while an
+              // item it can take is over it.
+              dropping && 'outline-2 outline-offset-2 outline-dashed outline-primary',
             )}
-            title={itemDef ? itemDef.name : 'Nothing placed — arm an item in the palette and click this room'}
+            title={
+              itemDef ? itemDef.name : 'Nothing placed — drag an item here, or arm one in the palette and click this room'
+            }
+            // The slot takes a palette drag for the selected room, the same
+            // placement a drop on the room's cell makes.
+            onDragOver={(event) => {
+              if (off || !canDrop()) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'copy';
+              setDropping(true);
+            }}
+            onDragLeave={() => setDropping(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDropping(false);
+              onDropItem();
+            }}
           >
             {itemDef ? <Sprite resolver={resolver} spriteKey={itemDef.sprite} size={18} /> : null}
           </span>

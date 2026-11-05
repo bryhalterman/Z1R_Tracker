@@ -1,7 +1,14 @@
 /** Where the plain-DOM panel headings hand their shared controls to React. */
 
 import { createRoot } from 'react-dom/client';
-import { ClearButton, PanelToggle, type ClearButtonProps, type PanelToggleProps } from './PanelHeading.js';
+import {
+  ClearButton,
+  HelpTip,
+  PanelToggle,
+  type ClearButtonProps,
+  type HelpTipProps,
+  type PanelToggleProps,
+} from './PanelHeading.js';
 import { LevelStrip, type LevelStripProps } from './LevelStrip.js';
 import '../shadcn.css';
 
@@ -18,4 +25,9 @@ export function mountLevelStrip(container: HTMLElement) {
 export function mountClearButton(container: HTMLElement) {
   const root = createRoot(container);
   return { render: (props: ClearButtonProps) => root.render(<ClearButton {...props} />) };
+}
+
+export function mountHelpTip(container: HTMLElement) {
+  const root = createRoot(container);
+  return { render: (props: HelpTipProps) => root.render(<HelpTip {...props} />) };
 }
