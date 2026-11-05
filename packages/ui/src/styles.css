@@ -633,12 +633,14 @@
 }
 
 .z1r-warp-guide-under {
+  fill: none;
   stroke: var(--z1r-bg);
   stroke-width: 4;
   stroke-linecap: round;
 }
 
 .z1r-warp-guide {
+  fill: none;
   stroke: var(--z1r-text);
   stroke-width: 2;
   stroke-dasharray: 5 4;
@@ -658,6 +660,11 @@
   background: var(--z1r-text);
   border-radius: var(--z1r-radius-cell);
   box-shadow: 0 0 0 1px var(--z1r-bg);
+}
+
+/* Under the cell, for a destination on the top row. */
+.z1r-warp-guide-tag[data-below="true"] {
+  transform: translate(-50%, 4px);
 }
 
 /* Selected as well: the usual ring would sit on the box, so the selection

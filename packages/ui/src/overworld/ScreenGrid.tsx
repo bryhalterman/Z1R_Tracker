@@ -174,6 +174,93 @@ export function ScreenGrid(props: ScreenGridProps) {
 
 const EXIT_NAME = { left: 'Left', middle: 'Middle', right: 'Right' } as const;
 
+/** The height a guide's letter plate needs above its cell, gap included. */
+const TAG_ROOM = 22;
+
+/** The preview ring outside a tile: its 3px outline and 2px offset. */
+const RING = 5;
+
+interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly halfW: number;
+  readonly halfH: number;
+}
+
+const inside = (p: { x: number; y: number }, b: Box) =>
+  Math.abs(p.x - b.x) < b.halfW && Math.abs(p.y - b.y) < b.halfH;
+
+/**
+ * Bends tried, as a share of the distance between the two warps: straight
+ * first, then a little either way, then more. The first that misses every
+ * other warp and stays on the map wins, so a clear path stays straight.
+ */
+const BENDS = [0, 0.18, -0.18, 0.32, -0.32, 0.48, -0.48, 0.66, -0.66];
+const SAMPLES = 48;
+
+/**
+ * A guide from one warp to another that does not run across a third.
+ *
+ * A quadratic curve through a control point pushed off the midpoint; each
+ * candidate is sampled and scored by how many samples land inside another
+ * warp's ring or off the map. The drawn path then starts where the curve
+ * leaves the hovered warp's ring and ends where it reaches the destination's,
+ * so it crosses neither tile.
+ */
+function guidePath(
+  from: Box,
+  to: Box,
+  obstacles: readonly Box[],
+  map: { width: number; height: number },
+): string {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  // A unit normal to the straight line, for pushing the control point off it.
+  const nx = -dy / length;
+  const ny = dx / length;
+  const curve = (bend: number) => {
+    const cx = (from.x + to.x) / 2 + nx * bend * length;
+    const cy = (from.y + to.y) / 2 + ny * bend * length;
+    return Array.from({ length: SAMPLES + 1 }, (_, i) => {
+      const t = i / SAMPLES;
+      const u = 1 - t;
+      return { x: u * u * from.x + 2 * u * t * cx + t * t * to.x, y: u * u * from.y + 2 * u * t * cy + t * t * to.y };
+    });
+  };
+  const cost = (points: readonly { x: number; y: number }[]) =>
+    points.filter(
+      (p) => obstacles.some((b) => inside(p, b)) || p.x < 0 || p.y < 0 || p.x > map.width || p.y > map.height,
+    ).length;
+
+  let best = curve(0);
+  let bestCost = cost(best);
+  for (const bend of BENDS.slice(1)) {
+    if (bestCost === 0) break;
+    const points = curve(bend);
+    const c = cost(points);
+    if (c < bestCost) {
+      best = points;
+      bestCost = c;
+    }
+  }
+
+  // Trim to the stretch between the two rings.
+  const first = best.findIndex((p) => !inside(p, from));
+  let last = -1;
+  for (let i = best.length - 1; i >= 0; i--) {
+    if (!inside(best[i]!, to)) {
+      last = i;
+      break;
+    }
+  }
+  if (first < 0 || last <= first) return '';
+  return best
+    .slice(first, last + 1)
+    .map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+    .join(' ');
+}
+
 /** "Left → warp 2 (B4)", or "… not marked yet" for a warp not on the map. */
 function exitLines(route: WarpRoute): string[] {
   return route.exits.map(
@@ -197,8 +284,14 @@ function WarpGuides({ from, routes }: { from: string; routes: readonly WarpRoute
   const route = routes.find((r) => r.screen === from);
   const key = route ? route.exits.map((exit) => exit.screen ?? '').join('|') : '';
   const [geometry, setGeometry] = useState<{
-    from: { x: number; y: number };
-    exits: { letter: string; x: number; y: number; top: number }[];
+    exits: {
+      letter: string;
+      x: number;
+      top: number;
+      bottom: number;
+      /** SVG path data, or '' for neighbours whose rings touch. */
+      path: string;
+    }[];
   } | null>(null);
 
   useLayoutEffect(() => {
@@ -211,7 +304,16 @@ function WarpGuides({ from, routes }: { from: string; routes: readonly WarpRoute
     const at = (screen: string) => {
       const cell = host.querySelector(`[data-screen="${screen}"]`)?.getBoundingClientRect();
       return cell
-        ? { x: cell.left - box.left + cell.width / 2, y: cell.top - box.top + cell.height / 2, top: cell.top - box.top }
+        ? {
+            x: cell.left - box.left + cell.width / 2,
+            y: cell.top - box.top + cell.height / 2,
+            // Half the tile plus the ring the preview draws outside it, so a
+            // line ends at the ring rather than running across the tile.
+            halfW: cell.width / 2 + RING,
+            halfH: cell.height / 2 + RING,
+            top: cell.top - box.top,
+            bottom: cell.bottom - box.top,
+          }
         : null;
     };
     const start = at(from);
@@ -219,11 +321,29 @@ function WarpGuides({ from, routes }: { from: string; routes: readonly WarpRoute
       setGeometry(null);
       return;
     }
+    // Every other warp on the map, as the box its ring covers: the guides
+    // bend around these rather than run across them.
+    const warps = routes.flatMap((r) => (r.screen ? [r.screen] : []));
     const exits = route.exits.flatMap((exit) => {
       const end = exit.screen ? at(exit.screen) : null;
-      return end ? [{ letter: EXIT_NAME[exit.position][0]!, ...end }] : [];
+      if (!end || !exit.screen) return [];
+      const obstacles = warps
+        .filter((screen) => screen !== from && screen !== exit.screen)
+        .flatMap((screen) => {
+          const ring = at(screen);
+          return ring ? [ring] : [];
+        });
+      return [
+        {
+          letter: EXIT_NAME[exit.position][0]!,
+          x: end.x,
+          top: end.top,
+          bottom: end.bottom,
+          path: guidePath(start, end, obstacles, { width: box.width, height: box.height }),
+        },
+      ];
     });
-    setGeometry({ from: start, exits });
+    setGeometry({ exits });
     // `key` stands for `route`: the routes are rebuilt on every render.
   }, [from, key]);
 
@@ -234,16 +354,29 @@ function WarpGuides({ from, routes }: { from: string; routes: readonly WarpRoute
           <svg>
             {geometry.exits.map((exit) => (
               <g key={exit.letter}>
-                <line className="z1r-warp-guide-under" x1={geometry.from.x} y1={geometry.from.y} x2={exit.x} y2={exit.y} />
-                <line className="z1r-warp-guide" x1={geometry.from.x} y1={geometry.from.y} x2={exit.x} y2={exit.y} />
+                <path className="z1r-warp-guide-under" d={exit.path} />
+                <path className="z1r-warp-guide" d={exit.path} />
               </g>
             ))}
           </svg>
-          {geometry.exits.map((exit) => (
-            <span key={exit.letter} className="z1r-warp-guide-tag" style={{ left: exit.x, top: exit.top }}>
-              {exit.letter}
-            </span>
-          ))}
+          {geometry.exits.map((exit) => {
+            /*
+             * Above the destination, unless that is off the top of the grid —
+             * a top-row warp — where the map's scrolling row would clip it.
+             * There it goes under the cell instead.
+             */
+            const below = exit.top < TAG_ROOM;
+            return (
+              <span
+                key={exit.letter}
+                className="z1r-warp-guide-tag"
+                data-below={below}
+                style={{ left: exit.x, top: below ? exit.bottom : exit.top }}
+              >
+                {exit.letter}
+              </span>
+            );
+          })}
         </>
       ) : null}
     </div>
