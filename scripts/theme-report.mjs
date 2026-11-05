@@ -89,10 +89,15 @@ const spectrum = new Map([...globalVars, ...mediumVars, ...darkVars]);
 // The alias -> Spectrum token bindings, read from theme.css so the report can
 // never drift from what actually ships.
 const themeCss = await readFile(THEME, 'utf8');
-const aliases = new Map();
+// An alias may point at another alias (`--z1r-focus` is the accent), so each
+// is resolved against the Spectrum tokens and the theme's own bindings at once.
+const bindings = new Map(spectrum);
 for (const [, name, value] of themeCss.matchAll(/(--z1r-[\w-]+)\s*:\s*([^;]+);/g)) {
-  const ref = value.trim().match(/^var\(\s*(--[\w-]+)/);
-  aliases.set(name, ref ? (resolve(ref[1], spectrum) ?? value.trim()) : value.trim());
+  bindings.set(name, value.trim());
+}
+const aliases = new Map();
+for (const name of bindings.keys()) {
+  if (name.startsWith('--z1r-')) aliases.set(name, resolve(name, bindings));
 }
 
 /** Foreground / background pairs the tracker actually renders. */
@@ -106,11 +111,9 @@ const PAIRS = [
   ['--z1r-bad', '--z1r-panel', 'destructive actions'],
   ['--z1r-text', '--z1r-field', 'input and option text'],
   ['--z1r-muted', '--z1r-field', 'placeholder text'],
-  // Slot-kind chips render these as text, not just as a tint. Omitting them is
-  // how a 3.98:1 heart chip passed review.
-  ['--z1r-floor', '--z1r-panel', 'FLOOR slot chip'],
-  ['--z1r-stair', '--z1r-panel', 'STAIR slot chip'],
-  ['--z1r-heart', '--z1r-panel', 'HEART slot chip'],
+  ['--z1r-stair', '--z1r-panel', 'room drawing stairway'],
+  // Every keyboard focus outline, against the panel it is drawn over.
+  ['--z1r-focus', '--z1r-panel', 'focus outline'],
 ];
 
 let failures = 0;

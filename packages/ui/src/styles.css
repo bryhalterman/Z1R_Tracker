@@ -906,10 +906,21 @@
   min-inline-size: 0;
 }
 
+/*
+ * One focus indicator everywhere: a gold outline, outside the control.
+ *
+ * `.z1r-ui` covers the popups React portals out of the tracker. The shadcn
+ * components draw a ring of their own on focus; it is cleared here so a
+ * control never shows two indicators at once. Unlayered, so it wins over the
+ * utilities, which sit in a cascade layer.
+ */
 .z1r-tracker :focus-visible,
-.z1r-controls :focus-visible {
-  outline: var(--spectrum-focus-indicator-thickness) solid var(--spectrum-focus-indicator-color);
-  outline-offset: var(--spectrum-focus-indicator-gap);
+.z1r-controls :focus-visible,
+.z1r-ui:focus-visible,
+.z1r-ui :focus-visible {
+  outline: var(--z1r-focus-width) solid var(--z1r-focus);
+  outline-offset: var(--z1r-focus-gap);
+  --tw-ring-shadow: 0 0 #0000;
 }
 
 /* SVG exception: an outline on a <g> is drawn around its bounding box, which
@@ -921,7 +932,7 @@
 }
 
 .z1r-tri-piece:focus-visible polygon {
-  stroke: var(--spectrum-focus-indicator-color);
+  stroke: var(--z1r-focus);
   stroke-width: 3;
 }
 

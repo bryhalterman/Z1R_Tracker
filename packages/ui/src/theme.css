@@ -52,15 +52,8 @@
   --z1r-good: var(--spectrum-green-1000);
   --z1r-bad: var(--spectrum-red-1000);
 
-  /* Slot-kind and region hues, kept distinguishable by step, not by hue —
-     the codes and labels carry the meaning. See ARCHITECTURE.md. */
-  --z1r-floor: var(--spectrum-seafoam-1000);
+  /* The room drawing's stairway: its dotted edges and the transport tile. */
   --z1r-stair: var(--spectrum-purple-1000);
-  /* magenta-1000, not red-900: this is rendered as *text* on the slot chip, and
-     red-900 measures 3.98:1 there — below AA. Magenta also keeps it distinct
-     from the destructive red. */
-  --z1r-heart: var(--spectrum-magenta-1000);
-  --z1r-overworld: var(--spectrum-yellow-1000);
   /* Room layout squares. Drawn shapes, never text, and each square kind has a
      shape of its own as well — so these are fills, not readability pairs. */
   --z1r-water: var(--spectrum-blue-900);
@@ -82,8 +75,18 @@
   --z1r-border-width: var(--spectrum-border-width-100);
   --z1r-border-width-thick: var(--spectrum-border-width-200);
 
+  /*
+   * Keyboard focus: one gold outline on every control, plain DOM and React
+   * alike — see the focus rule in `styles.css`. Spectrum's thickness and gap,
+   * in the tracker's accent rather than Spectrum's blue, so focus matches the
+   * selected states it sits beside. An outline, so it is a shape as well as a
+   * color.
+   */
+  --z1r-focus: var(--z1r-accent);
+  --z1r-focus-width: var(--spectrum-focus-indicator-thickness);
+  --z1r-focus-gap: var(--spectrum-focus-indicator-gap);
+
   /* Spacing steps, used instead of ad-hoc pixel values. */
-  --z1r-space-xs: var(--spectrum-spacing-50); /* 2px */
   --z1r-space-sm: var(--spectrum-spacing-75); /* 4px */
   --z1r-space-md: var(--spectrum-spacing-100); /* 8px */
   --z1r-space-lg: var(--spectrum-spacing-200); /* 12px */
