@@ -1,0 +1,441 @@
+/**
+ * The overworld's 16x8 screen cells, drawn by React.
+ *
+ * The markup, class hooks and data attributes are the ones the plain-DOM cells
+ * had, so `styles.css` and any OBS custom CSS written against them still
+ * apply. What changed is the hover text: a shadcn tooltip with the screen and
+ * its region as the heading and one fact per line, which also opens on
+ * keyboard focus. The same facts, joined into one line, are the cell's
+ * accessible name.
+ *
+ * The panel (`buildMap` in `tracker.ts`) keeps the view state — the selected
+ * screen, the armed marker, a preview from another panel — and what a click
+ * does; this only draws.
+ */
+
+import { memo } from 'react';
+import {
+  COAST_ITEM_REQUIRES,
+  DUNGEON_BLOCKS_BY_ID,
+  MARKS_BY_KIND,
+  OVERWORLD_COLUMNS,
+  OVERWORLD_LOCATIONS,
+  OVERWORLD_ROWS,
+  POOL_BY_ID,
+  SCREEN_ITEMS_BY_ID,
+  SECRET_SIZES_BY_ID,
+  SHOP_STOCK_BY_ID,
+  canEnterLevel9,
+  coastScreen,
+  dungeonItems,
+  regionForScreen,
+  screenId,
+  type MarkKind,
+  type RegionDef,
+  type ScreenNote,
+  type SpriteResolver,
+  type TrackerState,
+} from '@z1r/core';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
+import { SpriteArt } from '../shared/Sprite.js';
+import { CellTip } from '../room-grid/CellTip.js';
+
+/**
+ * Where one map image sits inside every cell.
+ *
+ * The map is 1280x468 with a legend strip below y=440, so the map proper is
+ * exactly 16x8 screens of 80x55 — which is the NES screen aspect (1.4545) and
+ * the grid's 16/11 cell ratio. One image is positioned inside every cell rather
+ * than sliced into 128 files.
+ */
+const MAP_COLUMNS_PERCENT = 16 * 100;
+const MAP_ROWS_PERCENT = (468 / 440) * 8 * 100;
+
+/**
+ * How many stock icons a shop tile draws.
+ *
+ * A map cell is about 50x34 CSS pixels at dock width, which is three columns of
+ * roughly 16px: a 14px sprite and a price of up to three digits under it. A
+ * fourth column would be legible as neither. Anything past the third is
+ * counted in the corner and spelled out in full in the tooltip.
+ */
+const MAX_SHOP_ICONS = 3;
+
+/**
+ * Two letters for a cell label.
+ *
+ * A cell is under 90px and already carries an icon, so anything longer than
+ * this wraps or clips. Two letters is enough to tell "RA" from "BO" when you
+ * know which handful of items are still missing.
+ */
+function shortCode(name: string | undefined): string {
+  if (!name) return '';
+  const words = name.trim().split(/\s+/);
+  // Initials for a two-word name — "White Sword" reads better as WS than WH.
+  if (words.length > 1) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+const SCREENS: readonly { id: string; col: number; row: number }[] = Array.from(
+  { length: OVERWORLD_ROWS * OVERWORLD_COLUMNS },
+  (_, index) => {
+    const col = (index % OVERWORLD_COLUMNS) + 1;
+    const row = Math.floor(index / OVERWORLD_COLUMNS) + 1;
+    return { id: screenId(col, row), col, row };
+  },
+);
+
+export interface ScreenGridProps {
+  readonly state: TrackerState;
+  readonly selected: string;
+  /** Screens another panel is pointing at — see `map-preview`. */
+  readonly previewed: ReadonlySet<string>;
+  /** The map image for the seed's quest and orientation, or '' when it did not resolve. */
+  readonly mapUrl: string;
+  readonly interactive: boolean;
+  readonly resolver: SpriteResolver;
+  readonly onTouch: (screen: string) => void;
+  /** Right-click: clear the mark outright. */
+  readonly onClear: (screen: string) => void;
+  /** Arrow keys: step through the marks. */
+  readonly onCycle: (screen: string, direction: 1 | -1) => void;
+}
+
+export function ScreenGrid(props: ScreenGridProps) {
+  const { state, selected, previewed, mapUrl, interactive, resolver, onTouch, onClear, onCycle } = props;
+  const mirrored = state.seed.mirroredOverworld;
+  const coast = coastScreen(mirrored);
+  // The coast ledge is reachable the moment the Ladder is in hand — and that
+  // is exactly when you have forgotten it is there.
+  const ladderHeld = (state.items[COAST_ITEM_REQUIRES] ?? 0) >= 1;
+  const level9Open = canEnterLevel9(state);
+  return (
+    <TooltipProvider delay={300}>
+      {SCREENS.map(({ id, col, row }) => {
+        const mark = state.marks[id] ?? 'none';
+        const note = state.screenNotes[id];
+        const region = regionForScreen(id, mirrored);
+        /*
+         * Whatever the location slots say is in this level. Learned from a hint
+         * before the dungeon is found, or from walking in without one — either
+         * way it shows here, because the two are joined by level number rather
+         * than by which was recorded first. Passed as a joined string so the
+         * cell's memo compares it by value.
+         */
+        const inside =
+          mark === 'dungeon' && note?.dungeon ? dungeonItems(state, note.dungeon).join(',') : '';
+        return (
+          <ScreenCell
+            key={id}
+            id={id}
+            col={col}
+            row={row}
+            mark={mark}
+            note={note}
+            region={region}
+            focused={!!region && region.id === state.focusRegion}
+            inside={inside}
+            isStart={state.startScreen === id}
+            isCoast={id === coast}
+            coastReady={id === coast && ladderHeld}
+            // Level 9 is the one dungeon you cannot enter on sight, so its
+            // marker is called out the moment the last piece lands.
+            level9Ready={note?.dungeon === 9 && level9Open}
+            isSelected={id === selected}
+            isPreviewed={previewed.has(id)}
+            mapUrl={mapUrl}
+            interactive={interactive}
+            resolver={resolver}
+            onTouch={onTouch}
+            onClear={onClear}
+            onCycle={onCycle}
+          />
+        );
+      })}
+    </TooltipProvider>
+  );
+}
+
+interface ScreenCellProps {
+  readonly id: string;
+  readonly col: number;
+  readonly row: number;
+  readonly mark: MarkKind;
+  readonly note: ScreenNote | undefined;
+  readonly region: RegionDef | undefined;
+  readonly focused: boolean;
+  /** Comma-joined `POOL_BY_ID` ids known to be inside this dungeon. */
+  readonly inside: string;
+  readonly isStart: boolean;
+  readonly isCoast: boolean;
+  readonly coastReady: boolean;
+  readonly level9Ready: boolean;
+  readonly isSelected: boolean;
+  readonly isPreviewed: boolean;
+  readonly mapUrl: string;
+  readonly interactive: boolean;
+  readonly resolver: SpriteResolver;
+  readonly onTouch: (screen: string) => void;
+  readonly onClear: (screen: string) => void;
+  readonly onCycle: (screen: string, direction: 1 | -1) => void;
+}
+
+/**
+ * One screen. Memoised on its own mark and note, so a change to one screen
+ * redraws one cell: the reducer hands back the same note object for every
+ * screen it did not touch.
+ */
+const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
+  const {
+    id,
+    col,
+    row,
+    mark,
+    note,
+    region,
+    focused,
+    isStart,
+    isCoast,
+    coastReady,
+    level9Ready,
+    isSelected,
+    isPreviewed,
+    mapUrl,
+    interactive,
+    resolver,
+    onTouch,
+    onClear,
+    onCycle,
+  } = props;
+  const def = MARKS_BY_KIND.get(mark);
+  const inside = props.inside
+    ? props.inside.split(',').map((entry) => POOL_BY_ID.get(entry)).filter((entry) => !!entry)
+    : [];
+
+  /*
+   * An item screen draws the item, not a generic star. Once you know what is
+   * sitting there, the star is telling you nothing the mark did not — and the
+   * map is read at a glance, where a sword reads faster than "SW".
+   */
+  const held = mark === 'item' && note?.item ? SCREEN_ITEMS_BY_ID.get(note.item) : undefined;
+
+  /*
+   * What this shop sells, capped at what a map cell can hold. Three icons and
+   * three prices fill a 50x34 cell exactly; the rest are counted in the corner
+   * and listed in full in the tooltip.
+   */
+  const stocked = mark === 'shop' ? (note?.shop ?? []).slice(0, MAX_SHOP_ICONS) : [];
+  const overflow = mark === 'shop' ? (note?.shop.length ?? 0) - stocked.length : 0;
+  const prices = stocked.map((stockId) => note?.shopPrices[stockId] ?? 0);
+  const pricesShown = prices.some((price) => price > 0);
+  // The widest number decides the type size: three columns of "250" at the
+  // normal size would run into each other.
+  const widest = pricesShown
+    ? Math.max(...prices.map((price) => (price > 0 ? String(price).length : 0)))
+    : 0;
+
+  // A dungeon, a warp and a stocked shop draw their own art; none of them
+  // wants the centred one as well.
+  const centred =
+    mark === 'dungeon' || mark === 'stairway' || stocked.length > 0 ? undefined : (held?.sprite ?? def?.sprite);
+
+  /** The text under the mark: blockers, a spot code, a secret's size. */
+  let detail = '';
+  if (mark === 'dungeon') {
+    // Just the blockers — the numeral carries the level.
+    detail = (note?.blocks ?? [])
+      .map((blockId) => DUNGEON_BLOCKS_BY_ID.get(blockId)?.code ?? '')
+      .filter(Boolean)
+      .join(' ');
+  } else if (mark === 'item') {
+    /*
+     * The sprite already says *what* it is, so the label says *where*: "CO"
+     * under a boomerang is the coast item. Falls back to the item when the spot
+     * is unnamed, and to a bare `?` when neither is known yet.
+     */
+    const spot = note?.spot ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label : '';
+    const itemName = note?.item ? SCREEN_ITEMS_BY_ID.get(note.item)?.name : '';
+    detail = shortCode(spot) || shortCode(itemName) || '?';
+  } else if (mark === 'rupeeSecret') {
+    // The size as one letter, the text channel for it; blank until known.
+    detail = note?.secret ? (SECRET_SIZES_BY_ID.get(note.secret)?.code ?? '') : '';
+  }
+
+  // Every fact about the screen, in words: the tooltip's lines, and joined
+  // with the screen and region into one line, the cell's accessible name.
+  const facts: string[] = [];
+  if (mark === 'dungeon') {
+    facts.push(note?.dungeon ? `Level ${note.dungeon}` : 'Dungeon (unidentified)');
+    if (inside.length) facts.push(`holds ${inside.map((entry) => entry!.name).join(', ')}`);
+    const blocked = (note?.blocks ?? []).map((blockId) => DUNGEON_BLOCKS_BY_ID.get(blockId)?.name ?? blockId);
+    if (blocked.length) facts.push(`blocked by ${blocked.join(', ')}`);
+    if (level9Ready) facts.push('every Triforce piece held — Level 9 is open');
+  } else if (mark === 'shop') {
+    /*
+     * Every item, not just the three the cell had room for, with the price
+     * beside each one that has it. This is also the tile's non-colour,
+     * non-picture channel: a shop reads without recognising a single sprite.
+     */
+    const recorded = note?.shopPrices ?? {};
+    const stock = (note?.shop ?? []).map((s) => {
+      const name = SHOP_STOCK_BY_ID.get(s)?.name ?? s;
+      const price = recorded[s] ?? 0;
+      return price > 0 ? `${name} ${price}` : name;
+    });
+    facts.push(stock.length ? `Shop: ${stock.join(', ')}` : 'Shop');
+  } else if (mark === 'item') {
+    const spot = note?.spot ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label : '';
+    facts.push(spot || 'Item');
+    facts.push(note?.item ? (SCREEN_ITEMS_BY_ID.get(note.item)?.name ?? '') : 'contents unknown');
+    if (note?.item) facts.push(note.collected ? 'collected' : 'not collected');
+    if (isCoast) facts.push(coastReady ? 'Ladder held — reachable now' : 'needs the Ladder');
+  } else if (mark === 'stairway') {
+    facts.push(note?.stairway ? `Warp ${note.stairway}` : 'Warp (unnumbered)');
+  } else if (mark === 'rupeeSecret') {
+    const size = note?.secret ? SECRET_SIZES_BY_ID.get(note.secret) : undefined;
+    facts.push(size ? `${size.name} rupee secret` : 'Rupee secret (size unknown)');
+  } else if (def && mark !== 'none') {
+    facts.push(def.name);
+  }
+  if (isStart) facts.push('start screen');
+  const heading = region ? `${id} · ${region.name}` : id;
+  const label = [id, ...(region ? [region.name] : []), ...facts].join(' — ');
+
+  const first = inside[0];
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        type="button"
+        className="z1r-screen"
+        data-screen={id}
+        data-mark={mark}
+        data-start={String(isStart)}
+        data-coast={String(isCoast)}
+        data-coast-ready={String(coastReady)}
+        data-ready={String(level9Ready)}
+        data-shop-prices={String(pricesShown)}
+        data-region={region?.id ?? ''}
+        data-focused={String(focused)}
+        data-selected={String(isSelected)}
+        data-previewed={String(isPreviewed)}
+        style={
+          {
+            '--mark-color': def?.color ?? 'transparent',
+            '--region-color': region?.color ?? 'transparent',
+          } as React.CSSProperties
+        }
+        aria-label={label}
+        disabled={!interactive}
+        onClick={interactive ? () => onTouch(id) : undefined}
+        // Right-click clears outright — the common correction, and faster than
+        // picking "Unmarked".
+        onContextMenu={
+          interactive
+            ? (event) => {
+                event.preventDefault();
+                onClear(id);
+              }
+            : undefined
+        }
+        // Arrow keys step through the marks without opening anything, which is
+        // quicker than the brushes when tagging a run of screens.
+        onKeyDown={
+          interactive
+            ? (event) => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                event.preventDefault();
+                onCycle(id, event.key === 'ArrowRight' ? 1 : -1);
+              }
+            : undefined
+        }
+      >
+        <span className="z1r-screen-terrain">
+          {/*
+           * Eager, not lazy: all 128 share one URL, so this is one request
+           * however it is scheduled, and lazy loading was seen leaving images
+           * pending with the cell in view. No referrer: the wiki serves a
+           * 200x73 thumbnail instead of the original to a request carrying one.
+           */}
+          <img
+            alt=""
+            loading="eager"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            src={mapUrl || undefined}
+            style={{
+              width: `${MAP_COLUMNS_PERCENT}%`,
+              height: `${MAP_ROWS_PERCENT}%`,
+              insetInlineStart: `${-(col - 1) * 100}%`,
+              insetBlockStart: `${-(row - 1) * 100}%`,
+            }}
+          />
+        </span>
+        {/* The region code is the non-colour channel: two letters, always
+            legible, where a tint alone would not be to a colour-blind viewer. */}
+        <span className="z1r-screen-region">{region?.code ?? ''}</span>
+        <span className="z1r-screen-mark">
+          {/* 18 is the nominal size; the stylesheet sizes the box from the map's zoom. */}
+          {centred && <SpriteArt resolver={resolver} spriteKey={centred} size={18} />}
+        </span>
+        {/* A dungeon draws its level as a large numeral instead of an icon. */}
+        <span className="z1r-screen-level">{mark === 'dungeon' && note?.dungeon ? String(note.dungeon) : ''}</span>
+        {/* A warp draws its staircase big, with which of the four it is. */}
+        <span className="z1r-screen-warp">
+          {mark === 'stairway' && def?.sprite && (
+            <>
+              <SpriteArt resolver={resolver} spriteKey={def.sprite} size={32} />
+              <span className="z1r-screen-warp-num">{note?.stairway ? String(note.stairway) : ''}</span>
+            </>
+          )}
+        </span>
+        {/* Only the first item: two icons in a cell is a smudge, and the rest
+            are in the tooltip and the Locations panel. */}
+        <span className="z1r-screen-badge">
+          {first && <SpriteArt resolver={resolver} spriteKey={first.sprite} size={16} />}
+        </span>
+        {/* A shop draws what it sells, one fixed-width column per item so the
+            price line below lands under the icon it belongs to. */}
+        <span className="z1r-screen-stock">
+          {stocked.map((stockId, index) => {
+            const entry = SHOP_STOCK_BY_ID.get(stockId);
+            return (
+              <span key={index} className="z1r-screen-stock-slot">
+                {entry && <SpriteArt resolver={resolver} spriteKey={entry.sprite} size={14} />}
+              </span>
+            );
+          })}
+        </span>
+        {/* A count, not an ellipsis: "how many more" is what you would
+            otherwise open the tooltip to learn. */}
+        <span className="z1r-screen-stock-more">{overflow > 0 ? `+${overflow}` : ''}</span>
+        {mark === 'shop' ? (
+          <span
+            className="z1r-screen-detail"
+            data-prices={String(pricesShown)}
+            data-digits={String(Math.min(Math.max(widest, 2), 4))}
+            hidden={!pricesShown}
+          >
+            {pricesShown &&
+              prices.map((price, index) => (
+                <span key={index} className="z1r-screen-price">
+                  {price > 0 ? String(price) : ''}
+                </span>
+              ))}
+          </span>
+        ) : (
+          <span className="z1r-screen-detail" data-prices="false" data-digits="2" hidden={detail === ''}>
+            {detail}
+          </span>
+        )}
+        {/* The start pennant, top-left over whatever the screen is marked as. */}
+        <span className="z1r-screen-start">
+          {isStart && <SpriteArt resolver={resolver} spriteKey="mark.start" size={14} />}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="z1r-ui max-w-64">
+        <CellTip heading={heading} lines={facts} />
+      </TooltipContent>
+    </Tooltip>
+  );
+});

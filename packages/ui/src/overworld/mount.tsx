@@ -9,6 +9,7 @@ import {
   type MapHeadingProps,
   type ScreenCardProps,
 } from './MapTools.js';
+import { ScreenGrid, type ScreenGridProps } from './ScreenGrid.js';
 import '../shadcn.css';
 
 export type { Armed, MapActions, MapView } from './MapTools.js';
@@ -23,3 +24,5 @@ function host<P extends object>(Component: (props: P) => React.ReactNode) {
 export const mountMapBrushes = host<MapBrushesProps>(MapBrushes);
 export const mountScreenCard = host<ScreenCardProps>(ScreenCard);
 export const mountMapHeading = host<MapHeadingProps>(MapHeading);
+
+export const mountScreenGrid = host<ScreenGridProps>(ScreenGrid);

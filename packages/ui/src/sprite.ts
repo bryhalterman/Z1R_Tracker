@@ -88,6 +88,37 @@ function snapToWholePixels(
   element.style.backgroundSize = `${natural.width * scale}px ${natural.height * scale}px`;
 }
 
+/**
+ * Paints `key` into an existing sprite element, and degrades it once the
+ * network answers. `createSprite` uses it on a fresh span; React uses it on a
+ * span it renders itself (`shared/Sprite.tsx`), so the art lands as the slot's
+ * direct child the way the stylesheet's `> .z1r-sprite` rules expect.
+ */
+export function applySprite(
+  element: HTMLElement,
+  resolver: SpriteResolver,
+  key: string,
+  size: number,
+): void {
+  element.dataset.spriteKey = key;
+  const resolved = resolver.resolve(key);
+  paint(element, resolved, size);
+
+  if (resolved.kind === 'image' || resolved.kind === 'sheet') {
+    // A dead host, a blocked hotlink, or being offline all land here. Degrade
+    // to the drawn vector when the key has one, and only then to letters.
+    void resolver.preload(key).then((ok) => {
+      // Repainted with another key while this one loaded: that one wins.
+      if (element.dataset.spriteKey !== key) return;
+      if (!ok) {
+        paint(element, resolver.fallback(key), size);
+        return;
+      }
+      snapToWholePixels(element, resolver.naturalSize(key), size);
+    });
+  }
+}
+
 export function createSprite(
   resolver: SpriteResolver,
   key: string,
@@ -98,26 +129,11 @@ export function createSprite(
   element.className = className ? `z1r-sprite ${className}` : 'z1r-sprite';
   element.style.setProperty('--sprite-size', `${size}px`);
 
-  const resolved = resolver.resolve(key);
-  element.title = label ?? resolved.name;
+  element.title = label ?? resolver.resolve(key).name;
   // Decorative. When a sprite sits inside a button, the button's own label must
   // win — otherwise screen readers announce the art and drop the state.
   element.setAttribute('aria-hidden', 'true');
-  element.dataset.spriteKey = key;
 
-  paint(element, resolved, size);
-
-  if (resolved.kind === 'image' || resolved.kind === 'sheet') {
-    // A dead host, a blocked hotlink, or being offline all land here. Degrade
-    // to the drawn vector when the key has one, and only then to letters.
-    void resolver.preload(key).then((ok) => {
-      if (!ok) {
-        paint(element, resolver.fallback(key), size);
-        return;
-      }
-      snapToWholePixels(element, resolver.naturalSize(key), size);
-    });
-  }
-
+  applySprite(element, resolver, key, size);
   return element;
 }
