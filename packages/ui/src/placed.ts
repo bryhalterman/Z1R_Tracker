@@ -41,9 +41,20 @@ export function placedIndex(state: TrackerState): Map<string, string[]> {
     const spot = note.spot ? OVERWORLD_LOCATIONS.find((l) => l.id === note.spot)?.label : '';
     record(note.item, spot ? `${spot} (${screen})` : screen);
   }
-  for (const { location, placement } of deriveItemLocations(state).slots) {
+  const derived = deriveItemLocations(state);
+  for (const { location, placement } of derived.slots) {
     if (placement?.source.kind === 'stored' && placement.item) {
       record(placement.item, location.label);
+    }
+  }
+  // An older save's extra floor slots, now listed as overflow in their level.
+  for (const [level, spilled] of derived.overflow) {
+    for (const placement of spilled) {
+      if (placement.source.kind !== 'stored' || !placement.item) continue;
+      // The id's last part is the slot's index, so two of these in one level,
+      // or one beside a real floor slot, still read differently.
+      const index = Number(placement.source.id.split('.').pop()) + 1;
+      record(placement.item, `L${level} extra floor ${index}`);
     }
   }
   return placedAt;

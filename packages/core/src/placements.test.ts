@@ -149,7 +149,7 @@ test('items beyond a level\'s slots of one kind overflow rather than vanish', ()
   assert.equal(derived.byId.get('d2.heart')?.item, 'raft');
   const overflow = derived.overflow.get(2) ?? [];
   assert.deepEqual(
-    overflow.map((p) => [p.item, p.kind, p.source.room]),
+    overflow.map((p) => [p.item, p.kind, p.source.kind === 'room' ? p.source.room : '']),
     [['book', 'floor', 'B1']],
   );
   // Running out of one kind does not touch the others.
@@ -165,15 +165,21 @@ test('Level 9 has no floor spot and no heart spot, so a floor item there overflo
   );
 });
 
-test('extra floor slots take overflow once Shuffle Minor Dungeon Drops allows them', () => {
+test('a floor item past the level’s floor spots overflows rather than needing a slot', () => {
+  // Shuffle Minor Dungeon Drops can put more major items on a level's floor
+  // than it has spots. Each one past the spots is still listed, as overflow.
   let state = createInitialState();
   state = reduce(state, { type: 'setSeed', patch: { shuffleMinorDrops: true } });
-  state = reduce(state, { type: 'addFloorSlot', level: 2, delta: 1 });
   state = placeRoom(state, 2, 'A1', 'bow');
   state = placeRoom(state, 2, 'A2', 'raft');
+  state = placeRoom(state, 2, 'A3', 'book');
   assert.equal(slot(state, 'd2.floor.0')?.item, 'bow');
-  assert.equal(slot(state, 'd2.floor.1')?.item, 'raft');
-  assert.equal(deriveItemLocations(state).overflow.has(2), false);
+  assert.equal(slot(state, 'd2.heart')?.item, 'raft');
+  assert.deepEqual(
+    (deriveItemLocations(state).overflow.get(2) ?? []).map((p) => [p.item, p.kind]),
+    [['book', 'floor']],
+  );
+  assert.equal(slot(state, 'd2.floor.1'), undefined);
 });
 
 test('the same rooms fill the same slots whatever order they were recorded in', () => {
@@ -275,7 +281,7 @@ test('un-collecting a room item never revokes it', () => {
 });
 
 test('a room with no item cannot be collected', () => {
-  const base = reduce(createInitialState(), { type: 'toggleRoomVisited', level: 1, room: 'A1' });
+  const base = reduce(createInitialState(), { type: 'setRoomNote', level: 1, room: 'A1', patch: { visited: true } });
   assert.equal(reduce(base, { type: 'collectRoom', level: 1, room: 'A1', collected: true }), base);
   const patched = reduce(base, {
     type: 'setRoomNote',
@@ -361,7 +367,8 @@ test('a screen with no item cannot be collected', () => {
 });
 
 test('collectLocation still raises the inventory through the shared grant', () => {
-  let state = reduce(createInitialState(), { type: 'setLocation', id: 'd1.floor.0', item: 'bow' });
+  let state = createInitialState();
+  state.locations['d1.floor.0'] = { item: 'bow', collected: false };
   state = reduce(state, { type: 'collectLocation', id: 'd1.floor.0', collected: true });
   assert.equal(state.items['bow'], 1);
   state = reduce(state, { type: 'collectLocation', id: 'd1.floor.0', collected: false });
@@ -378,7 +385,7 @@ test('a slot the maps leave empty falls back to the stored location', () => {
   assert.deepEqual(derived.byId.get('d3.stair.0'), {
     item: 'raft',
     collected: true,
-    source: { kind: 'stored' },
+    source: { kind: 'stored', id: 'd3.stair.0' },
   });
   assert.equal(derived.byId.get('ow.armos')?.item, 'bow');
 });
@@ -579,4 +586,31 @@ test('Meat goes on a screen but not in a room', () => {
   state = reduce(state, { type: 'collectScreen', screen: 'E4', collected: true });
   assert.equal(state.items['bait'], 1);
   assert.equal(reduce(state, { type: 'setRoomItem', level: 1, room: 'A1', item: 'meat' }), state);
+});
+
+test('an entry an older save made in an extra floor slot is listed as overflow', () => {
+  // Extra floor slots were added by hand under Shuffle Minor Dungeon Drops and
+  // no longer exist; d2.floor.3 is past anything a quest gives Level 2.
+  let state = createInitialState();
+  state.locations['d2.floor.3'] = { item: 'raft', collected: false };
+  const derived = deriveItemLocations(state);
+  assert.deepEqual(derived.overflow.get(2), [
+    { item: 'raft', collected: false, source: { kind: 'stored', id: 'd2.floor.3' }, kind: 'floor' },
+  ]);
+  // Its flag is still collected through the entry's own id.
+  state = reduce(state, { type: 'collectLocation', id: 'd2.floor.3', collected: true });
+  assert.equal(deriveItemLocations(state).overflow.get(2)?.[0]?.collected, true);
+});
+
+test('a stored entry for a slot only the other quest has stays hidden, not overflow', () => {
+  // Switching quests and back must find the entry where it was left.
+  const state = createInitialState();
+  const second = { ...state, seed: { ...state.seed, dungeonQuest: '2nd' as const } };
+  const secondOnly = deriveItemLocations(second).slots
+    .map((slot) => slot.location.id)
+    .find((id) => !deriveItemLocations(state).slots.some((slot) => slot.location.id === id));
+  assert.ok(secondOnly, 'the 2nd quest has a dungeon slot the 1st does not');
+  state.locations[secondOnly] = { item: 'raft', collected: false };
+  const derived = deriveItemLocations(state);
+  assert.equal([...derived.overflow.values()].flat().length, 0);
 });

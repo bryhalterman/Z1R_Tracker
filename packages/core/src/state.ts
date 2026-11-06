@@ -38,14 +38,11 @@ import {
   type RoomNote,
   type RoomNotePatch,
   type RoomSide,
-  type RoomStairKind,
 } from './rooms.js';
 import { isRoomLayout } from './layouts.js';
+import { emptyNote, fitNoteToMark, noteIsBare } from './notes.js';
 
 export const STATE_VERSION = 13;
-
-/** Upper bound on manual extra floor slots. Shared with `migrate` on purpose. */
-export const MAX_EXTRA_FLOOR_SLOTS = 8;
 
 export interface LocationState {
   /** Pool entry id known to be here. Empty until identified. */
@@ -171,8 +168,6 @@ export interface TrackerState {
    * back and the entries are still there.
    */
   locations: Record<string, LocationState>;
-  /** Level -> extra floor slots added under Shuffle Minor Dungeon Drops. */
-  extraFloorSlots: Record<string, number>;
   /** Hints heard, in the order they were recorded. */
   hints: HintEntry[];
   /** Monotonic source of hint ids — the reducer must stay deterministic. */
@@ -230,8 +225,6 @@ export type Action =
    * `collectRoom`: there has to be an item on the screen to collect.
    */
   | { type: 'collectScreen'; screen: string; collected: boolean }
-  /** Been in this room, or not. */
-  | { type: 'toggleRoomVisited'; level: number; room: string }
   /** What one of a room's four doorways turned out to be. */
   | { type: 'setRoomDoor'; level: number; room: string; side: RoomSide; state: DoorState }
   /**
@@ -249,8 +242,6 @@ export type Action =
   | { type: 'setRoomFrom'; level: number; room: string; from: RoomFrom }
   /** Which boss is in a room. '' clears it. Ganon and Zelda only on Level 9. */
   | { type: 'setRoomBoss'; level: number; room: string; boss: string }
-  /** Anything but `transport` also drops the pair number. */
-  | { type: 'setRoomStairs'; level: number; room: string; stairs: RoomStairKind }
   /**
    * Put transport pair N on a room, and make it transport stairs.
    *
@@ -268,11 +259,8 @@ export type Action =
   /** Wipe one level's room map, leaving the other levels alone. */
   | { type: 'clearRooms'; level: number }
   | { type: 'setSeed'; patch: Partial<SeedSettings> }
-  /** Record which pool entry sits at a location. Does not touch inventory. */
-  | { type: 'setLocation'; id: string; item: string }
   /** Mark a location picked up. Collecting also grants the item; unchecking never revokes it. */
   | { type: 'collectLocation'; id: string; collected: boolean }
-  | { type: 'addFloorSlot'; level: number; delta: 1 | -1 }
   | { type: 'addHint' }
   | { type: 'updateHint'; id: string; patch: Partial<Omit<HintEntry, 'id'>> }
   | { type: 'removeHint'; id: string }
@@ -290,52 +278,32 @@ function emptyDungeon(): DungeonState {
   };
 }
 
-function emptyNote(): ScreenNote {
-  return {
-    dungeon: 0,
-    stairway: 0,
-    shop: [],
-    shopPrices: {},
-    blocks: [],
-    spot: '',
-    item: '',
-    collected: false,
-    secret: '',
-  };
-}
-
-/** True once a note carries nothing worth keeping. */
-function noteIsBare(note: ScreenNote): boolean {
-  return (
-    note.dungeon === 0 &&
-    note.stairway === 0 &&
-    note.shop.length === 0 &&
-    // A price outlives nothing: `toggleShopStock` drops one with its stock, so
-    // this only holds a note up when a price was written without the stock.
-    Object.keys(note.shopPrices).length === 0 &&
-    note.blocks.length === 0 &&
-    note.spot === '' &&
-    note.item === '' &&
-    !note.collected &&
-    note.secret === ''
-  );
-}
-
 /**
  * Store a note, or drop the key when it has emptied out.
  *
  * Same rule as `marks`: absence is the empty state, so a save never accumulates
  * `{dungeon: 0, shop: [], item: ''}` for every screen the player ever touched
  * and then changed their mind about.
+ *
+ * Every note is stored through here, so this is also where it is fitted to the
+ * screen's mark: a level or stairway number, or dungeon blockers, on a screen
+ * not marked to carry them would be taken by `placeDungeon` or
+ * `placeStairway` for the old marker and the screen deleted over it.
+ *
+ * Returns `notes` itself when the stored entry would not change, so a caller
+ * can tell a no-op from a write.
  */
 function pruneNote(
   notes: Record<string, ScreenNote>,
+  marks: Record<string, MarkKind>,
   screen: string,
   note: ScreenNote,
 ): Record<string, ScreenNote> {
+  const fitted = fitNoteToMark(note, marks[screen]);
+  if (fitted === notes[screen]) return notes;
   const next = { ...notes };
-  if (noteIsBare(note)) delete next[screen];
-  else next[screen] = note;
+  if (noteIsBare(fitted)) delete next[screen];
+  else next[screen] = fitted;
   return next;
 }
 
@@ -427,11 +395,16 @@ function writeMark(state: TrackerState, screen: string, mark: MarkKind): Partial
   if (mark === 'none') delete marks[screen];
   else marks[screen] = mark;
 
-  if (mark !== 'none') return { marks };
-  if (!(screen in state.screenNotes)) return { marks };
-  const screenNotes = { ...state.screenNotes };
-  delete screenNotes[screen];
-  return { marks, screenNotes };
+  const note = state.screenNotes[screen];
+  if (!note) return { marks };
+  if (mark === 'none') {
+    const screenNotes = { ...state.screenNotes };
+    delete screenNotes[screen];
+    return { marks, screenNotes };
+  }
+  const screenNotes = pruneNote(state.screenNotes, marks, screen, note);
+  // Nothing for the new mark to drop: the notes object stays as it was.
+  return screenNotes === state.screenNotes ? { marks } : { marks, screenNotes };
 }
 
 export function createInitialState(now = Date.now()): TrackerState {
@@ -453,7 +426,6 @@ export function createInitialState(now = Date.now()): TrackerState {
     rooms: {},
     seed: createSeedSettings(),
     locations: {},
-    extraFloorSlots: {},
     hints: [],
     hintSeq: 0,
     focusRegion: '',
@@ -582,7 +554,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
         action.patch.collected === undefined ? undefined : action.patch.collected === true;
       const settled = settleCollected(current, next.item, requested);
       next.collected = settled.collected;
-      const screenNotes = pruneNote(state.screenNotes, action.screen, next);
+      const screenNotes = pruneNote(state.screenNotes, state.marks, action.screen, next);
       if (!settled.picked) return bump({ screenNotes });
       return bump({ screenNotes, items: grantPoolEntry(state.items, next.item) });
     }
@@ -610,13 +582,13 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       }
 
       marks[action.screen] = 'dungeon';
-      screenNotes[action.screen] = {
+      const placed: ScreenNote = {
         ...emptyNote(),
         ...carried,
         ...screenNotes[action.screen],
         dungeon: level,
       };
-      return bump({ marks, screenNotes });
+      return bump({ marks, screenNotes: pruneNote(screenNotes, marks, action.screen, placed) });
     }
 
     case 'placeStairway': {
@@ -640,15 +612,19 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       }
 
       marks[action.screen] = 'stairway';
-      screenNotes[action.screen] = {
+      const placed: ScreenNote = {
         ...emptyNote(),
         ...screenNotes[action.screen],
         stairway: number,
       };
-      return bump({ marks, screenNotes });
+      return bump({ marks, screenNotes: pruneNote(screenNotes, marks, action.screen, placed) });
     }
 
     case 'toggleDungeonBlock': {
+      // Blockers belong to a dungeon. With the dungeon brush armed the card
+      // offers them for whatever screen is selected, so this is reachable on a
+      // shop; refusing keeps an invisible blocker off it.
+      if (state.marks[action.screen] !== 'dungeon') return state;
       const current = state.screenNotes[action.screen] ?? emptyNote();
       const held = current.blocks.includes(action.block);
       const next: ScreenNote = {
@@ -657,7 +633,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
           ? current.blocks.filter((id) => id !== action.block)
           : [...current.blocks, action.block].sort(),
       };
-      return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
+      return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
     }
 
     case 'clearMap':
@@ -707,7 +683,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       if (!current || current.item === '') return state;
       if (current.collected === action.collected) return state;
       const next: ScreenNote = { ...current, collected: action.collected };
-      const screenNotes = pruneNote(state.screenNotes, action.screen, next);
+      const screenNotes = pruneNote(state.screenNotes, state.marks, action.screen, next);
       if (!action.collected) return bump({ screenNotes });
       return bump({ screenNotes, items: grantPoolEntry(state.items, current.item) });
     }
@@ -729,7 +705,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
             [...current.shop, action.stock].sort(),
         shopPrices,
       };
-      return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
+      return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
     }
 
     case 'setShopPrice': {
@@ -743,22 +719,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       if (price === 0) delete shopPrices[action.stock];
       else shopPrices[action.stock] = price;
       const next: ScreenNote = { ...current, shopPrices };
-      return bump({ screenNotes: pruneNote(state.screenNotes, action.screen, next) });
-    }
-
-    case 'toggleRoomVisited': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
-      const visited = !target.current.visited;
-      // Known and visited are one three-way state: walking a room supersedes
-      // having seen it on the map.
-      const next: RoomNote = {
-        ...target.current,
-        visited,
-        known: visited ? false : target.current.known,
-      };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
+      return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
     }
 
     case 'setRoomDoor': {
@@ -835,25 +796,6 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       if (action.boss !== '' && !bossAllowedOnLevel(action.boss, action.level)) return state;
       if (target.current.boss === action.boss) return state;
       const next: RoomNote = { ...target.current, boss: action.boss };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
-    }
-
-    case 'setRoomStairs': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
-      if (!ROOM_STAIRS_BY_ID.has(action.stairs)) return state;
-      if (target.current.stairs === action.stairs) return state;
-      // A pair number belongs to a transport staircase. Leaving it behind on an
-      // item staircase would keep the room in a pair it is no longer part of,
-      // and the other half would point at nothing.
-      const paired = action.stairs === 'transport';
-      const next: RoomNote = {
-        ...target.current,
-        stairs: action.stairs,
-        transport: paired ? target.current.transport : 0,
-        transportSeq: paired ? target.current.transportSeq : 0,
-      };
       const levelRooms = { ...state.rooms[target.level], [action.room]: next };
       return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
     }
@@ -1007,14 +949,6 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       return bump({ seed });
     }
 
-    case 'setLocation': {
-      const current = state.locations[action.id] ?? { item: '', collected: false };
-      if (current.item === action.item) return state;
-      return bump({
-        locations: { ...state.locations, [action.id]: { ...current, item: action.item } },
-      });
-    }
-
     case 'collectLocation': {
       const current = state.locations[action.id] ?? { item: '', collected: false };
       const locations = {
@@ -1026,16 +960,6 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       // A Heart Container records where it was without touching inventory —
       // see `grantPoolEntry`, which every collect gesture shares.
       return bump({ locations, items: grantPoolEntry(state.items, current.item) });
-    }
-
-    case 'addFloorSlot': {
-      const key = String(action.level);
-      const next = Math.min(
-        Math.max((state.extraFloorSlots[key] ?? 0) + action.delta, 0),
-        MAX_EXTRA_FLOOR_SLOTS,
-      );
-      if (next === (state.extraFloorSlots[key] ?? 0)) return state;
-      return bump({ extraFloorSlots: { ...state.extraFloorSlots, [key]: next } });
     }
 
     case 'addHint': {

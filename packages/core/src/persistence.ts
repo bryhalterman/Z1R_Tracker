@@ -10,14 +10,17 @@
 
 import {
   createInitialState,
-  MAX_EXTRA_FLOOR_SLOTS,
   STATE_VERSION,
   type DungeonState,
   type HintEntry,
+  type LocationState,
   type ScreenNote,
   type Store,
   type TrackerState,
 } from './state.js';
+import { ITEMS_BY_ID, maxValue } from './items.js';
+import { isStorableLocationId } from './legacy-locations.js';
+import { fitNoteToMark, noteIsBare } from './notes.js';
 
 import {
   bossAllowedOnLevel,
@@ -51,7 +54,7 @@ import {
   type MarkKind,
   type SecretSize,
 } from './overworld.js';
-import { OVERWORLD_LOCATIONS, SCREEN_ITEMS_BY_ID, type SeedSettings } from './seed.js';
+import { OVERWORLD_LOCATIONS, POOL_BY_ID, SCREEN_ITEMS_BY_ID, type SeedSettings } from './seed.js';
 
 export const STORAGE_KEY = 'z1r-tracker:state';
 export const CHANNEL_NAME = 'z1r-tracker';
@@ -70,11 +73,25 @@ function conform<T extends object>(template: T, saved: unknown): T {
   return result as T;
 }
 
+/**
+ * Items the model still has, each a whole number the item can actually hold.
+ *
+ * A type check alone let `arrow: 99`, `bow: -3` and `candle: 1.5` through.
+ * Logic reads `>=` against stage counts, so an out-of-range value satisfied
+ * rules it should not, and `cycleItem` stepped from it into fractions. Clamped
+ * rather than reset, so a save from a build with more stages keeps the top one.
+ */
 function pruneItems(
   base: Record<string, number>,
   saved: Record<string, number> | undefined,
 ): Record<string, number> {
-  return conform(base, saved);
+  const items = conform(base, saved);
+  for (const [id, value] of Object.entries(items)) {
+    const def = ITEMS_BY_ID.get(id);
+    if (!def) continue;
+    items[id] = Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), 0), maxValue(def)) : 0;
+  }
+  return items;
 }
 
 function pruneDungeons(
@@ -206,18 +223,9 @@ function conformScreenNotes(saved: unknown, mirrored: boolean): Record<string, S
         ? (note.secret as SecretSize)
         : '';
 
-    if (
-      dungeon === 0 &&
-      stairway === 0 &&
-      shop.length === 0 &&
-      blocks.length === 0 &&
-      spot === '' &&
-      item === '' &&
-      secret === ''
-    ) {
-      continue;
-    }
-    out[screen] = { dungeon, stairway, shop, shopPrices, blocks, spot, item, collected, secret };
+    const conformed = { dungeon, stairway, shop, shopPrices, blocks, spot, item, collected, secret };
+    if (noteIsBare(conformed)) continue;
+    out[screen] = conformed;
   }
   return out;
 }
@@ -414,13 +422,47 @@ function conformSeed(base: SeedSettings, saved: unknown): SeedSettings {
   return seed;
 }
 
-/** Clamped to the same bound the reducer enforces, so the two can't drift. */
-function conformExtraSlots(saved: unknown): Record<string, number> {
-  if (!saved || typeof saved !== 'object') return {};
-  const out: Record<string, number> = {};
-  for (const [level, value] of Object.entries(saved as Record<string, unknown>)) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
-    out[level] = Math.min(Math.max(Math.trunc(value), 0), MAX_EXTRA_FLOOR_SLOTS);
+/**
+ * Stored slot entries from saves written before locations were read off the
+ * maps. Only a fallback for slots the maps leave empty, but still checked:
+ * spreading the raw value in let a string or an array arrive as index keys.
+ * An entry saying nothing — no known item, not collected — is dropped, and so
+ * is one for an id no seed produces, which would render nowhere and sit in
+ * every save and export forever.
+ */
+function conformLocations(saved: unknown): Record<string, LocationState> {
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+  const out: Record<string, LocationState> = {};
+  for (const [id, value] of Object.entries(saved as Record<string, unknown>)) {
+    if (!isStorableLocationId(id)) continue;
+    if (!value || typeof value !== 'object') continue;
+    const { item, collected } = value as { item?: unknown; collected?: unknown };
+    const entry: LocationState = {
+      item: typeof item === 'string' && POOL_BY_ID.has(item) ? item : '',
+      collected: collected === true,
+    };
+    if (entry.item === '' && !entry.collected) continue;
+    out[id] = entry;
+  }
+  return out;
+}
+
+/**
+ * Clear numbers and blockers left on screens no longer marked to carry them.
+ *
+ * Saves written before `writeMark` cleared them can still hold one, and the
+ * placement actions treat any note carrying the number as the marker to move,
+ * which would delete that screen. A note left with nothing in it is dropped.
+ */
+function fitNotesToMarks(
+  notes: Record<string, ScreenNote>,
+  marks: Record<string, MarkKind>,
+): Record<string, ScreenNote> {
+  const out: Record<string, ScreenNote> = {};
+  for (const [screen, note] of Object.entries(notes)) {
+    const kept = fitNoteToMark(note, marks[screen]);
+    if (noteIsBare(kept)) continue;
+    out[screen] = kept;
   }
   return out;
 }
@@ -444,6 +486,9 @@ export function migrate(raw: unknown): TrackerState | null {
   if (!candidate.dungeons || typeof candidate.dungeons !== 'object') return null;
 
   const base = createInitialState();
+  const seed = conformSeed(base.seed, candidate.seed);
+  const marks = conformMarks(candidate.marks);
+  const hints = conformHints(candidate.hints);
   return {
     ...base,
     version: STATE_VERSION,
@@ -459,18 +504,21 @@ export function migrate(raw: unknown): TrackerState | null {
     // survive every future load and get written back into exported saves.
     items: pruneItems(base.items, candidate.items),
     dungeons: pruneDungeons(base.dungeons, candidate.dungeons),
-    marks: conformMarks(candidate.marks),
-    // After the seed, which says whether the coast is F16 or F1.
-    screenNotes: conformScreenNotes(candidate.screenNotes, conformSeed(base.seed, candidate.seed).mirroredOverworld),
+    marks,
+    // After the seed, which says whether the coast is F16 or F1, and after
+    // the marks, which say which numbers a note may still carry.
+    screenNotes: fitNotesToMarks(
+      conformScreenNotes(candidate.screenNotes, seed.mirroredOverworld),
+      marks,
+    ),
     // Absent in every save written before v11, which loads as no rooms.
     rooms: conformRooms(candidate.rooms),
     // v1 saves predate seed tracking; merging over the defaults fills in any
     // setting added since without discarding what the save does carry.
-    seed: conformSeed(base.seed, candidate.seed),
-    locations: { ...(candidate.locations ?? {}) },
-    extraFloorSlots: conformExtraSlots(candidate.extraFloorSlots),
+    seed,
+    locations: conformLocations(candidate.locations),
     // A null in this array threw on every render; the panel indexes into it.
-    hints: conformHints(candidate.hints),
+    hints,
     // Restart ids above anything the save already used, or a new hint would
     // collide with an existing one and edits would hit the wrong row.
     //
@@ -478,7 +526,7 @@ export function migrate(raw: unknown): TrackerState | null {
     // hintSeq used to make this NaN, giving every new hint the id "hNaN" —
     // after which editing one note edited all of them and removing one row
     // removed the lot.
-    hintSeq: hintSeqFrom(candidate.hintSeq, conformHints(candidate.hints)),
+    hintSeq: hintSeqFrom(candidate.hintSeq, hints),
     focusRegion: typeof candidate.focusRegion === 'string' ? candidate.focusRegion : '',
     // Both new in v13. A screen or room that does not exist would draw nowhere
     // and outlive every Clear, so it is dropped.

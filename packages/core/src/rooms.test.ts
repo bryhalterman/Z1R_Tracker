@@ -131,13 +131,13 @@ test('moving the staircase kind off transport clears the pair number', () => {
   state = reduce(state, { type: 'placeRoomTransport', level: 3, room: 'D4', number: 1 });
   assert.equal(room(state, 3, 'D4')?.transport, 1);
 
-  state = reduce(state, { type: 'setRoomStairs', level: 3, room: 'D4', stairs: 'item' });
+  state = reduce(state, { type: 'setRoomNote', level: 3, room: 'D4', patch: { stairs: 'item' } });
   assert.equal(room(state, 3, 'D4')?.stairs, 'item');
   assert.equal(room(state, 3, 'D4')?.transport, 0);
   assert.equal(room(state, 3, 'D4')?.transportSeq, 0);
 
   // And with no stairs at all the room is bare again, so the key goes.
-  state = reduce(state, { type: 'setRoomStairs', level: 3, room: 'D4', stairs: 'none' });
+  state = reduce(state, { type: 'setRoomNote', level: 3, room: 'D4', patch: { stairs: 'none' } });
   assert.equal('3' in state.rooms, false);
 });
 
@@ -203,10 +203,10 @@ test('an unknown door state or staircase kind is refused', () => {
   });
   assert.equal(door, base);
   const stairs = reduce(base, {
-    type: 'setRoomStairs',
+    type: 'setRoomNote',
     level: 1,
     room: 'A1',
-    stairs: 'basement' as 'item',
+    patch: { stairs: 'basement' as 'item' },
   });
   assert.equal(stairs, base);
 });
@@ -219,21 +219,21 @@ test('a room off the grid, or a level with no grid, is refused', () => {
     [10, 'A1'],
     [1.5, 'A1'],
   ] as const) {
-    const state = reduce(base, { type: 'toggleRoomVisited', level, room: id });
+    const state = reduce(base, { type: 'setRoomNote', level, room: id, patch: { visited: true } });
     assert.equal(state, base, `level ${level} room ${id}`);
   }
 });
 
 test('a room goes bare again when its last fact is removed', () => {
   let state = createInitialState();
-  state = reduce(state, { type: 'toggleRoomVisited', level: 7, room: 'G7' });
+  state = reduce(state, { type: 'setRoomNote', level: 7, room: 'G7', patch: { visited: true } });
   state = reduce(state, { type: 'setRoomItem', level: 7, room: 'G7', item: 'bow' });
   assert.equal(room(state, 7, 'G7')?.visited, true);
 
   state = reduce(state, { type: 'setRoomItem', level: 7, room: 'G7', item: '' });
   // Still visited, so the room stays.
   assert.ok(room(state, 7, 'G7'));
-  state = reduce(state, { type: 'toggleRoomVisited', level: 7, room: 'G7' });
+  state = reduce(state, { type: 'setRoomNote', level: 7, room: 'G7', patch: { visited: false } });
   // Nothing left to record, so neither the room nor the level is kept.
   assert.equal('7' in state.rooms, false);
   assert.equal(roomIsBare(emptyRoom()), true);
@@ -241,7 +241,7 @@ test('a room goes bare again when its last fact is removed', () => {
 
 test('clearing one level leaves the other levels alone', () => {
   let state = createInitialState();
-  state = reduce(state, { type: 'toggleRoomVisited', level: 1, room: 'A1' });
+  state = reduce(state, { type: 'setRoomNote', level: 1, room: 'A1', patch: { visited: true } });
   state = reduce(state, { type: 'setRoomBoss', level: 2, room: 'B2', boss: 'dodongo' });
   state = reduce(state, { type: 'clearRooms', level: 1 });
   assert.equal('1' in state.rooms, false);
@@ -776,7 +776,7 @@ test('known and visited are one three-way state, never both', () => {
   // And premarking a walked room takes the visit off.
   state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { known: true } });
   assert.deepEqual([room()?.known, room()?.visited], [true, false]);
-  state = reduce(state, { type: 'toggleRoomVisited', level: 2, room: 'C3' });
+  state = reduce(state, { type: 'setRoomNote', level: 2, room: 'C3', patch: { visited: true } });
   assert.deepEqual([room()?.known, room()?.visited], [false, true]);
   // A patch claiming both is refused whole.
   const refused = reduce(state, {

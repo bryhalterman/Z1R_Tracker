@@ -158,11 +158,11 @@ if the tracker ever grows a light theme, subset first.
 
 ## Seeds and derived locations
 
-`seed.ts` holds the randomizer settings; `deriveLocations(settings, extraFloorSlots)` turns them
+`seed.ts` holds the randomizer settings; `deriveLocations(settings)` turns them
 into the list of findable slots. The list is **derived on every render, never stored**.
 
 That's the important call. Storing the slot list would mean reconciling it whenever a setting
-changed — a migration problem for something that is a pure function of two inputs. Deriving it means
+changed — a migration problem for something that is a pure function of the settings. Deriving it means
 switching Dungeon Quest simply produces a different list. State keys off the slot **id**, so
 switching to 2nd Quest and back leaves everything already recorded intact rather than orphaned.
 
@@ -237,7 +237,9 @@ built-in test runner. The bundle step exists because the sources import each oth
 specifiers that only a bundler resolves; there's no framework and no config.
 
 Coverage is deliberately narrow: the reducer and `migrate` are pure functions over plain data, and
-they're where the bugs have actually been. `migrate` in particular earned its tests — a plain spread
+they're where the bugs have actually been. Pure helpers in `packages/ui` are tested the same way —
+`collect.ts` and `placed.ts` turn derived locations into actions and labels with no DOM — so logic
+worth a test is moved out of a panel into a module like those rather than tested through rendering. `migrate` in particular earned its tests — a plain spread
 merge silently kept item keys and dungeon fields that had been removed from the model, so they
 survived every load and got written back into exported saves. Browser testing couldn't confirm the
 fix (the page wasn't re-executing), which is what prompted the harness.

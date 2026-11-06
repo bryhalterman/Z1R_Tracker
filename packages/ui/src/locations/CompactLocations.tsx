@@ -29,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#compo
 import { cn } from '#lib/utils';
 import { Sprite } from '../shared/Sprite.js';
 import { previewHandlers } from '../map-preview.js';
+import { collectAction } from '../collect.js';
 
 export interface CompactLocationsProps {
   state: TrackerState;
@@ -55,21 +56,6 @@ const KIND_INITIAL: Record<string, string> = { floor: 'F', stair: 'S', heart: 'H
 /** The three overworld spots are not interchangeable, so they do not share a letter. */
 const SPOT_CODE: Record<string, string> = { 'ow.whiteSword': 'WS', 'ow.armos': 'AR', 'ow.coast': 'CO' };
 
-/**
- * Toggle a filled slot's collected flag on whatever it was read from. A slot is
- * a view of a placement, so collecting one is collecting the room or screen
- * behind it; only a slot an older save holds directly goes through
- * `collectLocation`. An empty slot has nothing to collect.
- */
-function toggleCollected(dispatch: CompactLocationsProps['dispatch'], location: LocationDef | null, placement: ItemPlacement | null) {
-  if (!placement) return;
-  const collected = !placement.collected;
-  const source = placement.source;
-  if (source.kind === 'room') dispatch({ type: 'collectRoom', level: source.level, room: source.room, collected });
-  else if (source.kind === 'screen') dispatch({ type: 'collectScreen', screen: source.screen, collected });
-  else if (location) dispatch({ type: 'collectLocation', id: location.id, collected });
-}
-
 function Chip({
   kind,
   location,
@@ -87,7 +73,10 @@ function Chip({
   const text =
     `${where} — ${entry?.name ?? 'unknown'}${collected ? ' (collected)' : ''}` +
     (placement ? '' : ' — place it on a map to record it');
-  const toggle = () => toggleCollected(dispatch, location, placement);
+  const toggle = () => {
+    const action = collectAction(placement);
+    if (action) dispatch(action);
+  };
 
   return (
     <Tooltip>

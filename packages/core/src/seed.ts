@@ -231,10 +231,7 @@ export const OVERWORLD_LOCATIONS: readonly LocationDef[] = [
  * `id`, so a slot that disappears keeps its recorded value should the setting
  * be changed back.
  */
-export function deriveLocations(
-  settings: SeedSettings,
-  extraFloorSlots: Readonly<Record<string, number>> = {},
-): LocationDef[] {
+export function deriveLocations(settings: SeedSettings): LocationDef[] {
   const locations: LocationDef[] = [];
 
   for (const dungeon of DUNGEONS) {
@@ -254,18 +251,9 @@ export function deriveLocations(
     }
 
     // "Shuffle Minor Dungeon Drops … can allow multiple major items to be
-    // found on the floor", so extra floor slots are addable when it's on.
-    const extra = settings.shuffleMinorDrops ? (extraFloorSlots[String(level)] ?? 0) : 0;
-    for (let i = 0; i < extra; i++) {
-      const index = floorIndex + i;
-      locations.push({
-        id: `d${level}.floor.${index}`,
-        label: `L${level} floor ${index + 1}`,
-        kind: 'floor',
-        level,
-        note: 'Extra floor drop from Shuffle Minor Dungeon Drops.',
-      });
-    }
+    // found on the floor". There is no slot for those: a floor item found
+    // once a level's floor slots are full overflows instead, which
+    // `deriveItemLocations` lists beside the level's slots.
 
     if (hasHeartContainer(level)) {
       locations.push({

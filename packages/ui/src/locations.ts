@@ -24,8 +24,8 @@ import {
   type LocationDef,
   type SpriteResolver,
   type Store,
-  type TrackerState,
 } from '@z1r/core';
+import { collectAction } from './collect.js';
 import { createSprite } from './sprite.js';
 import { memoise, runPatches, type Patch } from './patch.js';
 import { mountCompactLocations } from './locations/mount.js';
@@ -38,39 +38,17 @@ const KIND_TITLE: Record<string, string> = {
 };
 
 /**
- * Toggle a filled slot's collected flag on whatever it was read from.
- *
- * A slot is a view of a placement, so collecting one is collecting the room or
- * the screen behind it — `source` says which. Only a slot an older save holds
- * directly goes through `collectLocation`, because that entry is the only place
- * its flag lives. An empty slot has nothing to collect and does nothing.
- */
-function toggleCollected(store: Store, location: LocationDef | null, placement: ItemPlacement | null): void {
-  if (!placement) return;
-  const collected = !placement.collected;
-  const source = placement.source;
-  if (source.kind === 'room') {
-    store.dispatch({ type: 'collectRoom', level: source.level, room: source.room, collected });
-  } else if (source.kind === 'screen') {
-    store.dispatch({ type: 'collectScreen', screen: source.screen, collected });
-  } else if (location) {
-    store.dispatch({ type: 'collectLocation', id: location.id, collected });
-  }
-}
-
-/**
  * Which slots and overflow chips the panel draws, as one string.
  *
  * Overflow is part of the shape: a room item placed past its level's slots adds
  * a chip, and the panel rebuilds for that rather than keeping spare nodes.
  */
-function shapeOf(state: TrackerState, derived: ItemLocations): string {
+function shapeOf(derived: ItemLocations): string {
   const overflow = [...derived.overflow.entries()].map(([level, list]) => `${level}x${list.length}`);
   return [
     derived.slots.map((slot) => slot.location.id).join('|'),
     overflow.join(','),
     derived.overworldOverflow.length,
-    state.seed.shuffleMinorDrops,
   ].join('::');
 }
 
@@ -267,8 +245,8 @@ function buildCompactLocations(
     slot.disabled = !interactive;
     if (interactive) {
       const toggle = () => {
-        const now = read();
-        toggleCollected(store, now.location, now.placement);
+        const action = collectAction(read().placement);
+        if (action) store.dispatch(action);
       };
       // Either button toggles collected. The left click used to open an item
       // picker, which is gone with item assignment here; the right click is
@@ -389,7 +367,7 @@ function buildCompactLocations(
 
   patches.push((state) => {
     derived = deriveItemLocations(state);
-    const signature = shapeOf(state, derived);
+    const signature = shapeOf(derived);
     renderedSignature = memoise(renderedSignature, signature, rebuild) ?? '';
     runPatches(slotPatches, state);
     const collected = derived.slots.filter((slot) => slot.placement?.collected).length;

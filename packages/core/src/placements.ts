@@ -21,13 +21,17 @@ import { allScreenIds } from './overworld.js';
 import { allRoomIds, resolveRoomFrom, type RoomNote, type RoomSlotKind } from './rooms.js';
 import { deriveLocations, OVERWORLD_LOCATIONS, POOL_BY_ID, SCREEN_ITEMS_BY_ID, type LocationDef } from './seed.js';
 import type { TrackerState } from './state.js';
+import { formerExtraFloorLevel } from './legacy-locations.js';
 
 /** Where a filled slot's item was read from — and so where to collect it. */
 export type PlacementSource =
   | { readonly kind: 'room'; readonly level: number; readonly room: string }
   | { readonly kind: 'screen'; readonly screen: string }
-  /** A `state.locations` entry: a slot from an older save with no placement behind it. */
-  | { readonly kind: 'stored' };
+  /**
+   * A `state.locations` entry: a slot from an older save with no placement
+   * behind it. `id` is the entry's key, which is where its flag is collected.
+   */
+  | { readonly kind: 'stored'; readonly id: string };
 
 export interface ItemPlacement {
   /**
@@ -39,10 +43,16 @@ export interface ItemPlacement {
   readonly source: PlacementSource;
 }
 
-/** A room item that found no free slot of its kind in its level. */
+/**
+ * An item listed beside its level's slots rather than in one: a room item that
+ * found no free slot of its kind, or an entry an older save recorded in an
+ * extra floor slot, which no longer exists.
+ */
 export interface OverflowPlacement extends ItemPlacement {
   readonly kind: RoomSlotKind;
-  readonly source: { readonly kind: 'room'; readonly level: number; readonly room: string };
+  readonly source:
+    | { readonly kind: 'room'; readonly level: number; readonly room: string }
+    | { readonly kind: 'stored'; readonly id: string };
 }
 
 export interface FilledSlot {
@@ -80,19 +90,13 @@ function slotKey(level: number, kind: string): string {
 /**
  * A stored slot entry, if it says anything.
  *
- * `state.locations` is carried through `migrate` unchecked, so the shape is
- * tested here rather than trusted.
+ * `migrate` checks the shape of `state.locations` on load, so an entry is
+ * either a known pool item, a collected flag, or both.
  */
 function storedPlacement(state: TrackerState, id: string): ItemPlacement | null {
-  const entry: unknown = state.locations[id];
-  if (!entry || typeof entry !== 'object') return null;
-  const { item, collected } = entry as { item?: unknown; collected?: unknown };
-  const stored = {
-    item: typeof item === 'string' && POOL_BY_ID.has(item) ? item : '',
-    collected: collected === true,
-  };
-  if (stored.item === '' && !stored.collected) return null;
-  return { ...stored, source: { kind: 'stored' } };
+  const entry = state.locations[id];
+  if (!entry || (entry.item === '' && !entry.collected)) return null;
+  return { item: entry.item, collected: entry.collected, source: { kind: 'stored', id } };
 }
 
 /**
@@ -112,7 +116,7 @@ function storedPlacement(state: TrackerState, id: string): ItemPlacement | null 
  * Screens are walked in overworld grid order for the same reason as rooms.
  */
 export function deriveItemLocations(state: TrackerState): ItemLocations {
-  const locations = deriveLocations(state.seed, state.extraFloorSlots);
+  const locations = deriveLocations(state.seed);
 
   // Free slots per level and kind, in listed order, consumed from the front.
   const free = new Map<string, LocationDef[]>();
@@ -194,6 +198,23 @@ export function deriveItemLocations(state: TrackerState): ItemLocations {
     if (byId.has(location.id)) continue;
     const stored = storedPlacement(state, location.id);
     if (stored) byId.set(location.id, stored);
+  }
+
+  // Extra floor slots an older save added by hand no longer exist, so what it
+  // recorded in one joins its level's overflow instead of vanishing.
+  // Filtered before sorting: most saves hold none, and this runs per render.
+  const extras: [string, number][] = [];
+  for (const id of Object.keys(state.locations)) {
+    const level = formerExtraFloorLevel(id);
+    if (level !== null) extras.push([id, level]);
+  }
+  extras.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const [id, level] of extras) {
+    const stored = storedPlacement(state, id);
+    if (!stored) continue;
+    const spilled = overflow.get(level) ?? [];
+    spilled.push({ ...stored, source: { kind: 'stored', id }, kind: 'floor' });
+    overflow.set(level, spilled);
   }
 
   return {

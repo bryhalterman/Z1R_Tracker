@@ -16,7 +16,7 @@ So the seed settings are:
 | Dungeon Quest | **Determines every dungeon's item slots** |
 | Item Shuffle | Records what pool is in play |
 | Shuffle dungeon drops | Triforce / hearts / keys / compass / map join the shuffle |
-| Shuffle minor drops | Lets a dungeon hold **extra floor items** |
+| Shuffle minor drops | Records that a dungeon can hold **extra floor items** |
 | Important items in 9 | Ladder, raft, bracelet, recorder, bow may be in Level 9 |
 | Quest split | Which quest levels 1-6 and 7-9 turned out to be |
 | Notes | Hints, routing, anything |
@@ -60,11 +60,12 @@ control entirely, since it can't do anything.
 
 `Shapes` follows First Quest item logic, per the wiki, so it's treated as 1st Quest here.
 
-### Extra floor slots
+### Extra floor items
 
 `Shuffle Minor Dungeon Drops` folds bomb/rupee/key drops into the shuffle, which the wiki notes
 "can allow multiple major items to be found on the floor". There's no way to know in advance how
-many, so with that flag on each level grows a **+ floor** button — add slots as you find them.
+many, and there is no slot to add for them: record the item in its room, and once the level's floor
+spots are full it is listed as an extra chip beside that level's slots.
 
 ## Recording a find
 

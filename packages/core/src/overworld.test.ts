@@ -556,3 +556,109 @@ test('every mark and the start pennant have drawn art', () => {
   for (const mark of MARKS) if (mark.sprite) assert.ok(VECTORS[mark.sprite], mark.sprite);
   assert.ok(VECTORS['mark.start']);
 });
+
+/* --------------------------------------------- re-marking a numbered screen */
+
+test('re-marking a dungeon screen clears its level number', () => {
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  state = reduce(state, { type: 'setMark', screen: 'A1', mark: 'shop' });
+  assert.equal(state.marks['A1'], 'shop');
+  // Nothing else was on the note, so it goes entirely.
+  assert.equal(state.screenNotes['A1'], undefined);
+});
+
+test('placing a level elsewhere leaves a screen re-marked from that level alone', () => {
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  state = reduce(state, { type: 'setMark', screen: 'A1', mark: 'shop' });
+  state = reduce(state, { type: 'toggleShopStock', screen: 'A1', stock: 'bomb' });
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 3 });
+  assert.equal(state.marks['A1'], 'shop');
+  assert.deepEqual(state.screenNotes['A1']?.shop, ['bomb']);
+  assert.equal(state.screenNotes['H8']?.dungeon, 3);
+});
+
+test('placing a stairway elsewhere leaves a screen re-marked from that stairway alone', () => {
+  let state = reduce(createInitialState(), { type: 'placeStairway', screen: 'A1', number: 2 });
+  state = reduce(state, { type: 'setMark', screen: 'A1', mark: 'shop' });
+  state = reduce(state, { type: 'toggleShopStock', screen: 'A1', stock: 'key' });
+  state = reduce(state, { type: 'placeStairway', screen: 'H8', number: 2 });
+  assert.equal(state.marks['A1'], 'shop');
+  assert.deepEqual(state.screenNotes['A1']?.shop, ['key']);
+  assert.equal(state.screenNotes['H8']?.stairway, 2);
+});
+
+test('re-marking drops the dungeon’s number and blockers and keeps the rest', () => {
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  state = reduce(state, { type: 'toggleDungeonBlock', screen: 'A1', block: 'key' });
+  state = reduce(state, { type: 'toggleShopStock', screen: 'A1', stock: 'bomb' });
+  state = reduce(state, { type: 'setMark', screen: 'A1', mark: 'shop' });
+  assert.equal(state.screenNotes['A1']?.dungeon, 0);
+  assert.deepEqual(state.screenNotes['A1']?.blocks, []);
+  assert.deepEqual(state.screenNotes['A1']?.shop, ['bomb']);
+  // Back to a dungeon, it is unidentified and unblocked, not the old guess.
+  state = reduce(state, { type: 'setMark', screen: 'A1', mark: 'dungeon' });
+  assert.equal(state.screenNotes['A1']?.dungeon, 0);
+  assert.deepEqual(state.screenNotes['A1']?.blocks, []);
+});
+
+test('a note patch cannot put a number on a screen marked as something else', () => {
+  let state = reduce(createInitialState(), { type: 'setMark', screen: 'A1', mark: 'shop' });
+  state = reduce(state, { type: 'toggleShopStock', screen: 'A1', stock: 'bomb' });
+  state = reduce(state, { type: 'setScreenNote', screen: 'A1', patch: { dungeon: 3, stairway: 2 } });
+  assert.equal(state.screenNotes['A1']?.dungeon, 0);
+  assert.equal(state.screenNotes['A1']?.stairway, 0);
+  // So placing Level 3 elsewhere cannot take the shop for it.
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 3 });
+  assert.equal(state.marks['A1'], 'shop');
+});
+
+test('a save holding a stale level number on a re-marked screen loads without it', () => {
+  const save = JSON.parse(JSON.stringify(createInitialState()));
+  save.marks = { A1: 'shop', H8: 'dungeon', C3: 'stairway' };
+  save.screenNotes = {
+    A1: { dungeon: 3, stairway: 0, shop: ['bomb'], blocks: ['key'], spot: '', item: '' },
+    H8: { dungeon: 5, stairway: 0, shop: [], blocks: [], spot: '', item: '' },
+    C3: { dungeon: 0, stairway: 4, shop: [], blocks: [], spot: '', item: '' },
+    D4: { dungeon: 2, stairway: 1, shop: [], blocks: [], spot: '', item: '' },
+  };
+  const state = migrate(save);
+  assert.ok(state);
+  assert.equal(state.screenNotes['A1']?.dungeon, 0, 'shop loses the level number');
+  assert.deepEqual(state.screenNotes['A1']?.shop, ['bomb'], 'and keeps its stock');
+  assert.deepEqual(state.screenNotes['A1']?.blocks, [], 'but not the dungeon’s blockers');
+  assert.equal(state.screenNotes['H8']?.dungeon, 5, 'a dungeon keeps its number');
+  assert.equal(state.screenNotes['C3']?.stairway, 4, 'a stairway keeps its number');
+  assert.equal(state.screenNotes['D4'], undefined, 'an unmarked note with only numbers goes');
+
+  // And the bug the stale number caused is gone after loading.
+  const placed = reduce(state, { type: 'placeDungeon', screen: 'H1', level: 3 });
+  assert.equal(placed.marks['A1'], 'shop');
+});
+
+test('placing a stairway on a dungeon screen drops the level, so the level can move safely', () => {
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  state = reduce(state, { type: 'toggleDungeonBlock', screen: 'A1', block: 'key' });
+  state = reduce(state, { type: 'placeStairway', screen: 'A1', number: 2 });
+  assert.equal(state.marks['A1'], 'stairway');
+  assert.equal(state.screenNotes['A1']?.dungeon, 0);
+  assert.deepEqual(state.screenNotes['A1']?.blocks, []);
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 3 });
+  assert.equal(state.marks['A1'], 'stairway');
+  assert.equal(state.screenNotes['A1']?.stairway, 2);
+});
+
+test('placing a level on a stairway screen drops the stairway number', () => {
+  let state = reduce(createInitialState(), { type: 'placeStairway', screen: 'A1', number: 2 });
+  state = reduce(state, { type: 'placeDungeon', screen: 'A1', level: 3 });
+  assert.equal(state.screenNotes['A1']?.stairway, 0);
+  state = reduce(state, { type: 'placeStairway', screen: 'H8', number: 2 });
+  assert.equal(state.marks['A1'], 'dungeon');
+  assert.equal(state.screenNotes['A1']?.dungeon, 3);
+});
+
+test('a blocker is refused on a screen that is not a dungeon', () => {
+  const shop = reduce(createInitialState(), { type: 'setMark', screen: 'B2', mark: 'shop' });
+  assert.equal(reduce(shop, { type: 'toggleDungeonBlock', screen: 'B2', block: 'key' }), shop);
+  const bare = createInitialState();
+  assert.equal(reduce(bare, { type: 'toggleDungeonBlock', screen: 'B2', block: 'key' }), bare);
+});

@@ -310,7 +310,10 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
                 preview={(value) => ({ kind: 'dungeon', level: Number(value) })}
               />
             </Row>
-            {selected ? (
+            {/* Blockers belong to a dungeon, and the reducer refuses them on
+                anything else, so the row is only offered on a dungeon screen —
+                not on a shop selected while the dungeon brush is armed. */}
+            {selected && mark === 'dungeon' ? (
               <Row label="Blocked by">
                 {DUNGEON_BLOCKS.map((block) => {
                   const on = !!note?.blocks.includes(block.id);

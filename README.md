@@ -57,8 +57,9 @@ Heart Container, plus the three shuffled overworld spots (White Sword Cave, Armo
 records *what's there* and *whether you've taken it*, separately, so a hint you can't act on yet
 still has somewhere to live.
 
-Turning on **Shuffle minor drops** grows a `+ floor` button per level, since that flag lets a
-dungeon hold more floor items than the base tables list.
+**Shuffle minor drops** lets a dungeon hold more floor items than the base tables list. A floor item
+found after a level's floor spots are full is still listed, as an extra chip beside that level's
+slots, so there is nothing to add by hand.
 
 ## Hints
 
@@ -165,7 +166,8 @@ and it has `map.html` to itself for when you want to read it.
 npm test
 ```
 
-Node's built-in test runner over the pure parts — the reducer and save migration. See
+Node's built-in test runner over the pure parts — the reducer, save migration, derived item
+locations, and the UI's pure helpers. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#testing).
 
 ## Building

@@ -2,8 +2,8 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
 import { importState, migrate } from './persistence.js';
-import { MAX_EXTRA_FLOOR_SLOTS, createInitialState, reduce, type TrackerState } from './state.js';
-import { ITEMS_BY_ID } from './items.js';
+import { createInitialState, reduce, type TrackerState } from './state.js';
+import { ITEMS_BY_ID, maxValue } from './items.js';
 import { overworldMap } from './seed.js';
 
 /** A save written before hearts/keys/rupees and boss/map/compass were dropped. */
@@ -102,7 +102,7 @@ test('rev increases on every change, so same-tick edits still sync', () => {
 
 test('collecting a Heart Container records the slot without touching inventory', () => {
   let state = createInitialState();
-  state = reduce(state, { type: 'setLocation', id: 'd1.heart', item: 'heart' });
+  state.locations['d1.heart'] = { item: 'heart', collected: false };
   state = reduce(state, { type: 'collectLocation', id: 'd1.heart', collected: true });
   assert.equal(state.locations['d1.heart']?.collected, true);
   assert.equal('heartContainers' in state.items, false);
@@ -110,7 +110,7 @@ test('collecting a Heart Container records the slot without touching inventory',
 
 test('collecting a real item raises it but unticking never revokes', () => {
   let state = createInitialState();
-  state = reduce(state, { type: 'setLocation', id: 'd9.stair.0', item: 'silverArrow' });
+  state.locations['d9.stair.0'] = { item: 'silverArrow', collected: false };
   state = reduce(state, { type: 'collectLocation', id: 'd9.stair.0', collected: true });
   assert.equal(state.items['arrow'], 2);
   state = reduce(state, { type: 'collectLocation', id: 'd9.stair.0', collected: false });
@@ -173,14 +173,13 @@ test('migrate rejects out-of-range enum settings instead of trusting them', () =
   assert.equal(state.seed.questHigh, '1st');
 });
 
-test('migrate clamps extraFloorSlots to the reducer bound', () => {
-  const save = { ...legacySave(), extraFloorSlots: { '1': 5_000_000, '2': -3, '3': 'x' } };
+test('migrate drops the extra floor slots older saves carry', () => {
+  // Five million used to build five million location rows on the render path.
+  const save = { ...legacySave(), extraFloorSlots: { '1': 5_000_000, '2': 3 } };
   const state = migrate(save);
   assert.ok(state);
-  // Five million would have built five million location rows on the render path.
-  assert.equal(state.extraFloorSlots['1'], MAX_EXTRA_FLOOR_SLOTS);
-  assert.equal(state.extraFloorSlots['2'], 0);
-  assert.equal('3' in state.extraFloorSlots, false);
+  assert.equal('extraFloorSlots' in state, false);
+  assert.equal(state.locations['d1.floor.1'], undefined);
 });
 
 test('migrate drops unknown top-level keys instead of persisting them forever', () => {
@@ -254,4 +253,44 @@ test('each overworld quest names its map, and Random shows the 1st Quest map', (
   assert.equal(overworldMap('mixed-1st'), 'mixed');
   assert.equal(overworldMap('mixed-2nd'), 'mixed');
   assert.equal(overworldMap('random'), '1st');
+});
+
+test('migrate clamps item values to what each item can hold', () => {
+  const save = JSON.parse(JSON.stringify(createInitialState()));
+  Object.assign(save.items, { arrow: 99, bow: -3, candle: 1.5, sword: 'x' });
+  const state = migrate(save);
+  assert.ok(state);
+  const arrow = ITEMS_BY_ID.get('arrow');
+  assert.ok(arrow);
+  assert.equal(state.items['arrow'], maxValue(arrow));
+  assert.equal(state.items['bow'], 0);
+  assert.equal(state.items['candle'], 1);
+  // The wrong type falls back to the empty value, as before.
+  assert.equal(state.items['sword'], 0);
+});
+
+test('migrate checks stored locations instead of spreading them in', () => {
+  for (const locations of ['abc', ['x', 'y'], 7, null]) {
+    const save = { ...JSON.parse(JSON.stringify(createInitialState())), locations };
+    const state = migrate(save);
+    assert.ok(state);
+    assert.deepEqual(state.locations, {}, JSON.stringify(locations));
+  }
+  const save = JSON.parse(JSON.stringify(createInitialState()));
+  save.locations = {
+    'd1.floor.0': { item: 'bow', collected: true },
+    'd2.floor.0': { item: 'not-an-item', collected: false },
+    'd3.floor.0': { item: '', collected: true },
+    'd4.floor.0': 'bow',
+    'zz.bogus': { item: 'bow', collected: true },
+    'd2.floor.3': { item: 'raft', collected: false },
+  };
+  const state = migrate(save);
+  assert.ok(state);
+  assert.deepEqual(state.locations, {
+    'd1.floor.0': { item: 'bow', collected: true },
+    'd3.floor.0': { item: '', collected: true },
+    // A former extra floor slot is kept; it is shown as overflow.
+    'd2.floor.3': { item: 'raft', collected: false },
+  });
 });
