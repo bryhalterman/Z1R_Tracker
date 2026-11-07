@@ -17,10 +17,19 @@ export interface SpriteOptions {
   readonly label?: string;
 }
 
-/** Paints one resolution into `element`, replacing whatever was there. */
+/**
+ * Paints one resolution into `element`, replacing whatever was there.
+ *
+ * Everything a resolution can set is cleared first. `SpriteArt` repaints one
+ * span when its key changes, so a sheet's scale or an image's sizing left
+ * behind would otherwise apply to the next sprite drawn there.
+ */
 function paint(element: HTMLElement, resolved: ResolvedSprite, size: number): void {
   element.style.backgroundImage = '';
   element.style.backgroundPosition = '';
+  element.style.backgroundSize = '';
+  element.style.imageRendering = '';
+  element.style.removeProperty('--sheet-scale');
   element.textContent = '';
 
   switch (resolved.kind) {

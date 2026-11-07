@@ -40,7 +40,7 @@ import {
   type RoomSide,
 } from './rooms.js';
 import { isRoomLayout } from './layouts.js';
-import { emptyNote, fitNoteToMark, noteIsBare } from './notes.js';
+import { emptyNote, fitNoteToMark, noteIsBare, sameNote } from './notes.js';
 
 export const STATE_VERSION = 13;
 
@@ -195,6 +195,12 @@ export type Action =
   | { type: 'setMark'; screen: string; mark: MarkKind }
   /** Write detail onto a marked screen: which dungeon, what stock, which item. */
   | { type: 'setScreenNote'; screen: string; patch: Partial<ScreenNote> }
+  /**
+   * Set a screen's mark and write its note in one edit — placing an item on a
+   * screen, or stamping a rupee secret with its size. Two dispatches would
+   * save and broadcast the half-done state between them.
+   */
+  | { type: 'markScreen'; screen: string; mark: MarkKind; patch: Partial<ScreenNote> }
   /** Add or remove one stock entry without resending the whole list. */
   | { type: 'toggleShopStock'; screen: string; stock: string }
   /** Price of one stock entry. 0 clears it — a price is never required. */
@@ -407,6 +413,47 @@ function writeMark(state: TrackerState, screen: string, mark: MarkKind): Partial
   return screenNotes === state.screenNotes ? { marks } : { marks, screenNotes };
 }
 
+/**
+ * Apply a patch to one screen's note, for `setScreenNote` and `markScreen`.
+ *
+ * Null when the stored note and the inventory come out unchanged, so neither
+ * action bumps `rev` — and so saves and broadcasts — for an edit that did
+ * nothing.
+ */
+function editScreenNote(
+  state: TrackerState,
+  screen: string,
+  patch: Partial<ScreenNote>,
+): Partial<TrackerState> | null {
+  const current = { ...emptyNote(), ...state.screenNotes[screen] };
+  const next = { ...current, ...patch };
+  if (typeof next.dungeon === 'number') {
+    // 0 means "found but not yet identified", which is a real state.
+    next.dungeon = Number.isInteger(next.dungeon) ? Math.min(Math.max(next.dungeon, 0), 9) : 0;
+  }
+  if (typeof next.stairway === 'number') {
+    // 0 is "no number yet"; the UI places stairways through placeStairway,
+    // which is what keeps the numbers unique.
+    next.stairway = Number.isInteger(next.stairway)
+      ? Math.min(Math.max(next.stairway, 0), OVERWORLD_STAIRWAY_COUNT)
+      : 0;
+  }
+  // An unknown size reads as unknown rather than refusing the whole patch.
+  if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
+  // The coast spot belongs to its screen: set there by the item, refused
+  // anywhere else.
+  next.spot = conformSpot(screen, next.spot, next.item, state.seed.mirroredOverworld);
+  // Coerced rather than refused, like the two numbers above: anything but
+  // a literal `true` is not collected.
+  const requested = patch.collected === undefined ? undefined : patch.collected === true;
+  const settled = settleCollected(current, next.item, requested);
+  next.collected = settled.collected;
+  const screenNotes = pruneNote(state.screenNotes, state.marks, screen, next);
+  const items = settled.picked ? grantPoolEntry(state.items, next.item) : state.items;
+  if (sameNote(screenNotes[screen], state.screenNotes[screen]) && items === state.items) return null;
+  return items === state.items ? { screenNotes } : { screenNotes, items };
+}
+
 export function createInitialState(now = Date.now()): TrackerState {
   const items: Record<string, number> = {};
   for (const def of ITEMS) {
@@ -517,6 +564,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       const key = String(action.level);
       const current = state.dungeons[key] ?? emptyDungeon();
       const next = { ...current, ...action.patch };
+      if (next.triforce === current.triforce) return state;
       return bump({ dungeons: { ...state.dungeons, [key]: next } });
     }
 
@@ -526,37 +574,25 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       return bump(writeMark(state, action.screen, next));
     }
 
-    case 'setMark':
-      return bump(writeMark(state, action.screen, action.mark));
+    case 'setMark': {
+      const written = writeMark(state, action.screen, action.mark);
+      const unchanged =
+        (state.marks[action.screen] ?? 'none') === action.mark &&
+        (written.screenNotes ?? state.screenNotes) === state.screenNotes;
+      return unchanged ? state : bump(written);
+    }
 
     case 'setScreenNote': {
-      const current = { ...emptyNote(), ...state.screenNotes[action.screen] };
-      const next = { ...current, ...action.patch };
-      if (typeof next.dungeon === 'number') {
-        // 0 means "found but not yet identified", which is a real state.
-        next.dungeon = Number.isInteger(next.dungeon) ? Math.min(Math.max(next.dungeon, 0), 9) : 0;
-      }
-      if (typeof next.stairway === 'number') {
-        // 0 is "no number yet"; the UI places stairways through placeStairway,
-        // which is what keeps the numbers unique.
-        next.stairway = Number.isInteger(next.stairway)
-          ? Math.min(Math.max(next.stairway, 0), OVERWORLD_STAIRWAY_COUNT)
-          : 0;
-      }
-      // An unknown size reads as unknown rather than refusing the whole patch.
-      if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
-      // The coast spot belongs to its screen: set there by the item, refused
-      // anywhere else.
-      next.spot = conformSpot(action.screen, next.spot, next.item, state.seed.mirroredOverworld);
-      // Coerced rather than refused, like the two numbers above: anything but
-      // a literal `true` is not collected.
-      const requested =
-        action.patch.collected === undefined ? undefined : action.patch.collected === true;
-      const settled = settleCollected(current, next.item, requested);
-      next.collected = settled.collected;
-      const screenNotes = pruneNote(state.screenNotes, state.marks, action.screen, next);
-      if (!settled.picked) return bump({ screenNotes });
-      return bump({ screenNotes, items: grantPoolEntry(state.items, next.item) });
+      const edited = editScreenNote(state, action.screen, action.patch);
+      return edited ? bump(edited) : state;
+    }
+
+    case 'markScreen': {
+      const marked = { ...state, ...writeMark(state, action.screen, action.mark) };
+      const edited = editScreenNote(marked, action.screen, action.patch);
+      const markChanged = (state.marks[action.screen] ?? 'none') !== action.mark;
+      if (!edited && !markChanged && marked.screenNotes === state.screenNotes) return state;
+      return bump({ marks: marked.marks, screenNotes: marked.screenNotes, ...edited });
     }
 
     case 'placeDungeon': {
@@ -570,22 +606,25 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
        * claiming Level 3 is worse than no marker at all, because you cannot
        * tell which one to walk to.
        *
-       * The note travels with it. Blockers belong to the dungeon, not to the
-       * square of grass it was mistakenly pinned on.
+       * The blockers travel with it: they belong to the dungeon, not to the
+       * square of grass it was mistakenly pinned on. Nothing else does — a
+       * shop's stock or a coast spot belongs to the screen it was recorded
+       * on — and they join any the new screen already lists rather than
+       * being hidden under them.
        */
-      let carried: ScreenNote | undefined;
+      const carried: string[] = [];
       for (const [screen, note] of Object.entries(screenNotes)) {
         if (screen === action.screen || note.dungeon !== level) continue;
-        carried = note;
+        carried.push(...note.blocks);
         delete screenNotes[screen];
         delete marks[screen];
       }
 
       marks[action.screen] = 'dungeon';
+      const target = { ...emptyNote(), ...screenNotes[action.screen] };
       const placed: ScreenNote = {
-        ...emptyNote(),
-        ...carried,
-        ...screenNotes[action.screen],
+        ...target,
+        blocks: [...new Set([...target.blocks, ...carried])].sort(),
         dungeon: level,
       };
       return bump({ marks, screenNotes: pruneNote(screenNotes, marks, action.screen, placed) });
@@ -713,6 +752,10 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
       // Rupees are whole and never negative, and anything unparseable reads as
       // "no price" rather than as a number nobody can act on.
       const price = Number.isFinite(action.price) ? Math.max(Math.trunc(action.price), 0) : 0;
+      // A price belongs to stock the shop carries; one for anything else would
+      // render nowhere. Clearing one is always allowed.
+      if (price !== 0 && !current.shop.includes(action.stock)) return state;
+      if ((current.shopPrices[action.stock] ?? 0) === price) return state;
       const shopPrices = { ...current.shopPrices };
       // 0 is the empty value, so it removes the key rather than being stored —
       // same rule as a bare note, and it keeps exports free of `{"bomb":0}`.
@@ -951,6 +994,11 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
 
     case 'collectLocation': {
       const current = state.locations[action.id] ?? { item: '', collected: false };
+      if (typeof action.collected !== 'boolean' || current.collected === action.collected) return state;
+      // Same refusal as `collectRoom` and `collectScreen`: an entry with no
+      // known item has nothing to have collected. Clearing one an older save
+      // holds is still allowed.
+      if (action.collected && current.item === '') return state;
       const locations = {
         ...state.locations,
         [action.id]: { ...current, collected: action.collected },
@@ -969,9 +1017,13 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
     }
 
     case 'updateHint': {
-      const hints = state.hints.map((hint) =>
-        hint.id === action.id ? { ...hint, ...action.patch } : hint,
-      );
+      const index = state.hints.findIndex((hint) => hint.id === action.id);
+      if (index < 0) return state;
+      const current = state.hints[index]!;
+      const next = { ...current, ...action.patch, id: current.id };
+      const fields = Object.keys(next) as (keyof HintEntry)[];
+      if (fields.every((field) => next[field] === current[field])) return state;
+      const hints = state.hints.map((hint, i) => (i === index ? next : hint));
       return bump({ hints });
     }
 

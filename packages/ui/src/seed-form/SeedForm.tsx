@@ -5,12 +5,14 @@
  * about a seed lives in the flag string, which is stored verbatim. See the
  * note at the top of `packages/core/src/seed.ts`.
  *
- * Like the room card it holds no state of its own: it renders `seed` as given
- * and reports every change through `set`. Read-only in the OBS overlay, where
+ * It renders `seed` as given and reports every change through `set`. The text
+ * fields hold what is mid-typing (`useDraft`) and report it once typing
+ * pauses, so a seed or flag string is not sent a character at a time. Read-only in the OBS overlay, where
  * `interactive` is false — the fields still show their values there.
  */
 
 import { useId } from 'react';
+import { useDraft } from '../shared/use-draft.js';
 import {
   DUNGEON_QUESTS,
   ITEM_SHUFFLES,
@@ -73,6 +75,7 @@ function TextField({
   props: SeedFormProps;
 }) {
   const id = useId();
+  const draft = useDraft(props.seed[name], (value) => props.set({ [name]: value }));
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <Label htmlFor={id} className={LABEL}>
@@ -80,11 +83,12 @@ function TextField({
       </Label>
       <Input
         id={id}
-        value={props.seed[name]}
+        value={draft.value}
         placeholder={placeholder}
         spellCheck={false}
         readOnly={!props.interactive}
-        onChange={(event) => props.set({ [name]: event.target.value })}
+        onChange={(event) => draft.onChange(event.target.value)}
+        onBlur={draft.onBlur}
       />
     </div>
   );

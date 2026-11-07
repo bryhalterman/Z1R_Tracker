@@ -154,7 +154,7 @@ The overlay accepts query parameters:
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `sections` | `items,dungeons` | Any of `seed`, `items`, `dungeons`, `locations`, `hintlog`, `hints` |
+| `sections` | `items,dungeons` | Any of `seed`, `items`, `dungeons`, `locations`, `hintlog` |
 | `size` | `40` | Item cell size in pixels |
 | `width` | `420` | Composition width — laid out at this width, then scaled to fit the source |
 | `scale` | auto | Pins the scale factor and turns auto-fit off |
@@ -170,7 +170,7 @@ npm test
 ```
 
 Node's built-in test runner over the pure parts — the reducer, save migration, derived item
-locations, and the UI's pure helpers. See
+locations, saving and syncing between windows, the sprite resolver, and the UI's pure helpers. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#testing).
 
 ## Building
@@ -189,7 +189,7 @@ offline sprite caching via a service worker.
 
 ```
 packages/core    game data, seed settings, tracker state, logic hints, sprites
-packages/ui      framework-free rendering shared by all three targets
+packages/ui      React panels in a plain-DOM host, shared by all three targets
 apps/web         GitHub Pages build
 apps/desktop     downloadable offline build
 apps/obs         browser source + custom dock

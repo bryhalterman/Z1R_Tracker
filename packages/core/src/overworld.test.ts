@@ -13,6 +13,7 @@ import { VECTORS } from './sprites/vectors.js';
 import { bundledManifest } from './index.js';
 
 import { COAST_SCREEN, COAST_SPOT_ID } from './overworld.js';
+import { REGIONS, screensInRegion } from './regions.js';
 
 function marked(screen: string, mark: MarkKind): TrackerState {
   return reduce(createInitialState(), { type: 'setMark', screen, mark });
@@ -661,4 +662,68 @@ test('a blocker is refused on a screen that is not a dungeon', () => {
   assert.equal(reduce(shop, { type: 'toggleDungeonBlock', screen: 'B2', block: 'key' }), shop);
   const bare = createInitialState();
   assert.equal(reduce(bare, { type: 'toggleDungeonBlock', screen: 'B2', block: 'key' }), bare);
+});
+
+/* ----------------------------------------------------- final-pass defects */
+
+test('moving a level carries its blockers and nothing else, and keeps the target’s', () => {
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  state = reduce(state, { type: 'toggleDungeonBlock', screen: 'A1', block: 'key' });
+  // The new screen already lists a blocker of its own.
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 4 });
+  state = reduce(state, { type: 'toggleDungeonBlock', screen: 'H8', block: 'bomb' });
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 3 });
+  assert.deepEqual(state.screenNotes['H8']?.blocks, ['bomb', 'key']);
+  assert.equal(state.screenNotes['H8']?.dungeon, 3);
+  assert.equal('A1' in state.marks, false);
+});
+
+test('an edit that changes nothing does not bump rev', () => {
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'A1', level: 3 });
+  const rev = state.rev;
+  for (const action of [
+    { type: 'setMark', screen: 'A1', mark: 'dungeon' },
+    { type: 'setScreenNote', screen: 'A1', patch: { dungeon: 3 } },
+    { type: 'setDungeon', level: 3, patch: { triforce: false } },
+    { type: 'updateHint', id: 'missing', patch: { note: 'x' } },
+  ] as const) {
+    assert.equal(reduce(state, action), state, action.type);
+  }
+  state = reduce(state, { type: 'addHint' });
+  const hint = state.hints[0]!;
+  assert.equal(reduce(state, { type: 'updateHint', id: hint.id, patch: { note: '' } }), state);
+  assert.ok(state.rev > rev);
+});
+
+test('markScreen sets the mark and the note in one edit', () => {
+  const base = createInitialState();
+  const placed = reduce(base, { type: 'markScreen', screen: 'C2', mark: 'item', patch: { item: 'bow' } });
+  assert.equal(placed.marks['C2'], 'item');
+  assert.equal(placed.screenNotes['C2']?.item, 'bow');
+  assert.equal(placed.rev, base.rev + 1, 'one edit, one rev');
+  const secret = reduce(base, { type: 'markScreen', screen: 'C2', mark: 'rupeeSecret', patch: { secret: 'small' } });
+  assert.equal(secret.screenNotes['C2']?.secret, 'small');
+  // Marking again with nothing new is not an edit.
+  assert.equal(reduce(placed, { type: 'markScreen', screen: 'C2', mark: 'item', patch: { item: 'bow' } }), placed);
+});
+
+test('a region lists its screens in reading order', () => {
+  for (const region of REGIONS) {
+    const screens = screensInRegion(region.id);
+    for (let i = 1; i < screens.length; i++) {
+      const [a, b] = [screens[i - 1]!, screens[i]!];
+      const ordered = a[0]! < b[0]! || (a[0] === b[0] && Number(a.slice(1)) < Number(b.slice(1)));
+      assert.ok(ordered, region.id + ': ' + a + ' before ' + b);
+    }
+  }
+});
+
+test('a price is refused for stock the shop does not carry', () => {
+  let state = reduce(createInitialState(), { type: 'setMark', screen: 'C5', mark: 'shop' });
+  assert.equal(reduce(state, { type: 'setShopPrice', screen: 'C5', stock: 'bomb', price: 20 }), state);
+  state = reduce(state, { type: 'toggleShopStock', screen: 'C5', stock: 'bomb' });
+  state = reduce(state, { type: 'setShopPrice', screen: 'C5', stock: 'bomb', price: 20 });
+  assert.equal(state.screenNotes['C5']?.shopPrices['bomb'], 20);
+  // The same price again is not an edit.
+  assert.equal(reduce(state, { type: 'setShopPrice', screen: 'C5', stock: 'bomb', price: 20 }), state);
 });

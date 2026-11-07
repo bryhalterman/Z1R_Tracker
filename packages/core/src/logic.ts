@@ -123,6 +123,18 @@ function warpScreens(state: TrackerState): Map<number, string> {
 }
 
 export function warpRoutes(state: TrackerState): WarpRoute[] {
+  // Cached per state, like the item locations: hovering the map re-renders it
+  // with an unchanged state, and every cell's guide reads the routes.
+  const cached = WARP_ROUTES.get(state);
+  if (cached) return cached;
+  const routes = computeWarpRoutes(state);
+  WARP_ROUTES.set(state, routes);
+  return routes;
+}
+
+const WARP_ROUTES = new WeakMap<TrackerState, WarpRoute[]>();
+
+function computeWarpRoutes(state: TrackerState): WarpRoute[] {
   const screens = warpScreens(state);
   const routes: WarpRoute[] = [];
   for (let warp = 1; warp <= OVERWORLD_STAIRWAY_COUNT; warp++) {

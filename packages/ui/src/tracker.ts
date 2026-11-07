@@ -1,10 +1,10 @@
 /**
  * The tracker view.
  *
- * Builds its DOM once and then patches it on every state change. A full
- * re-render would be simpler, but this view runs inside an OBS browser source
- * alongside a game capture — churning hundreds of nodes per click is exactly
- * the kind of thing that shows up as a dropped frame on stream.
+ * Builds each panel's shell once as plain DOM and renders the panel itself as
+ * React, re-rendered with the whole state on every change; the memoized cells
+ * and the per-state location cache keep that cheap. See the Rendering section
+ * of docs/ARCHITECTURE.md.
  */
 
 import {
@@ -986,14 +986,17 @@ function buildMap(
     if (!SCREEN_ITEMS_BY_ID.has(item)) return;
     const state = store.getState();
     const isItem = state.marks[screen] === 'item';
-    if (isItem && state.screenNotes[screen]?.item === item) {
-      store.dispatch({ type: 'setScreenNote', screen, patch: { item: '' } });
-    } else {
-      if (!isItem) store.dispatch({ type: 'setMark', screen, mark: 'item' });
-      store.dispatch({ type: 'setScreenNote', screen, patch: { item } });
-    }
-    // One find, one placement: the item is put down once it has landed.
-    placement.set({ item: '' });
+    // One find, one placement: the item is put down once it has landed, in the
+    // same redraw as the edit.
+    placement.settle({ item: '' }, () => {
+      if (isItem && state.screenNotes[screen]?.item === item) {
+        store.dispatch({ type: 'setScreenNote', screen, patch: { item: '' } });
+      } else {
+        // One edit, so the half-placed screen is never saved or broadcast.
+        store.dispatch({ type: 'markScreen', screen, mark: 'item', patch: { item } });
+      }
+      return store.getState() !== state;
+    });
     selected = screen;
     highlightSelection();
     syncToolbar(store.getState());
@@ -1026,10 +1029,9 @@ function buildMap(
       // One per map: this moves the pennant, and leaves the screen's mark alone.
       store.dispatch({ type: 'setStartScreen', screen });
     } else {
-      store.dispatch({ type: 'setMark', screen, mark: armed });
-      if (armed === 'rupeeSecret' && armedSecret) {
-        store.dispatch({ type: 'setScreenNote', screen, patch: { secret: armedSecret } });
-      }
+      // The size goes on in the same edit as the mark.
+      const patch = armed === 'rupeeSecret' && armedSecret ? { secret: armedSecret } : {};
+      store.dispatch({ type: 'markScreen', screen, mark: armed, patch });
     }
     // Selected, not toggled — clicking an already-selected tile while armed
     // should re-stamp it, not drop the selection out from under the detail rows.
@@ -1112,9 +1114,9 @@ function buildMap(
     toggleStock: (stock) => {
       if (selected) store.dispatch({ type: 'toggleShopStock', screen: selected, stock });
     },
-    setPrice: (stock, price) => {
+    setPrice: (screen, stock, price) => {
       // An empty box is 0, which the reducer reads as "no price recorded".
-      if (selected) store.dispatch({ type: 'setShopPrice', screen: selected, stock, price });
+      if (screen) store.dispatch({ type: 'setShopPrice', screen, stock, price });
     },
     patchNote: patchSelected,
     toggleCollected: () => {
@@ -1149,6 +1151,8 @@ function buildMap(
 
   patches.push(syncToolbar);
   patches.push(drawGrid);
+  // The store's pass also carries a brush put down by `placement.settle`.
+  patches.push(() => syncArming());
 
   /*
    * Another panel pointing at a screen: the start brush, or a dungeon number

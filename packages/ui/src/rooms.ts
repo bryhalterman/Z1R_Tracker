@@ -65,6 +65,14 @@ export interface PlacementBrush {
 export interface PlacementChannel {
   get(): PlacementBrush;
   set(next: Partial<PlacementBrush>): void;
+  /**
+   * Change the brush and run `apply`, the store edit that goes with it, in one
+   * redraw. The brush changes without telling the watchers; every panel that
+   * reads it also redraws on the store's pass. `apply` returns whether the
+   * store changed — when it did not, there is no pass, so the watchers are
+   * told after all.
+   */
+  settle(next: Partial<PlacementBrush>, apply: () => boolean): void;
   watch(listener: () => void): void;
 }
 
@@ -72,13 +80,24 @@ export function createPlacement(): PlacementChannel {
   let brush: PlacementBrush = { item: '' };
   const listeners = new Set<() => void>();
 
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
+
   return {
     get: () => brush,
     set(next) {
       const item = next.item ?? brush.item;
       if (item === brush.item) return;
       brush = { item };
-      for (const listener of listeners) listener();
+      notify();
+    },
+    settle(next, apply) {
+      const item = next.item ?? brush.item;
+      const changed = item !== brush.item;
+      brush = { item };
+      const redrawn = apply();
+      if (changed && !redrawn) notify();
     },
     watch(listener) {
       listeners.add(listener);
@@ -294,14 +313,18 @@ export function buildRooms(
     }
     const current = roomsOf(store.getState())[room]?.item ?? '';
     // The same item clicked onto the same room takes it back off. Either way
-    // the item is put down once it has landed: one find, one placement.
-    commit(
-      room,
-      current === armed
-        ? { type: 'setRoomItem', level, room, item: '' }
-        : { type: 'setRoomNote', level, room, patch: { item: armed, visited: true } },
-    );
-    placement.set({ item: '' });
+    // the item is put down once it has landed: one find, one placement, one
+    // redraw for both.
+    placement.settle({ item: '' }, () => {
+      const before = store.getState();
+      commit(
+        room,
+        current === armed
+          ? { type: 'setRoomItem', level, room, item: '' }
+          : { type: 'setRoomNote', level, room, patch: { item: armed, visited: true } },
+      );
+      return store.getState() !== before;
+    });
   };
 
   /** Whether the armed item — or the one being dragged — can land in a room. */

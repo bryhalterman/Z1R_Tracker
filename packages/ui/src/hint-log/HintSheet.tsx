@@ -15,9 +15,10 @@ import { cn } from '#lib/utils';
 import { HintList } from './HintList.js';
 
 export function HintSheet({ store }: { store: Store }) {
-  const state = useSyncExternalStore(store.subscribe, store.getState);
+  // Only the count: the header button is all that shows while the sheet is
+  // closed, and it should not re-render for every edit elsewhere in the run.
+  const count = useSyncExternalStore(store.subscribe, () => store.getState().hints.length);
   const [open, setOpen] = useState(false);
-  const count = state.hints.length;
 
   return (
     <Sheet open={open} onOpenChange={setOpen} modal={false} disablePointerDismissal>
@@ -33,9 +34,15 @@ export function HintSheet({ store }: { store: Store }) {
           <SheetTitle>Hints{count ? ` · ${count}` : ''}</SheetTitle>
         </SheetHeader>
         <div className="px-4 pb-4">
-          <HintList state={state} interactive dispatch={store.dispatch} onShown={() => setOpen(false)} />
+          <HintSheetBody store={store} onShown={() => setOpen(false)} />
         </div>
       </SheetContent>
     </Sheet>
   );
+}
+
+/** The log itself, which reads the whole state, rendered only inside the open sheet. */
+function HintSheetBody({ store, onShown }: { store: Store; onShown: () => void }) {
+  const state = useSyncExternalStore(store.subscribe, store.getState);
+  return <HintList state={state} interactive dispatch={store.dispatch} onShown={onShown} />;
 }

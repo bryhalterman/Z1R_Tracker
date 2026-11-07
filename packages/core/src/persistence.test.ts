@@ -294,3 +294,35 @@ test('migrate checks stored locations instead of spreading them in', () => {
     'd2.floor.3': { item: 'raft', collected: false },
   });
 });
+
+test('migrate keeps when the run started and was last edited', () => {
+  const save = JSON.parse(JSON.stringify(createInitialState(1000)));
+  save.updatedAt = 5000;
+  const state = migrate(save);
+  assert.ok(state);
+  assert.equal(state.startedAt, 1000);
+  assert.equal(state.updatedAt, 5000);
+  // Not a time: falls back to now rather than being kept.
+  const bad = migrate({ ...save, startedAt: 'yesterday', updatedAt: -1 });
+  assert.ok(bad);
+  assert.ok(bad.startedAt > 5000 && bad.updatedAt > 5000);
+});
+
+test('migrate stores rooms under the level key the reducer reads', () => {
+  const save = JSON.parse(JSON.stringify(createInitialState()));
+  save.rooms = { '03': { A1: { visited: true } } };
+  const state = migrate(save);
+  assert.ok(state);
+  assert.equal(state.rooms['3']?.A1?.visited, true);
+  assert.equal('03' in state.rooms, false);
+});
+
+test('collectLocation refuses an empty entry and ignores a repeat', () => {
+  const base = createInitialState();
+  assert.equal(reduce(base, { type: 'collectLocation', id: 'd1.floor.0', collected: true }), base);
+  const stored = createInitialState();
+  stored.locations['d1.floor.0'] = { item: 'bow', collected: false };
+  const collected = reduce(stored, { type: 'collectLocation', id: 'd1.floor.0', collected: true });
+  assert.equal(collected.locations['d1.floor.0']?.collected, true);
+  assert.equal(reduce(collected, { type: 'collectLocation', id: 'd1.floor.0', collected: true }), collected);
+});

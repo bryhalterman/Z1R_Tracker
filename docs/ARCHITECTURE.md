@@ -261,6 +261,10 @@ a plain spread merge silently kept item keys and dungeon fields that had been re
 model, so they survived every load and got written back into exported saves. Browser testing
 couldn't confirm the fix (the page wasn't re-executing), which is what prompted the harness.
 
+Persistence is tested against an in-memory `Storage` and Node's own `BroadcastChannel`, so two
+stores in one test sync the way two OBS windows do; the sprite resolver is tested with `fetch`
+stubbed.
+
 Pure helpers in `packages/ui` are tested the same way — `collect.ts`, `placed.ts` and
 `shared/disposers.ts` work with no DOM — so logic worth a test is moved out of a panel into a module
 like those rather than tested through rendering.

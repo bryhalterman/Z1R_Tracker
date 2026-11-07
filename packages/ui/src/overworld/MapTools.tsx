@@ -6,7 +6,8 @@
  * The map's view state — the selected screen and the armed marker, with the
  * level, warp or size it will stamp — stays in `buildMap`, because the grid's
  * own click handling reads it. These components draw it and report every
- * change back through `MapActions`; they hold no state of their own.
+ * change back through `MapActions`. The one thing they hold is a shop price
+ * mid-typing (`PriceInput`), which commits to the screen it was typed for.
  *
  * Two states are kept apart throughout: *armed* is "the next screen you click
  * becomes this", *current* is "the selected screen already is this". Armed is a
@@ -33,6 +34,7 @@ import {
   type TrackerState,
 } from '@z1r/core';
 import { Input } from '#components/ui/input';
+import { useDraft } from '../shared/use-draft.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#components/ui/select';
 import { Toggle } from '#components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '#components/ui/toggle-group';
@@ -62,7 +64,8 @@ export interface MapActions {
   pickSecret: (size: SecretSize) => void;
   toggleBlock: (block: string) => void;
   toggleStock: (stock: string) => void;
-  setPrice: (stock: string, price: number) => void;
+  /** Explicit about the screen: a pending price must not follow the selection. */
+  setPrice: (screen: string, stock: string, price: number) => void;
   patchNote: (patch: Partial<ScreenNote>) => void;
   toggleCollected: () => void;
 }
@@ -264,6 +267,35 @@ const SPOTS = [
   })),
 ];
 
+/** A shop price, committed once typing pauses rather than per keystroke. */
+function PriceInput({
+  name,
+  disabled,
+  price,
+  onCommit,
+}: {
+  name: string;
+  disabled: boolean;
+  price: number;
+  onCommit: (price: number) => void;
+}) {
+  const draft = useDraft(price ? String(price) : '', (value) => onCommit(Number(value)));
+  return (
+    <Input
+      type="number"
+      min={0}
+      step={1}
+      placeholder="–"
+      aria-label={`Price of ${name}`}
+      disabled={disabled}
+      value={draft.value}
+      onChange={(event) => draft.onChange(event.target.value)}
+      onBlur={draft.onBlur}
+      className="h-6 w-10 [appearance:textfield] px-1 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+    />
+  );
+}
+
 export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) {
   const { selected, armed } = view;
   const mark = selected ? (state.marks[selected] ?? 'none') : 'none';
@@ -379,16 +411,15 @@ export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) 
                   </Tip>
                   {/* Greyed rather than hidden until ticked, so the row never
                       reflows; an empty box is no price recorded. */}
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="–"
-                    aria-label={`Price of ${stock.name}`}
+                  {/* Keyed by screen as well as stock: picking another
+                      screen mounts a fresh field, and a price still pending
+                      commits to the screen it was typed for. */}
+                  <PriceInput
+                    key={`${selected}:${stock.id}`}
+                    name={stock.name}
                     disabled={!stocked}
-                    value={price ? String(price) : ''}
-                    onChange={(event) => actions.setPrice(stock.id, Number(event.target.value))}
-                    className="h-6 w-10 [appearance:textfield] px-1 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    price={price}
+                    onCommit={(value) => actions.setPrice(selected, stock.id, value)}
                   />
                 </div>
               );

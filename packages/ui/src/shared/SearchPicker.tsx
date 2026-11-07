@@ -49,12 +49,16 @@ export function SearchPicker({
   onPick: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Closed for good when the control is disabled, not just hidden: masking it
+  // with `open && !disabled` left `open` true, and the popover came back on its
+  // own the moment the control was enabled again.
+  if (disabled && open) setOpen(false);
   // Typing is the fastest way to an entry, so the filter takes focus on open.
   const filter = useRef<HTMLInputElement>(null);
   const current = groups.flatMap((group) => group.options).find((option) => option.value === value);
 
   return (
-    <Popover open={open && !disabled} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
         aria-label={label}

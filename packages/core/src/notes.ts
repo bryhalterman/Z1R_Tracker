@@ -39,6 +39,27 @@ export function noteIsBare(note: ScreenNote): boolean {
   );
 }
 
+/** Whether two notes record the same thing, field by field. */
+export function sameNote(a: ScreenNote | undefined, b: ScreenNote | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const prices = (note: ScreenNote) =>
+    Object.entries(note.shopPrices)
+      .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
+      .join(';');
+  return (
+    a.dungeon === b.dungeon &&
+    a.stairway === b.stairway &&
+    a.spot === b.spot &&
+    a.item === b.item &&
+    a.collected === b.collected &&
+    a.secret === b.secret &&
+    a.shop.join() === b.shop.join() &&
+    a.blocks.join() === b.blocks.join() &&
+    prices(a) === prices(b)
+  );
+}
+
 /**
  * Drop what a note holds for a mark the screen no longer carries.
  *

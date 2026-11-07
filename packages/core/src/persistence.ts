@@ -386,7 +386,8 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
     }
 
     if (Object.keys(kept).length === 0) continue;
-    out[level] = conformPairs(kept);
+    // Keyed the way the reducer reads it: "03" is Level 3, stored as "3".
+    out[String(number)] = conformPairs(kept);
   }
   return out;
 }
@@ -467,6 +468,11 @@ function fitNotesToMarks(
   return out;
 }
 
+/** A saved epoch-milliseconds time, or `fallback` when it is not one. */
+function timestamp(saved: unknown, fallback: number): number {
+  return typeof saved === 'number' && Number.isFinite(saved) && saved >= 0 ? Math.trunc(saved) : fallback;
+}
+
 /**
  * Accepts anything shaped like a tracker state; repairs older versions.
  *
@@ -492,6 +498,11 @@ export function migrate(raw: unknown): TrackerState | null {
   return {
     ...base,
     version: STATE_VERSION,
+    // When the run started and was last edited are the save's, not this load's:
+    // every load and every broadcast passes through here. Absent or not a
+    // finite number, they fall back to now.
+    startedAt: timestamp(candidate.startedAt, base.startedAt),
+    updatedAt: timestamp(candidate.updatedAt, base.updatedAt),
     // Saves written before `rev` existed have none; start them at 0.
     //
     // Finite and integral, not merely "a number". JSON has no Infinity literal

@@ -15,6 +15,7 @@
  * count carries a dotted ring outside, so the two facts read together.
  */
 
+import { memo } from 'react';
 import {
   SCREEN_ITEMS_BY_ID,
   TRIFORCE_REQUIRED_FOR_L9,
@@ -56,7 +57,32 @@ const KIND_INITIAL: Record<string, string> = { floor: 'F', stair: 'S', heart: 'H
 /** The three overworld spots are not interchangeable, so they do not share a letter. */
 const SPOT_CODE: Record<string, string> = { 'ow.whiteSword': 'WS', 'ow.armos': 'AR', 'ow.coast': 'CO' };
 
-function Chip({
+/**
+ * A chip is redrawn only when what it shows changes. The placement objects are
+ * rebuilt with every state, so they are compared by what they say — the item,
+ * whether it is collected, and where it was read from — not by identity.
+ */
+function sameChip(a: ChipProps, b: ChipProps): boolean {
+  const said = (placement: ItemPlacement | null) =>
+    placement ? [placement.item, placement.collected, JSON.stringify(placement.source)].join('|') : '';
+  return (
+    a.kind === b.kind &&
+    a.location?.id === b.location?.id &&
+    a.resolver === b.resolver &&
+    a.dispatch === b.dispatch &&
+    said(a.placement) === said(b.placement)
+  );
+}
+
+type ChipProps = {
+  kind: string;
+  location: LocationDef | null;
+  placement: ItemPlacement | null;
+} & Pick<CompactLocationsProps, 'resolver' | 'dispatch'>;
+
+const Chip = memo(ChipBody, sameChip);
+
+function ChipBody({
   kind,
   location,
   placement,

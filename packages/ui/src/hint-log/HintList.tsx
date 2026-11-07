@@ -7,7 +7,9 @@
  * should turn 128 screens into the eight or so worth walking to.
  *
  * Renders in the toolbar's bottom sheet and, for the windows that ask for the
- * `hintlog` section by name, inline in a panel. Holds no state of its own.
+ * `hintlog` section by name, inline in a panel. The only state it holds is
+ * what is mid-typing in a row's screen and note fields (`useDraft`), which
+ * commits once typing pauses.
  */
 
 import { CircleIcon, CircleDotIcon, PlusIcon, XIcon } from 'lucide-react';
@@ -23,6 +25,7 @@ import {
 } from '@z1r/core';
 import { Button } from '#components/ui/button';
 import { Input } from '#components/ui/input';
+import { useDraft } from '../shared/use-draft.js';
 import { Toggle } from '#components/ui/toggle';
 import { SearchPicker, type PickerGroup } from '../shared/SearchPicker.js';
 
@@ -61,6 +64,8 @@ function HintRow({
   hint: HintEntry;
 } & HintListProps) {
   const update = (patch: Partial<Omit<HintEntry, 'id'>>) => dispatch({ type: 'updateHint', id: hint.id, patch });
+  const screenDraft = useDraft(hint.screen, (screen) => update({ screen }));
+  const noteDraft = useDraft(hint.note, (note) => update({ note }));
   const region = hint.region ? REGIONS_BY_ID.get(hint.region) : undefined;
   const focused = !!hint.region && state.focusRegion === hint.region;
   const screens = region ? screensInRegion(region.id, state.seed.mirroredOverworld).length : 0;
@@ -117,8 +122,9 @@ function HintRow({
         maxLength={4}
         spellCheck={false}
         readOnly={!interactive}
-        value={hint.screen}
-        onChange={(event) => update({ screen: event.target.value.trim().toUpperCase() })}
+        value={screenDraft.value}
+        onChange={(event) => screenDraft.onChange(event.target.value.trim().toUpperCase())}
+        onBlur={screenDraft.onBlur}
         className="h-7 w-16 shrink-0 px-2 text-center text-xs uppercase"
       />
       <Input
@@ -126,8 +132,9 @@ function HintRow({
         placeholder="note"
         spellCheck={false}
         readOnly={!interactive}
-        value={hint.note}
-        onChange={(event) => update({ note: event.target.value })}
+        value={noteDraft.value}
+        onChange={(event) => noteDraft.onChange(event.target.value)}
+        onBlur={noteDraft.onBlur}
         className="h-7 min-w-0 flex-[2_1_8rem] px-2 text-xs"
       />
       <Button

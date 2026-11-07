@@ -557,6 +557,10 @@ function DoorWall({
   onPick: (door: DoorState) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Closed for good when the control is disabled, not just hidden: masking it
+  // with `open && !disabled` left `open` true, and the popover came back on its
+  // own the moment the control was enabled again.
+  if (disabled && open) setOpen(false);
   const pick = (door: DoorState) => {
     onPick(door);
     setOpen(false);
@@ -565,7 +569,7 @@ function DoorWall({
     ? 'Pick a room first'
     : `${SIDE_NAME[side]}: ${doorLabel(current)} — click to choose, right-click to clear`;
   return (
-    <Popover open={open && !disabled} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         className="z1r-door-wall"
         data-side={SIDE_CLASS[side]}
@@ -641,6 +645,10 @@ function LayoutPicker({
   onPick: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Closed for good when the control is disabled, not just hidden: masking it
+  // with `open && !disabled` left `open` true, and the popover came back on its
+  // own the moment the control was enabled again.
+  if (disabled && open) setOpen(false);
   // Typing is the fastest way to a layout, so the filter takes focus on open.
   const filter = useRef<HTMLInputElement>(null);
   const current = ROOM_LAYOUTS_BY_ID.get(value);
@@ -649,7 +657,7 @@ function LayoutPicker({
     setOpen(false);
   };
   return (
-    <Popover open={open && !disabled} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
         className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
