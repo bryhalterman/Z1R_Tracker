@@ -24,12 +24,11 @@ export interface SpriteOptions {
  * span when its key changes, so a sheet's scale or an image's sizing left
  * behind would otherwise apply to the next sprite drawn there.
  */
-function paint(element: HTMLElement, resolved: ResolvedSprite, size: number): void {
+export function paint(element: HTMLElement, resolved: ResolvedSprite, size: number): void {
   element.style.backgroundImage = '';
   element.style.backgroundPosition = '';
   element.style.backgroundSize = '';
   element.style.imageRendering = '';
-  element.style.removeProperty('--sheet-scale');
   element.textContent = '';
 
   switch (resolved.kind) {
@@ -63,8 +62,9 @@ function paint(element: HTMLElement, resolved: ResolvedSprite, size: number): vo
       element.dataset.spriteMode = 'sheet';
       element.style.backgroundImage = `url("${resolved.url}")`;
       element.style.backgroundPosition = `${-x * scale}px ${-y * scale}px`;
+      // Sized to the sheet's natural size times `scale` once it has loaded
+      // (see `applySprite`); until then it draws unscaled.
       element.style.backgroundSize = 'auto';
-      element.style.setProperty('--sheet-scale', String(scale));
       return;
     }
   }
@@ -97,6 +97,24 @@ function snapToWholePixels(
 }
 
 /**
+ * Sizes a whole sprite sheet so the region `rect` fills the box.
+ *
+ * The offset `paint` sets is in the same scaled units, so the two agree. The
+ * sheet's natural size is only known once it has loaded; scaling only the
+ * offset, as this used to, showed the wrong region at any size but 1x.
+ */
+export function scaleSheet(
+  element: HTMLElement,
+  natural: { width: number; height: number } | null,
+  rect: readonly [number, number, number, number],
+  size: number,
+): void {
+  if (!natural || !natural.width || !natural.height) return;
+  const scale = size / Math.max(rect[2], rect[3]);
+  element.style.backgroundSize = `${natural.width * scale}px ${natural.height * scale}px`;
+}
+
+/**
  * Paints `key` into an existing sprite element, and degrades it once the
  * network answers. `createSprite` uses it on a fresh span; React uses it on a
  * span it renders itself (`shared/Sprite.tsx`), so the art lands as the slot's
@@ -115,6 +133,10 @@ export function applySprite(element: HTMLElement, resolver: SpriteResolver, key:
       if (element.dataset.spriteKey !== key) return;
       if (!ok) {
         paint(element, resolver.fallback(key), size);
+        return;
+      }
+      if (resolved.kind === 'sheet') {
+        scaleSheet(element, resolver.naturalSize(key), resolved.rect, size);
         return;
       }
       snapToWholePixels(element, resolver.naturalSize(key), size);

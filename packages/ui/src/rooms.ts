@@ -210,7 +210,7 @@ export function buildRooms(
   count.title = 'Rooms recorded on this level';
   title.append(count);
 
-  const clearHost = el('span', 'z1r-heading-clearhost');
+  const clearHost = el('span');
   const onClear = async () => {
     const total = Object.keys(roomsOf(store.getState())).length;
     if (total === 0) return;

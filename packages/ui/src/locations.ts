@@ -185,7 +185,6 @@ function buildCompactLocations(
    */
   if (interactive) {
     const host = document.createElement('div');
-    host.className = 'z1r-locations-compact-react';
     root.append(host);
     const columns = mountCompactLocations(host);
     patches.push((state) => {

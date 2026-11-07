@@ -710,7 +710,6 @@ function buildPalette(
 ): HTMLElement {
   const { placement, placeInto, itemSize } = opts;
   const { root, body } = section('Items', 'z1r-palette');
-  root.classList.add('z1r-palette-panel');
   root.style.setProperty('--z1r-item-min', `${itemSize + 10}px`);
   const heading = root.querySelector('.z1r-panel-title');
 

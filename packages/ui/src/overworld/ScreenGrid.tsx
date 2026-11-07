@@ -557,7 +557,6 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
         style={
           {
             '--mark-color': def?.color ?? 'transparent',
-            '--region-color': region?.color ?? 'transparent',
           } as React.CSSProperties
         }
         aria-label={label}

@@ -270,7 +270,7 @@ export function RoomCard(props: RoomCardProps) {
 
   return (
     <div
-      className="z1r-ui z1r-card grid gap-3 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground"
+      className="z1r-ui grid gap-3 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground"
       {...dropHandlers}
     >
       {/* The room, and the things you do to a room as a whole. */}

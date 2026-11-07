@@ -1,8 +1,4 @@
-export { createSprite, type SpriteOptions } from './sprite.js';
+// What the apps use: the panels are built by `mountTracker` and the header bar
+// by `mountControls`, so the per-panel builders stay internal.
 export { mountTracker, type MountOptions, type TrackerSection } from './tracker.js';
 export { mountControls, type ControlsOptions } from './controls.js';
-export { buildSeedPanel } from './seed-panel.js';
-export { buildLocations } from './locations.js';
-export { buildHintTracker } from './hints.js';
-export { buildTriforce } from './triforce.js';
-export { buildRooms, createPlacement, type PlacementBrush, type PlacementChannel } from './rooms.js';

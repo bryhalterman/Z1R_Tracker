@@ -8,8 +8,6 @@
 
 export { attachPersistence, createInitialState, createStore, load, loadResolver } from '@z1r/core';
 
-export type { TrackerSection as TrackerSectionName } from '@z1r/ui';
-
 import type { TrackerSection } from '@z1r/ui';
 
 /**

@@ -2033,15 +2033,13 @@
   inset: 3px;
   background: color-mix(in srgb, var(--z1r-room-ink) 7%, transparent);
   border: var(--z1r-border-width) solid var(--z1r-room-ink);
-  pointer-events: none;
-}
-
-/* Walked rooms are lit: a soft warm glow around the inked box, spilling just
-   past it. Decoration on top of the box, which already says "visited" by its
-   shape. A shadow rather than a background, because at a dock's cell size the
-   box covers nearly all of the cell and a background glow hid under it. */
-.z1r-room[data-visited='true']::before {
+  /* Walked rooms are lit: a soft warm glow around the inked box, spilling
+     just past it. Decoration on top of the box, which already says "visited"
+     by its shape. A shadow rather than a background, because at a dock's cell
+     size the box covers nearly all of the cell and a background glow hid
+     under it. */
   box-shadow: 0 0 7px 1px var(--z1r-room-glow);
+  pointer-events: none;
 }
 
 /*

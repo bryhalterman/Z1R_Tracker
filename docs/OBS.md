@@ -117,6 +117,11 @@ body { --overlay-pad: 0px; }
 .z1r-tracker { background: rgba(0, 0, 0, .55); border-radius: 6px; }
 ```
 
+To style one part of the overlay, these classes are kept as hooks: `.z1r-panel` on every panel,
+`.z1r-item-groups` (the items), `.z1r-triforce-panel`, `.z1r-locations-compact-panel`, `.z1r-seed`
+and `.z1r-hint-tracker`, plus `.z1r-item-sprite` for each item's art and
+`.z1r-item[data-item="bow"]` for one item by id.
+
 Use `--overlay-pad`, not `padding`. The auto-fit reads that variable when it measures, so the scale
 stays correct; setting `padding` directly both loses on specificity and desynchronizes the fit.
 
