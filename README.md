@@ -16,6 +16,8 @@ lands everywhere at once.
 
 ## Quick start
 
+Needs Node 22 or later.
+
 ```bash
 npm install
 ```
@@ -168,6 +170,10 @@ and it has `map.html` to itself for when you want to read it.
 ```bash
 npm test
 ```
+
+CI also runs `npm run typecheck` (the apps, core on its own without Node types, and the build
+scripts), `npm run lint` (ESLint, including React's rules of hooks), `npm run format:check`
+(Prettier; `npm run format` fixes it) and `npm run theme:check`.
 
 Node's built-in test runner over the pure parts — the reducer, save migration, derived item
 locations, saving and syncing between windows, the sprite resolver, and the UI's pure helpers. See

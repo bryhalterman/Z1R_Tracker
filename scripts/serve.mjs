@@ -39,7 +39,7 @@ const TYPES = {
 };
 
 createServer(async (req, res) => {
-  let rel = '/';
+  let rel;
   try {
     // Decoding lives inside the try: a malformed escape like `/%ZZ` makes
     // decodeURIComponent throw, and an unhandled throw here takes the whole

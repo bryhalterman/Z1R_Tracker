@@ -528,8 +528,7 @@ function settleCollected(
   requested: boolean | undefined,
 ): { collected: boolean; picked: boolean } {
   const sameItem = before.item === item;
-  const collected =
-    item !== '' && (requested !== undefined ? requested : sameItem && before.collected);
+  const collected = item !== '' && (requested !== undefined ? requested : sameItem && before.collected);
   return { collected, picked: collected && !(sameItem && before.collected) };
 }
 
@@ -631,10 +630,7 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
     }
 
     case 'placeStairway': {
-      const number = Math.min(
-        Math.max(Math.trunc(action.number) || 0, 1),
-        OVERWORLD_STAIRWAY_COUNT,
-      );
+      const number = Math.min(Math.max(Math.trunc(action.number) || 0, 1), OVERWORLD_STAIRWAY_COUNT);
       const marks = { ...state.marks };
       const screenNotes = { ...state.screenNotes };
 
@@ -1103,4 +1099,3 @@ export function triforceCount(state: TrackerState): number {
     ([level, dungeon]) => dungeon.triforce && holdsTriforcePiece(Number(level)),
   ).length;
 }
-

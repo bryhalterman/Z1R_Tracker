@@ -71,8 +71,17 @@ const PALETTE_GROUPS: readonly { name: string; caption: string; entries: readonl
     name: 'pool',
     caption: 'Pool',
     entries: [
-      'sword', 'boomerang', 'bow', 'arrow', 'candle', 'ring',
-      'recorder', 'wand', 'magicalKey', 'bombs', 'potion',
+      'sword',
+      'boomerang',
+      'bow',
+      'arrow',
+      'candle',
+      'ring',
+      'recorder',
+      'wand',
+      'magicalKey',
+      'bombs',
+      'potion',
     ],
   },
   {
@@ -157,13 +166,15 @@ function tileClass({
     inFamily ? 'rounded-sm' : 'rounded-lg',
     'focus-visible:ring-2 focus-visible:ring-ring',
     held === 'held' && 'bg-secondary shadow-[inset_0_0_0_1.5px_var(--foreground)]',
-    held === 'unheld' && 'shadow-[inset_0_0_0_1px_var(--border)] [&_.z1r-sprite]:opacity-35 [&_.z1r-sprite]:grayscale',
+    held === 'unheld' &&
+      'shadow-[inset_0_0_0_1px_var(--border)] [&_.z1r-sprite]:opacity-35 [&_.z1r-sprite]:grayscale',
     held === 'none' && 'bg-secondary/50 shadow-[inset_0_0_0_1px_var(--border)]',
     // Bought, not found: a dashed edge in place of the ring, held or not.
     bought && 'shadow-none border border-dashed border-muted-foreground',
     // Armed is the one the next map click spends: a thicker ring in the
     // accent, and the sprite back at full strength whatever is held.
-    armed && 'shadow-[inset_0_0_0_2.5px_var(--primary)] [&_.z1r-sprite]:opacity-100 [&_.z1r-sprite]:grayscale-0',
+    armed &&
+      'shadow-[inset_0_0_0_2.5px_var(--primary)] [&_.z1r-sprite]:opacity-100 [&_.z1r-sprite]:grayscale-0',
     placeable ? 'cursor-grab hover:bg-accent' : 'cursor-pointer hover:bg-accent',
   );
 }
@@ -204,7 +215,21 @@ interface PaletteTileProps {
  * callbacks are made once per mount, so they never break the comparison.
  */
 const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
-  const { spec, inFamily, items, isArmed, where, resolver, itemSize, placeInto, arm, setHeld, step, dragStart, dragEnd } = props;
+  const {
+    spec,
+    inFamily,
+    items,
+    isArmed,
+    where,
+    resolver,
+    itemSize,
+    placeInto,
+    arm,
+    setHeld,
+    step,
+    dragStart,
+    dragEnd,
+  } = props;
   const bought = typeof spec !== 'string';
   const pool = bought ? undefined : SCREEN_ITEMS_BY_ID.get(spec);
   const def = bought ? undefined : (ROOM_ITEMS_BY_ID.get(spec) ?? pool);
@@ -213,7 +238,11 @@ const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
   // The inventory item this tile reports, and the stage it stands for. The
   // Heart Container's inventory id is empty, and the Map, the Compass and a
   // Triforce piece have no pool entry: those four have no held state.
-  const inventory = bought ? ITEMS_BY_ID.get(spec.inventory) : pool?.itemId ? ITEMS_BY_ID.get(pool.itemId) : undefined;
+  const inventory = bought
+    ? ITEMS_BY_ID.get(spec.inventory)
+    : pool?.itemId
+      ? ITEMS_BY_ID.get(pool.itemId)
+      : undefined;
   const stage = bought ? spec.stage : (pool?.value ?? 0);
   const value = inventory ? (items[inventory.id] ?? 0) : 0;
   const name = bought ? (inventory ? labelFor(inventory, stage) : '') : def!.name;
@@ -232,7 +261,7 @@ const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
     if (inventory && stage > 0) setHeld(inventory.id, value >= stage ? stage - 1 : stage);
   };
   const toggleArmed = () => {
-    if (target) arm(isArmed ? '' : spec as string);
+    if (target) arm(isArmed ? '' : (spec as string));
   };
 
   // What the tile is, a fact per line. How to use the palette is behind the
@@ -245,7 +274,8 @@ const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
   if (bought) facts.push('bought in a shop, never placed');
   else if (!target) facts.push('nowhere in this window to place it');
   const hints: string[] = [];
-  if (target) hints.push(isArmed ? 'right-click to put it down' : `right-click to arm, or drag onto ${target}`);
+  if (target)
+    hints.push(isArmed ? 'right-click to put it down' : `right-click to arm, or drag onto ${target}`);
   if (held !== 'none') hints.push(held === 'held' ? 'click to mark it not held' : 'click to mark it held');
   const text = [name, ...facts, ...hints].join(' — ');
 
@@ -308,7 +338,8 @@ const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
 });
 
 export function ItemPalette(props: ItemPaletteProps) {
-  const { state, armed, placedAt, resolver, itemSize, placeInto, arm, setHeld, step, dragStart, dragEnd } = props;
+  const { state, armed, placedAt, resolver, itemSize, placeInto, arm, setHeld, step, dragStart, dragEnd } =
+    props;
 
   /** One tile, keyed by what it stands for. */
   const tile = (spec: TileSpec, inFamily: boolean) => {
@@ -344,10 +375,11 @@ export function ItemPalette(props: ItemPaletteProps) {
     );
   };
 
-
   const groups = [
     ...PALETTE_GROUPS.map(({ name, caption, entries }) => ({ name, caption, tiles: entries.map(entry) })),
-    ...(UNPLACED.length ? [{ name: 'inventory', caption: 'Mark held', tiles: UNPLACED_SPECS.map((spec) => tile(spec, false)) }] : []),
+    ...(UNPLACED.length
+      ? [{ name: 'inventory', caption: 'Mark held', tiles: UNPLACED_SPECS.map((spec) => tile(spec, false)) }]
+      : []),
   ];
 
   return (

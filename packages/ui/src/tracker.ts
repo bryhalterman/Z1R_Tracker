@@ -50,21 +50,9 @@ import { buildSeedPanel } from './seed-panel.js';
 import { buildLocations } from './locations.js';
 import { buildHintTracker } from './hints.js';
 import { buildTriforce } from './triforce.js';
-import {
-  buildRooms,
-  createPlacement,
-  roomItemsForInventory,
-  type PlacementChannel,
-} from './rooms.js';
+import { buildRooms, createPlacement, roomItemsForInventory, type PlacementChannel } from './rooms.js';
 
-export type TrackerSection =
-  | 'seed'
-  | 'items'
-  | 'dungeons'
-  | 'locations'
-  | 'hintlog'
-  | 'map'
-  | 'rooms';
+export type TrackerSection = 'seed' | 'items' | 'dungeons' | 'locations' | 'hintlog' | 'map' | 'rooms';
 
 export interface MountOptions {
   readonly store: Store;
@@ -1196,4 +1184,3 @@ function buildMap(
 
   return root;
 }
-

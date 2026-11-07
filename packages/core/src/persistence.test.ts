@@ -223,7 +223,10 @@ test('migrate coerces hintSeq so new hints cannot collide', () => {
     state = reduce(state, { type: 'addHint' });
     const ids = state.hints.map((h) => h.id);
     assert.equal(new Set(ids).size, ids.length, `ids must stay unique for hintSeq=${String(bad)}`);
-    assert.equal(ids.some((id) => id.includes('NaN')), false);
+    assert.equal(
+      ids.some((id) => id.includes('NaN')),
+      false,
+    );
   }
 });
 
@@ -231,7 +234,10 @@ test('migrate keeps hintSeq above ids already present in the save', () => {
   const state = migrate({ ...legacySave(), hintSeq: 0, hints: [{ id: 'h42' }] });
   assert.ok(state);
   const next = reduce(state, { type: 'addHint' });
-  assert.equal(next.hints.some((h) => h.id === 'h42'), true);
+  assert.equal(
+    next.hints.some((h) => h.id === 'h42'),
+    true,
+  );
   assert.equal(next.hints.filter((h) => h.id === 'h42').length, 1);
 });
 

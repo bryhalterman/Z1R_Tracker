@@ -24,10 +24,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22: the `cn` dependency declares `engines.node >=22`.
+          node-version: 22
           cache: npm
 
       - run: npm ci
+
+      # Deploys run on every push to main, independently of CI, so they check
+      # for themselves rather than publishing a build that fails its tests.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       - name: Build web
         run: npm run build:web

@@ -55,7 +55,10 @@ export function ClearButton({ title, onClear, className }: ClearButtonProps) {
     <Button
       variant="outline"
       size="sm"
-      className={cn('z1r-ui tracking-normal normal-case text-destructive hover:border-destructive', className)}
+      className={cn(
+        'z1r-ui tracking-normal normal-case text-destructive hover:border-destructive',
+        className,
+      )}
       title={title}
       onClick={onClear}
     >

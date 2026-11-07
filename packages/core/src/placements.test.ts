@@ -138,7 +138,7 @@ test('Map, Compass and Triforce fill no slot', () => {
   assert.equal(slot(state, 'd1.floor.0')?.item, 'bow');
 });
 
-test('items beyond a level\'s slots of one kind overflow rather than vanish', () => {
+test("items beyond a level's slots of one kind overflow rather than vanish", () => {
   let state = createInitialState();
   // Level 2 has one floor slot and the heart spot: two floor spots in all.
   state = placeRoom(state, 2, 'A1', 'bow');
@@ -281,7 +281,12 @@ test('un-collecting a room item never revokes it', () => {
 });
 
 test('a room with no item cannot be collected', () => {
-  const base = reduce(createInitialState(), { type: 'setRoomNote', level: 1, room: 'A1', patch: { visited: true } });
+  const base = reduce(createInitialState(), {
+    type: 'setRoomNote',
+    level: 1,
+    room: 'A1',
+    patch: { visited: true },
+  });
   assert.equal(reduce(base, { type: 'collectRoom', level: 1, room: 'A1', collected: true }), base);
   const patched = reduce(base, {
     type: 'setRoomNote',
@@ -292,7 +297,7 @@ test('a room with no item cannot be collected', () => {
   assert.equal(patched, base);
 });
 
-test('changing or clearing a room\'s item resets collected', () => {
+test("changing or clearing a room's item resets collected", () => {
   let state = placeRoom(createInitialState(), 1, 'A1', 'bow');
   state = reduce(state, { type: 'collectRoom', level: 1, room: 'A1', collected: true });
   state = reduce(state, { type: 'setRoomItem', level: 1, room: 'A1', item: 'raft' });
@@ -360,10 +365,7 @@ test('a screen with no item cannot be collected', () => {
   let base = createInitialState();
   base = reduce(base, { type: 'setScreenNote', screen: 'C2', patch: { spot: 'ow.armos' } });
   assert.equal(reduce(base, { type: 'collectScreen', screen: 'C2', collected: true }), base);
-  assert.equal(
-    reduce(createInitialState(), { type: 'collectScreen', screen: 'H1', collected: true }).rev,
-    0,
-  );
+  assert.equal(reduce(createInitialState(), { type: 'collectScreen', screen: 'H1', collected: true }).rev, 0);
 });
 
 test('collectLocation still raises the inventory through the shared grant', () => {
@@ -608,8 +610,8 @@ test('a stored entry for a slot only the other quest has stays hidden, not overf
   // under test is only derived after its entry is in place.
   const first = createInitialState();
   const second = { ...first, seed: { ...first.seed, dungeonQuest: '2nd' as const } };
-  const secondOnly = deriveItemLocations(second).slots
-    .map((slot) => slot.location.id)
+  const secondOnly = deriveItemLocations(second)
+    .slots.map((slot) => slot.location.id)
     .find((id) => !deriveItemLocations(first).slots.some((slot) => slot.location.id === id));
   assert.ok(secondOnly, 'the 2nd quest has a dungeon slot the 1st does not');
   const state = createInitialState();

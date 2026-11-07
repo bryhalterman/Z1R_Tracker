@@ -131,8 +131,7 @@ export function ScreenGrid(props: ScreenGridProps) {
          * than by which was recorded first. Passed as a joined string so the
          * cell's memo compares it by value.
          */
-        const inside =
-          mark === 'dungeon' && note?.dungeon ? dungeonItems(state, note.dungeon).join(',') : '';
+        const inside = mark === 'dungeon' && note?.dungeon ? dungeonItems(state, note.dungeon).join(',') : '';
         // Where a warp's three staircases lead, as tooltip lines — joined, so
         // the memo compares it by value.
         const route = mark === 'stairway' ? routes.find((r) => r.screen === id) : undefined;
@@ -224,7 +223,10 @@ function guidePath(
     return Array.from({ length: SAMPLES + 1 }, (_, i) => {
       const t = i / SAMPLES;
       const u = 1 - t;
-      return { x: u * u * from.x + 2 * u * t * cx + t * t * to.x, y: u * u * from.y + 2 * u * t * cy + t * t * to.y };
+      return {
+        x: u * u * from.x + 2 * u * t * cx + t * t * to.x,
+        y: u * u * from.y + 2 * u * t * cy + t * t * to.y,
+      };
     });
   };
   const cost = (points: readonly { x: number; y: number }[]) =>
@@ -264,7 +266,8 @@ function guidePath(
 function exitLines(route: WarpRoute): string[] {
   return route.exits.map(
     (exit) =>
-      `${EXIT_NAME[exit.position]} → warp ${exit.warp}` + (exit.screen ? ` (${exit.screen})` : ', not marked yet'),
+      `${EXIT_NAME[exit.position]} → warp ${exit.warp}` +
+      (exit.screen ? ` (${exit.screen})` : ', not marked yet'),
   );
 }
 
@@ -281,7 +284,6 @@ function exitLines(route: WarpRoute): string[] {
 function WarpGuides({ from, routes }: { from: string; routes: readonly WarpRoute[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const route = routes.find((r) => r.screen === from);
-  const key = route ? route.exits.map((exit) => exit.screen ?? '').join('|') : '';
   const [geometry, setGeometry] = useState<{
     exits: {
       letter: string;
@@ -343,8 +345,9 @@ function WarpGuides({ from, routes }: { from: string; routes: readonly WarpRoute
       ];
     });
     setGeometry({ exits });
-    // `key` stands for `route`: the routes are rebuilt on every render.
-  }, [from, key]);
+    // `warpRoutes` is cached per state, so these change only when the state
+    // does, not on every hover re-render.
+  }, [from, route, routes]);
 
   return (
     <div ref={ref} className="z1r-warp-guides" aria-hidden="true">
@@ -437,7 +440,10 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
   } = props;
   const def = MARKS_BY_KIND.get(mark);
   const inside = props.inside
-    ? props.inside.split(',').map((entry) => POOL_BY_ID.get(entry)).filter((entry) => !!entry)
+    ? props.inside
+        .split(',')
+        .map((entry) => POOL_BY_ID.get(entry))
+        .filter((entry) => !!entry)
     : [];
 
   /*
@@ -458,14 +464,14 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
   const pricesShown = prices.some((price) => price > 0);
   // The widest number decides the type size: three columns of "250" at the
   // normal size would run into each other.
-  const widest = pricesShown
-    ? Math.max(...prices.map((price) => (price > 0 ? String(price).length : 0)))
-    : 0;
+  const widest = pricesShown ? Math.max(...prices.map((price) => (price > 0 ? String(price).length : 0))) : 0;
 
   // A dungeon, a warp and a stocked shop draw their own art; none of them
   // wants the centred one as well.
   const centred =
-    mark === 'dungeon' || mark === 'stairway' || stocked.length > 0 ? undefined : (held?.sprite ?? def?.sprite);
+    mark === 'dungeon' || mark === 'stairway' || stocked.length > 0
+      ? undefined
+      : (held?.sprite ?? def?.sprite);
 
   /** The text under the mark: blockers, a spot code, a secret's size. */
   let detail = '';
@@ -602,7 +608,9 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
           {centred && <SpriteArt resolver={resolver} spriteKey={centred} size={18} />}
         </span>
         {/* A dungeon draws its level as a large numeral instead of an icon. */}
-        <span className="z1r-screen-level">{mark === 'dungeon' && note?.dungeon ? String(note.dungeon) : ''}</span>
+        <span className="z1r-screen-level">
+          {mark === 'dungeon' && note?.dungeon ? String(note.dungeon) : ''}
+        </span>
         {/* A warp draws its staircase big, with which of the four it is. */}
         <span className="z1r-screen-warp">
           {mark === 'stairway' && def?.sprite && (

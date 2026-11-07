@@ -36,8 +36,8 @@ class PanelBoundary extends Component<{ children: ReactNode }, BoundaryState> {
     if (!this.state.failed) return this.props.children;
     return (
       <p role="alert" className="z1r-ui p-2 text-xs text-muted-foreground">
-        This panel stopped drawing after an error. Your tracking is saved; reload the page to bring
-        the panel back.
+        This panel stopped drawing after an error. Your tracking is saved; reload the page to bring the panel
+        back.
       </p>
     );
   }

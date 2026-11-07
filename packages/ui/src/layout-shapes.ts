@@ -25,21 +25,41 @@ export function layoutShapes(def: RoomLayoutDef): LayoutShape[] {
       const full = { x, y, width: 1, height: 1 };
       switch (square) {
         case '#':
-          shapes.push({ tag: 'rect', kind: 'block', attrs: { x: x + 0.06, y: y + 0.06, width: 0.88, height: 0.88 } });
+          shapes.push({
+            tag: 'rect',
+            kind: 'block',
+            attrs: { x: x + 0.06, y: y + 0.06, width: 0.88, height: 0.88 },
+          });
           break;
         case 'o':
-          shapes.push({ tag: 'ellipse', kind: 'statue', attrs: { cx: x + 0.5, cy: y + 0.5, rx: 0.3, ry: 0.3 } });
+          shapes.push({
+            tag: 'ellipse',
+            kind: 'statue',
+            attrs: { cx: x + 0.5, cy: y + 0.5, rx: 0.3, ry: 0.3 },
+          });
           break;
         case '=':
-          shapes.push({ tag: 'rect', kind: 'stairs', attrs: { x: x + 0.15, y: y + 0.2, width: 0.7, height: 0.15 } });
-          shapes.push({ tag: 'rect', kind: 'stairs', attrs: { x: x + 0.15, y: y + 0.65, width: 0.7, height: 0.15 } });
+          shapes.push({
+            tag: 'rect',
+            kind: 'stairs',
+            attrs: { x: x + 0.15, y: y + 0.2, width: 0.7, height: 0.15 },
+          });
+          shapes.push({
+            tag: 'rect',
+            kind: 'stairs',
+            attrs: { x: x + 0.15, y: y + 0.65, width: 0.7, height: 0.15 },
+          });
           break;
         case '~':
           shapes.push({ tag: 'rect', kind: 'water', attrs: full });
           shapes.push({ tag: 'rect', kind: 'wave', attrs: { x, y: y + 0.45, width: 1, height: 0.1 } });
           break;
         case ':':
-          shapes.push({ tag: 'ellipse', kind: 'sand', attrs: { cx: x + 0.5, cy: y + 0.5, rx: 0.14, ry: 0.14 } });
+          shapes.push({
+            tag: 'ellipse',
+            kind: 'sand',
+            attrs: { cx: x + 0.5, cy: y + 0.5, rx: 0.14, ry: 0.14 },
+          });
           break;
         case 'x':
           shapes.push({ tag: 'rect', kind: 'black', attrs: full });

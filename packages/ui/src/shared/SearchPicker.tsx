@@ -62,7 +62,11 @@ export function SearchPicker({
       <PopoverTrigger
         disabled={disabled}
         aria-label={label}
-        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'min-w-0 justify-between gap-1.5', className)}
+        className={cn(
+          buttonVariants({ variant: 'outline', size: 'sm' }),
+          'min-w-0 justify-between gap-1.5',
+          className,
+        )}
       >
         <span className={cn('truncate', current ? '' : 'text-muted-foreground italic')}>
           {current ? current.label : placeholder}

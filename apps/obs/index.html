@@ -30,8 +30,12 @@
       imports, rather than copies of their values.
     -->
     <style>
-      :root { color-scheme: dark; }
-      * { box-sizing: border-box; }
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         padding: 24px;
@@ -40,9 +44,19 @@
         font-family: var(--z1r-font);
         line-height: 1.5;
       }
-      main { max-inline-size: 640px; margin-inline: auto; }
-      h1 { margin: 0 0 4px; font-size: 20px; }
-      .lede { margin: 0 0 20px; color: var(--z1r-muted); font-size: 14px; }
+      main {
+        max-inline-size: 640px;
+        margin-inline: auto;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      .lede {
+        margin: 0 0 20px;
+        color: var(--z1r-muted);
+        font-size: 14px;
+      }
       .card {
         display: block;
         margin-block-end: 12px;
@@ -53,9 +67,19 @@
         border: 1px solid var(--z1r-border);
         border-radius: 6px;
       }
-      .card:hover { border-color: var(--z1r-accent); }
-      .card h2 { margin: 0 0 2px; font-size: 15px; color: var(--z1r-accent); }
-      .card p { margin: 0 0 8px; font-size: 13px; color: var(--z1r-muted); }
+      .card:hover {
+        border-color: var(--z1r-accent);
+      }
+      .card h2 {
+        margin: 0 0 2px;
+        font-size: 15px;
+        color: var(--z1r-accent);
+      }
+      .card p {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: var(--z1r-muted);
+      }
       code {
         display: inline-block;
         padding: 2px 6px;
@@ -76,7 +100,9 @@
         border-inline-start: 3px solid var(--z1r-accent);
         border-radius: var(--z1r-radius);
       }
-      .note strong { color: var(--z1r-text); }
+      .note strong {
+        color: var(--z1r-text);
+      }
     </style>
   </head>
   <body>
@@ -87,8 +113,8 @@
       <a class="card" href="./overlay.html">
         <h2>Overlay → add as a Browser Source</h2>
         <p>
-          Read-only and transparent, for compositing over the game capture. Every control is
-          disabled on purpose. Append <code>?sections=</code> to choose panels.
+          Read-only and transparent, for compositing over the game capture. Every control is disabled on
+          purpose. Append <code>?sections=</code> to choose panels.
         </p>
         <code id="overlay-url">overlay.html</code>
       </a>
@@ -96,8 +122,8 @@
       <a class="card" href="./dock.html">
         <h2>Dock → add as a Custom Browser Dock</h2>
         <p>
-          Where you click: the items and the Item locations columns, with the seed form, the hint
-          log and Export, Import and Reset in its header bar.
+          Where you click: the items and the Item locations columns, with the seed form, the hint log and
+          Export, Import and Reset in its header bar.
         </p>
         <code id="dock-url">dock.html</code>
       </a>
@@ -105,17 +131,17 @@
       <a class="card" href="./map.html">
         <h2>Map → add as a second Custom Browser Dock</h2>
         <p>
-          The two maps — the overworld and the dungeon room sheet — with the seed and hint log, so
-          the maps can be sized properly and left alone instead of being scrolled past. Shares a run
-          with the dock: a change in either shows in both.
+          The two maps — the overworld and the dungeon room sheet — with the seed and hint log, so the maps
+          can be sized properly and left alone instead of being scrolled past. Shares a run with the dock: a
+          change in either shows in both.
         </p>
         <code id="map-url">map.html</code>
       </a>
 
       <p class="note">
-        <strong>Both must load from this same address.</strong> They sync through localStorage and
-        a BroadcastChannel, which are scoped to an origin — two <code>file://</code> pages do not
-        share one in OBS, so keep using this server for both.
+        <strong>Both must load from this same address.</strong> They sync through localStorage and a
+        BroadcastChannel, which are scoped to an origin — two <code>file://</code> pages do not share one in
+        OBS, so keep using this server for both.
       </p>
     </main>
 

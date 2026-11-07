@@ -12,11 +12,7 @@ import type { Store } from '@z1r/core';
 import type { Patch } from './patch.js';
 import { mountHintList } from './hint-log/mount.js';
 
-export function buildHintTracker(
-  store: Store,
-  patches: Patch[],
-  interactive: boolean,
-): HTMLElement {
+export function buildHintTracker(store: Store, patches: Patch[], interactive: boolean): HTMLElement {
   const root = document.createElement('section');
   root.className = 'z1r-panel z1r-hint-tracker';
 

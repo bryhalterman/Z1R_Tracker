@@ -77,8 +77,8 @@
   --z1r-space-lg: 12px;
 
   /* Type. */
-  --z1r-font: system-ui, "Segoe UI", Roboto, -apple-system, sans-serif;
-  --z1r-font-mono: "Source Code Pro", Monaco, monospace;
+  --z1r-font: system-ui, 'Segoe UI', Roboto, -apple-system, sans-serif;
+  --z1r-font-mono: 'Source Code Pro', Monaco, monospace;
   /* The overworld region codes and the slot chips have to fit inside a
      ~60x40px grid cell, so the two smallest steps sit below body text. */
   --z1r-text-2xs: 9px;

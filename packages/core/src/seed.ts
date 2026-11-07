@@ -15,13 +15,7 @@ import { DUNGEONS } from './dungeons.js';
 
 /** https://z1r.wiki/wiki/Dungeon_Quest */
 export type DungeonQuest =
-  | '1st'
-  | '2nd'
-  | 'mixed'
-  | 'shapes'
-  | 'mixed-shapes'
-  | 'random-no-shapes'
-  | 'random';
+  '1st' | '2nd' | 'mixed' | 'shapes' | 'mixed-shapes' | 'random-no-shapes' | 'random';
 
 export const DUNGEON_QUESTS: readonly { value: DungeonQuest; label: string }[] = [
   { value: '1st', label: '1st Quest' },
@@ -376,11 +370,7 @@ export const MINOR_DROPS: readonly PoolEntry[] = [
 ];
 
 /** Everything an overworld screen can hold: the pool, the minor drops, the extras. */
-export const SCREEN_ITEMS: readonly PoolEntry[] = [
-  ...SHUFFLE_POOL,
-  ...MINOR_DROPS,
-  ...OVERWORLD_EXTRAS,
-];
+export const SCREEN_ITEMS: readonly PoolEntry[] = [...SHUFFLE_POOL, ...MINOR_DROPS, ...OVERWORLD_EXTRAS];
 
 export const SCREEN_ITEMS_BY_ID: ReadonlyMap<string, PoolEntry> = new Map(
   SCREEN_ITEMS.map((entry) => [entry.id, entry]),

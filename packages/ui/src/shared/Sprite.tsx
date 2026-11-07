@@ -7,7 +7,15 @@ import { applySprite, createSprite } from '../sprite.js';
  * the tracker draws, so art, glyph fallbacks and the manifest behave the same.
  * Labelled empty — it always sits inside a control that names it.
  */
-export function Sprite({ resolver, spriteKey, size }: { resolver: SpriteResolver; spriteKey: string; size: number }) {
+export function Sprite({
+  resolver,
+  spriteKey,
+  size,
+}: {
+  resolver: SpriteResolver;
+  spriteKey: string;
+  size: number;
+}) {
   const ref = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     ref.current?.replaceChildren(createSprite(resolver, spriteKey, { size, label: '' }));

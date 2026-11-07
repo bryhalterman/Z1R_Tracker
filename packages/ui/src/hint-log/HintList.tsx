@@ -51,7 +51,13 @@ const SUBJECTS: readonly PickerGroup[] = [
 ];
 
 const REGION_OPTIONS: readonly PickerGroup[] = [
-  { options: REGIONS.map((def) => ({ value: def.id, label: `${def.code} · ${def.name}`, keywords: [def.code] })) },
+  {
+    options: REGIONS.map((def) => ({
+      value: def.id,
+      label: `${def.code} · ${def.name}`,
+      keywords: [def.code],
+    })),
+  },
 ];
 
 function HintRow({
@@ -63,7 +69,8 @@ function HintRow({
 }: {
   hint: HintEntry;
 } & HintListProps) {
-  const update = (patch: Partial<Omit<HintEntry, 'id'>>) => dispatch({ type: 'updateHint', id: hint.id, patch });
+  const update = (patch: Partial<Omit<HintEntry, 'id'>>) =>
+    dispatch({ type: 'updateHint', id: hint.id, patch });
   const screenDraft = useDraft(hint.screen, (screen) => update({ screen }));
   const noteDraft = useDraft(hint.note, (note) => update({ note }));
   const region = hint.region ? REGIONS_BY_ID.get(hint.region) : undefined;
@@ -105,7 +112,11 @@ function HintRow({
         size="sm"
         pressed={focused}
         disabled={!interactive || !region}
-        title={region ? `${focused ? 'Hide' : 'Show'} ${region.name} on the map (${screens} screens)` : 'Pick a region first'}
+        title={
+          region
+            ? `${focused ? 'Hide' : 'Show'} ${region.name} on the map (${screens} screens)`
+            : 'Pick a region first'
+        }
         onPressedChange={(pressed) => {
           if (!hint.region) return;
           dispatch({ type: 'focusRegion', region: hint.region });

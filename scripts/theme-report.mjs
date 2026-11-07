@@ -45,7 +45,10 @@ function toRgb(value) {
   }
   const rgb = value.match(/^rgba?\(([^)]+)\)$/i);
   if (rgb) {
-    const parts = rgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    const parts = rgb[1]
+      .split(/[\s,/]+/)
+      .filter(Boolean)
+      .map(Number);
     if (parts.length >= 3 && parts.every((n) => Number.isFinite(n))) return parts.slice(0, 3);
   }
   return null;
@@ -60,15 +63,15 @@ const luminance = ([r, g, b]) => {
 };
 
 const contrast = (a, b) => {
-  const [l1, l2] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (l1 + 0.05) / (l2 + 0.05);
+  const [la, lb] = [luminance(a), luminance(b)];
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 };
 
 // Comments stripped first, so a value quoted in a comment is never read.
 const themeCss = (await readFile(THEME, 'utf8')).replace(/\/\*[\s\S]*?\*\//g, '');
 const bindings = new Map();
 for (const [, name, value] of themeCss.matchAll(/(--z1r-[\w-]+)\s*:\s*([^;]+);/g)) {
-  bindings.set(name, value.trim());
+  if (name && value) bindings.set(name, value.trim());
 }
 
 /** Foreground / background pairs the tracker actually renders. */
@@ -105,8 +108,7 @@ for (const [fg, bg, label] of PAIRS) {
   const ok = ratio >= 4.5;
   if (!ok) failures++;
   console.log(
-    `  ${ok ? 'PASS' : 'FAIL'}  ${ratio.toFixed(2).padStart(5)}:1  ${label}` +
-      `  (${fg} on ${bg})`,
+    `  ${ok ? 'PASS' : 'FAIL'}  ${ratio.toFixed(2).padStart(5)}:1  ${label}` + `  (${fg} on ${bg})`,
   );
 }
 

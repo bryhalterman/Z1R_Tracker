@@ -28,13 +28,18 @@ export function SeedSheet({ store }: { store: Store }) {
   const set = (patch: Partial<SeedSettings>) => store.dispatch({ type: 'setSeed', patch });
   return (
     <Sheet>
-      <SheetTrigger className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'z1r-ui')} title="Seed settings">
+      <SheetTrigger
+        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'z1r-ui')}
+        title="Seed settings"
+      >
         Seed
       </SheetTrigger>
       <SheetContent side="right" className="z1r-ui w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Seed settings</SheetTitle>
-          <SheetDescription>Set these before the run. They decide each level’s item slots and the map.</SheetDescription>
+          <SheetDescription>
+            Set these before the run. They decide each level’s item slots and the map.
+          </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-4">
           <SeedForm seed={seed} interactive set={set} />

@@ -37,7 +37,10 @@ test('middle and right are the two after that, wrapping', () => {
 
 test('a warp never lists itself as an exit', () => {
   for (const route of warpRoutes(createInitialState())) {
-    assert.equal(route.exits.some((exit) => exit.warp === route.warp), false);
+    assert.equal(
+      route.exits.some((exit) => exit.warp === route.warp),
+      false,
+    );
   }
 });
 

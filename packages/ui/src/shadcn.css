@@ -10,9 +10,9 @@
  * own source folders, so no class the existing panels use can pick one up.
  */
 @layer theme, base, components, utilities;
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities) source(none);
-@import "tw-animate-css";
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+@import 'tw-animate-css';
 
 @source "./room-card";
 @source "./room-grid";

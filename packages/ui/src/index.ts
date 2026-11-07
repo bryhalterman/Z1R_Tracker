@@ -5,9 +5,4 @@ export { buildSeedPanel } from './seed-panel.js';
 export { buildLocations } from './locations.js';
 export { buildHintTracker } from './hints.js';
 export { buildTriforce } from './triforce.js';
-export {
-  buildRooms,
-  createPlacement,
-  type PlacementBrush,
-  type PlacementChannel,
-} from './rooms.js';
+export { buildRooms, createPlacement, type PlacementBrush, type PlacementChannel } from './rooms.js';

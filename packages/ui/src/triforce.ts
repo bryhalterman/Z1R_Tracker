@@ -306,9 +306,7 @@ export function buildTriforce(resolver: SpriteResolver, patches: Patch[]): HTMLE
     figure.dataset.unsure = String(unsure);
     figure.setAttribute(
       'aria-description',
-      unsure
-        ? 'Level numbering assumes the recorded quest split, which may not be confirmed yet.'
-        : '',
+      unsure ? 'Level numbering assumes the recorded quest split, which may not be confirmed yet.' : '',
     );
   });
 

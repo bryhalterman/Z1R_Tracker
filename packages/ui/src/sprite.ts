@@ -56,7 +56,6 @@ function paint(element: HTMLElement, resolved: ResolvedSprite, size: number): vo
       element.dataset.spriteMode = 'image';
       element.style.backgroundImage = `url("${resolved.url}")`;
       return;
-    
 
     case 'sheet': {
       const [x, y, width, height] = resolved.rect;
@@ -103,12 +102,7 @@ function snapToWholePixels(
  * span it renders itself (`shared/Sprite.tsx`), so the art lands as the slot's
  * direct child the way the stylesheet's `> .z1r-sprite` rules expect.
  */
-export function applySprite(
-  element: HTMLElement,
-  resolver: SpriteResolver,
-  key: string,
-  size: number,
-): void {
+export function applySprite(element: HTMLElement, resolver: SpriteResolver, key: string, size: number): void {
   element.dataset.spriteKey = key;
   const resolved = resolver.resolve(key);
   paint(element, resolved, size);

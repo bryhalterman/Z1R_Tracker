@@ -275,7 +275,9 @@ export function RoomCard(props: RoomCardProps) {
     >
       {/* The room, and the things you do to a room as a whole. */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={cn('mr-1 tabular-nums', selected ? 'text-base font-semibold' : 'text-muted-foreground')}>
+        <span
+          className={cn('mr-1 tabular-nums', selected ? 'text-base font-semibold' : 'text-muted-foreground')}
+        >
           {selected ? `L${level} · ${selected}` : 'Click a room'}
         </span>
         {/* One three-way state: never on the map, seen on the map (the level's
@@ -368,154 +370,165 @@ export function RoomCard(props: RoomCardProps) {
         </div>
 
         <div className="grid min-w-[13rem] flex-1 gap-2">
-        <Row label="Layout">
-          <LayoutPicker
-            value={note?.layout ?? ''}
-            disabled={off}
-            onPick={(id) => patch(id ? { layout: id, visited: true } : { layout: '' })}
-          />
-        </Row>
-
-        {/* The item comes from the palette; this row shows it and whether it is held. */}
-        <Row label="Item">
-          <span
-            className={cn(
-              'inline-grid size-7 place-items-center rounded-md border',
-              itemDef ? 'border-border' : 'border-dashed border-border',
-              // A shape, not a tint: a dashed ring outside the slot while an
-              // item it can take is over it.
-              dropping && 'outline-2 outline-offset-2 outline-dashed outline-primary',
-            )}
-            title={
-              itemDef
-                ? itemDef.name
-                : 'Nothing placed — drag an item onto this card, or arm one in the palette and click this room'
-            }
-          >
-            {itemDef ? <Sprite resolver={resolver} spriteKey={itemDef.sprite} size={18} /> : null}
-          </span>
-          <span className={cn(itemDef ? '' : 'text-muted-foreground italic')}>{itemDef ? itemDef.name : 'none'}</span>
-          <CheckToggle
-            label="Collected"
-            pressed={!!itemDef && !!note?.collected}
-            disabled={off || !itemDef}
-            title={
-              itemDef
-                ? note?.collected
-                  ? `Mark ${itemDef.name} not picked up. The inventory keeps what collecting gave it.`
-                  : `Mark ${itemDef.name} picked up, which marks it held`
-                : 'Nothing here to collect'
-            }
-            onPressedChange={(pressed) =>
-              selected && note?.item && commit({ type: 'collectRoom', level, room: selected, collected: pressed })
-            }
-          />
-          {itemDef ? (
-            <Button
-              variant="ghost"
-              size="sm"
+          <Row label="Layout">
+            <LayoutPicker
+              value={note?.layout ?? ''}
               disabled={off}
-              title={`Forget that ${itemDef.name} is here`}
-              onClick={() => selected && commit({ type: 'setRoomItem', level, room: selected, item: '' })}
-            >
-              Clear
-            </Button>
-          ) : null}
-        </Row>
-
-        {/* Only a pool entry fills a slot, so only a pool entry is asked how it was found. */}
-        {slotted ? (
-          <Row label="From">
-            <Segmented
-              label="Which location slot this item fills"
-              value={note?.from ?? 'auto'}
-              disabled={off}
-              options={ROOM_FROMS.map((from) => ({
-                value: from,
-                text: from === 'auto' ? `Auto · ${FROM_NAME[autoFrom]}` : FROM_NAME[from],
-              }))}
-              onChange={(from) => from && selected && commit({ type: 'setRoomFrom', level, room: selected, from })}
+              onPick={(id) => patch(id ? { layout: id, visited: true } : { layout: '' })}
             />
           </Row>
-        ) : null}
 
-        <Row label="Boss">
-          <ToggleGroup
-            aria-label="Boss in this room"
-            variant="outline"
-            size="sm"
-            spacing={1}
-            className="flex-wrap"
-            value={note?.boss ? [note.boss] : []}
-            disabled={off}
-            onValueChange={(next) => setBoss(next[0] ?? '')}
-          >
-            {DUNGEON_BOSSES.filter((boss) => bossAllowedOnLevel(boss.id, level)).map((boss) => (
-              <ToggleGroupItem
-                key={boss.id}
-                value={boss.id}
-                title={boss.level9Only ? `${boss.name} — Level 9 only` : boss.name}
-                aria-label={boss.name}
-                className="size-8 px-0 data-[pressed]:border-primary data-[pressed]:ring-2 data-[pressed]:ring-primary"
-              >
-                <Sprite resolver={resolver} spriteKey={boss.sprite} size={22} />
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </Row>
-
-        <Row label="Stairs">
-          <Segmented
-            label="What the staircase in this room is"
-            value={selected ? stairs : null}
-            disabled={off}
-            options={ROOM_STAIRS.map((stair) => ({
-              value: stair.id,
-              text: STAIR_WORD[stair.id],
-              title: stair.tag ? `${stair.name} (${stair.tag})` : stair.name,
-              disabled: stairsRuledOut && stair.id !== 'none',
-            }))}
-            onChange={setStairs}
-          />
-          {stairsRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
-          {stairs === 'transport' ? (
-            <Segmented
-              label="Which transport pair this staircase is half of"
-              value={transport ? String(transport) : null}
-              disabled={off}
-              options={Array.from({ length: pairsShown }, (_, index) => ({
-                value: String(index + 1),
-                text: String(index + 1),
-                title: transport === index + 1 ? `Transport pair ${index + 1} — click again to unpair` : `Transport pair ${index + 1}`,
-              }))}
-              onChange={(value) => {
-                if (!selected) return;
-                // The pressed number again unpairs; the staircase itself stays.
-                commit(
-                  value === ''
-                    ? { type: 'clearRoomTransport', level, room: selected }
-                    : { type: 'placeRoomTransport', level, room: selected, number: Number(value) },
-                );
-              }}
+          {/* The item comes from the palette; this row shows it and whether it is held. */}
+          <Row label="Item">
+            <span
+              className={cn(
+                'inline-grid size-7 place-items-center rounded-md border',
+                itemDef ? 'border-border' : 'border-dashed border-border',
+                // A shape, not a tint: a dashed ring outside the slot while an
+                // item it can take is over it.
+                dropping && 'outline-2 outline-offset-2 outline-dashed outline-primary',
+              )}
+              title={
+                itemDef
+                  ? itemDef.name
+                  : 'Nothing placed — drag an item onto this card, or arm one in the palette and click this room'
+              }
+            >
+              {itemDef ? <Sprite resolver={resolver} spriteKey={itemDef.sprite} size={18} /> : null}
+            </span>
+            <span className={cn(itemDef ? '' : 'text-muted-foreground italic')}>
+              {itemDef ? itemDef.name : 'none'}
+            </span>
+            <CheckToggle
+              label="Collected"
+              pressed={!!itemDef && !!note?.collected}
+              disabled={off || !itemDef}
+              title={
+                itemDef
+                  ? note?.collected
+                    ? `Mark ${itemDef.name} not picked up. The inventory keeps what collecting gave it.`
+                    : `Mark ${itemDef.name} picked up, which marks it held`
+                  : 'Nothing here to collect'
+              }
+              onPressedChange={(pressed) =>
+                selected &&
+                note?.item &&
+                commit({ type: 'collectRoom', level, room: selected, collected: pressed })
+              }
             />
-          ) : null}
-        </Row>
+            {itemDef ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={off}
+                title={`Forget that ${itemDef.name} is here`}
+                onClick={() => selected && commit({ type: 'setRoomItem', level, room: selected, item: '' })}
+              >
+                Clear
+              </Button>
+            ) : null}
+          </Row>
 
-        <Row label="Push">
-          <Segmented
-            label="Whether a block in this room might push"
-            value={selected ? (note?.pushBlock ?? '') || 'none' : null}
-            disabled={off}
-            options={ROOM_PUSH_BLOCKS.map((value) => ({
-              value: value || 'none',
-              text: PUSH_WORD[value],
-              title: PUSH_TITLE[value],
-              disabled: pushRuledOut && value !== '',
-            }))}
-            onChange={(value) => patch({ pushBlock: value === 'maybe' || value === 'checked' ? value : '' })}
-          />
-          {pushRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
-        </Row>
+          {/* Only a pool entry fills a slot, so only a pool entry is asked how it was found. */}
+          {slotted ? (
+            <Row label="From">
+              <Segmented
+                label="Which location slot this item fills"
+                value={note?.from ?? 'auto'}
+                disabled={off}
+                options={ROOM_FROMS.map((from) => ({
+                  value: from,
+                  text: from === 'auto' ? `Auto · ${FROM_NAME[autoFrom]}` : FROM_NAME[from],
+                }))}
+                onChange={(from) =>
+                  from && selected && commit({ type: 'setRoomFrom', level, room: selected, from })
+                }
+              />
+            </Row>
+          ) : null}
+
+          <Row label="Boss">
+            <ToggleGroup
+              aria-label="Boss in this room"
+              variant="outline"
+              size="sm"
+              spacing={1}
+              className="flex-wrap"
+              value={note?.boss ? [note.boss] : []}
+              disabled={off}
+              onValueChange={(next) => setBoss(next[0] ?? '')}
+            >
+              {DUNGEON_BOSSES.filter((boss) => bossAllowedOnLevel(boss.id, level)).map((boss) => (
+                <ToggleGroupItem
+                  key={boss.id}
+                  value={boss.id}
+                  title={boss.level9Only ? `${boss.name} — Level 9 only` : boss.name}
+                  aria-label={boss.name}
+                  className="size-8 px-0 data-[pressed]:border-primary data-[pressed]:ring-2 data-[pressed]:ring-primary"
+                >
+                  <Sprite resolver={resolver} spriteKey={boss.sprite} size={22} />
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </Row>
+
+          <Row label="Stairs">
+            <Segmented
+              label="What the staircase in this room is"
+              value={selected ? stairs : null}
+              disabled={off}
+              options={ROOM_STAIRS.map((stair) => ({
+                value: stair.id,
+                text: STAIR_WORD[stair.id],
+                title: stair.tag ? `${stair.name} (${stair.tag})` : stair.name,
+                disabled: stairsRuledOut && stair.id !== 'none',
+              }))}
+              onChange={setStairs}
+            />
+            {stairsRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
+            {stairs === 'transport' ? (
+              <Segmented
+                label="Which transport pair this staircase is half of"
+                value={transport ? String(transport) : null}
+                disabled={off}
+                options={Array.from({ length: pairsShown }, (_, index) => ({
+                  value: String(index + 1),
+                  text: String(index + 1),
+                  title:
+                    transport === index + 1
+                      ? `Transport pair ${index + 1} — click again to unpair`
+                      : `Transport pair ${index + 1}`,
+                }))}
+                onChange={(value) => {
+                  if (!selected) return;
+                  // The pressed number again unpairs; the staircase itself stays.
+                  commit(
+                    value === ''
+                      ? { type: 'clearRoomTransport', level, room: selected }
+                      : { type: 'placeRoomTransport', level, room: selected, number: Number(value) },
+                  );
+                }}
+              />
+            ) : null}
+          </Row>
+
+          <Row label="Push">
+            <Segmented
+              label="Whether a block in this room might push"
+              value={selected ? (note?.pushBlock ?? '') || 'none' : null}
+              disabled={off}
+              options={ROOM_PUSH_BLOCKS.map((value) => ({
+                value: value || 'none',
+                text: PUSH_WORD[value],
+                title: PUSH_TITLE[value],
+                disabled: pushRuledOut && value !== '',
+              }))}
+              onChange={(value) =>
+                patch({ pushBlock: value === 'maybe' || value === 'checked' ? value : '' })
+              }
+            />
+            {pushRuledOut && layoutDef ? <NotAvailable reason={layoutDef.name} /> : null}
+          </Row>
 
           <Row label="Room">
             <CheckToggle
@@ -583,7 +596,9 @@ function DoorWall({
         }}
       >
         <span className="z1r-door-line" />
-        <span className="z1r-door-tag">{current === 'unknown' ? '?' : (DOOR_STATES_BY_ID.get(current)?.tag ?? '')}</span>
+        <span className="z1r-door-tag">
+          {current === 'unknown' ? '?' : (DOOR_STATES_BY_ID.get(current)?.tag ?? '')}
+        </span>
       </PopoverTrigger>
       <PopoverContent
         align="center"
@@ -615,7 +630,9 @@ function DoorWall({
                 )}
                 onClick={() => pick(door)}
               >
-                <span className="inline-flex w-3 justify-center">{checked ? <CheckIcon className="size-3.5" /> : null}</span>
+                <span className="inline-flex w-3 justify-center">
+                  {checked ? <CheckIcon className="size-3.5" /> : null}
+                </span>
                 <span data-door={door} className="inline-flex">
                   <span className="z1r-door-line" />
                 </span>
@@ -661,14 +678,18 @@ function LayoutPicker({
       <PopoverTrigger
         disabled={disabled}
         className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
-        title={current ? `${current.name} — pick a different layout` : 'Pick what stands on this room’s floor'}
+        title={
+          current ? `${current.name} — pick a different layout` : 'Pick what stands on this room’s floor'
+        }
       >
         {current ? (
           <span className="inline-flex h-4 w-7 border border-border">
             <LayoutArt def={current} className="size-full" />
           </span>
         ) : null}
-        <span className={cn(current ? '' : 'text-muted-foreground italic')}>{current ? current.name : 'not recorded'}</span>
+        <span className={cn(current ? '' : 'text-muted-foreground italic')}>
+          {current ? current.name : 'not recorded'}
+        </span>
         <ChevronDownIcon data-icon="inline-end" />
       </PopoverTrigger>
       <PopoverContent align="start" initialFocus={filter} className="z1r-ui w-72 p-0">

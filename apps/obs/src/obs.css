@@ -25,8 +25,7 @@ body.overlay {
    * scale would itself be scaled, and the overlay would drift further off
    * centre the larger it got.
    */
-  transform: translate(var(--overlay-x, 0px), var(--overlay-y, 0px))
-    scale(var(--overlay-scale, 1));
+  transform: translate(var(--overlay-x, 0px), var(--overlay-y, 0px)) scale(var(--overlay-scale, 1));
   transform-origin: top left;
 }
 

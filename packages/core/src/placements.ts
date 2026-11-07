@@ -19,7 +19,13 @@
 import { DUNGEONS } from './dungeons.js';
 import { allScreenIds } from './overworld.js';
 import { allRoomIds, resolveRoomFrom, type RoomNote, type RoomSlotKind } from './rooms.js';
-import { deriveLocations, OVERWORLD_LOCATIONS, POOL_BY_ID, SCREEN_ITEMS_BY_ID, type LocationDef } from './seed.js';
+import {
+  deriveLocations,
+  OVERWORLD_LOCATIONS,
+  POOL_BY_ID,
+  SCREEN_ITEMS_BY_ID,
+  type LocationDef,
+} from './seed.js';
 import type { TrackerState } from './state.js';
 import { formerExtraFloorLevel } from './legacy-locations.js';
 

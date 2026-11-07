@@ -116,9 +116,9 @@ export function createPlacement(): PlacementChannel {
  * Magical Shield, the Bait and the Letter.
  */
 export function roomItemsForInventory(def: ItemDef): readonly string[] {
-  return SHUFFLE_POOL.filter(
-    (entry) => entry.itemId === def.id && ROOM_ITEMS_BY_ID.has(entry.id),
-  ).map((entry) => entry.id);
+  return SHUFFLE_POOL.filter((entry) => entry.itemId === def.id && ROOM_ITEMS_BY_ID.has(entry.id)).map(
+    (entry) => entry.id,
+  );
 }
 
 /* -------------------------------------------------------------------- panel */
@@ -345,7 +345,6 @@ export function buildRooms(
   const cardHost = el('div', 'z1r-room-cardhost');
   body.append(cardHost);
   const card = mountRoomCard(cardHost);
-
 
   /* ------------------------------------------------------------- the passes */
 

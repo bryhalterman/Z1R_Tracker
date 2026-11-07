@@ -35,7 +35,7 @@
   user-select: none;
 }
 
-.z1r-sprite[data-sprite-mode="svg"] > svg {
+.z1r-sprite[data-sprite-mode='svg'] > svg {
   inline-size: 100%;
   block-size: 100%;
   display: block;
@@ -43,7 +43,7 @@
   shape-rendering: geometricPrecision;
 }
 
-.z1r-sprite[data-sprite-mode="glyph"] {
+.z1r-sprite[data-sprite-mode='glyph'] {
   font-family: var(--z1r-font-mono);
   font-size: calc(var(--sprite-size, 32px) * 0.42);
   font-weight: 700;
@@ -105,7 +105,7 @@
  * border around the empty half of a row that did not fill, which read as part
  * of the group rather than as leftover space.
  */
-.z1r-item-group[data-group="bslot"] .z1r-item-grid {
+.z1r-item-group[data-group='bslot'] .z1r-item-grid {
   inline-size: fit-content;
   max-inline-size: 100%;
   padding: var(--z1r-space-sm);
@@ -139,10 +139,13 @@
   /* Unobtained items read as silhouettes, the convention every tracker uses. */
   filter: grayscale(1) brightness(0.45);
   opacity: 0.6;
-  transition: filter 90ms linear, opacity 90ms linear, border-color 90ms linear;
+  transition:
+    filter 90ms linear,
+    opacity 90ms linear,
+    border-color 90ms linear;
 }
 
-.z1r-item[data-owned="true"] {
+.z1r-item[data-owned='true'] {
   filter: none;
   opacity: 1;
   border-style: solid;
@@ -165,7 +168,9 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--z1r-text);
-  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  text-shadow:
+    0 0 3px #000,
+    0 0 3px #000;
   pointer-events: none;
 }
 
@@ -194,7 +199,7 @@
   transition: fill 90ms linear;
 }
 
-.z1r-tri-piece[data-on="true"] polygon {
+.z1r-tri-piece[data-on='true'] polygon {
   fill: var(--z1r-accent);
   stroke-width: 1.25;
 }
@@ -208,14 +213,14 @@
   user-select: none;
 }
 
-.z1r-tri-piece[data-on="true"] text {
+.z1r-tri-piece[data-on='true'] text {
   font-weight: 800;
   fill: var(--z1r-bg);
 }
 
 /* Mixed and Random seeds don't reveal the quest split until the player records
    it, so the numbering shown may not be the seed's. */
-.z1r-triforce[data-unsure="true"] .z1r-tri-piece text {
+.z1r-triforce[data-unsure='true'] .z1r-tri-piece text {
   font-style: italic;
   text-decoration: underline dotted;
 }
@@ -246,7 +251,7 @@
   pointer-events: none;
 }
 
-.z1r-triforce-panel[data-winnable="true"] .z1r-endgame-figure {
+.z1r-triforce-panel[data-winnable='true'] .z1r-endgame-figure {
   display: block;
   animation: z1r-endgame-arrive 520ms ease-out;
 }
@@ -264,7 +269,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .z1r-triforce-panel[data-winnable="true"] .z1r-endgame-figure {
+  .z1r-triforce-panel[data-winnable='true'] .z1r-endgame-figure {
     animation: none;
   }
 }
@@ -293,7 +298,7 @@
   stroke-linejoin: round;
 }
 
-.z1r-triforce[data-complete="true"] .z1r-triforce-edge {
+.z1r-triforce[data-complete='true'] .z1r-triforce-edge {
   display: block;
 }
 
@@ -414,7 +419,7 @@
   color: var(--z1r-muted);
 }
 
-.z1r-triforce-status[data-ready="true"] {
+.z1r-triforce-status[data-ready='true'] {
   color: var(--z1r-good);
   font-weight: 600;
 }
@@ -464,10 +469,12 @@
   border-radius: var(--z1r-radius-cell);
   cursor: pointer;
   box-shadow: inset 0 0 0 0 var(--mark-color, transparent);
-  transition: box-shadow 90ms linear, background-color 90ms linear;
+  transition:
+    box-shadow 90ms linear,
+    background-color 90ms linear;
 }
 
-.z1r-screen:not([data-mark="none"]) {
+.z1r-screen:not([data-mark='none']) {
   box-shadow: inset 0 0 0 2px var(--mark-color, transparent);
 }
 
@@ -522,7 +529,7 @@
   pointer-events: none;
 }
 
-.z1r-map[data-regions="false"] .z1r-screen-region {
+.z1r-map[data-regions='false'] .z1r-screen-region {
   display: none;
 }
 
@@ -562,11 +569,11 @@
  * other screen dims and the match gets a white ring outside the tile: a change
  * in brightness and a ring, so it does not lean on colour.
  */
-.z1r-map[data-preview="true"] .z1r-screen:not([data-previewed="true"]) {
+.z1r-map[data-preview='true'] .z1r-screen:not([data-previewed='true']) {
   filter: brightness(0.45);
 }
 
-.z1r-map[data-preview="true"] .z1r-screen[data-previewed="true"] {
+.z1r-map[data-preview='true'] .z1r-screen[data-previewed='true'] {
   outline: 3px solid var(--z1r-text);
   outline-offset: 2px;
   z-index: 3;
@@ -625,14 +632,14 @@
 }
 
 /* Under the cell, for a destination on the top row. */
-.z1r-warp-guide-tag[data-below="true"] {
+.z1r-warp-guide-tag[data-below='true'] {
   transform: translate(-50%, 4px);
 }
 
 /* Selected as well: the usual ring would sit on the box, so the selection
    moves outside the tile as a dashed ring instead. Still a ring, still white,
    and dashed so it does not read as part of the box. */
-.z1r-screen[data-selected="true"][data-start="true"] {
+.z1r-screen[data-selected='true'][data-start='true'] {
   outline: 2px dashed var(--z1r-text);
   outline-offset: 1px;
   z-index: 3;
@@ -649,13 +656,13 @@
   filter: drop-shadow(0 0 1px var(--z1r-bg)) drop-shadow(0 0 1px var(--z1r-bg));
 }
 
-.z1r-screen[data-start="true"] .z1r-screen-region {
+.z1r-screen[data-start='true'] .z1r-screen-region {
   inset-inline-start: calc(var(--map-cell-height, 34px) * 0.5 + 4px);
 }
 
 /* A focused hint labels its own region even with the codes switched off —
    that is the moment the label is worth the space. */
-.z1r-map[data-regions="false"] .z1r-screen[data-focused="true"] .z1r-screen-region {
+.z1r-map[data-regions='false'] .z1r-screen[data-focused='true'] .z1r-screen-region {
   display: block;
 }
 
@@ -695,7 +702,7 @@
   block-size: calc(var(--map-cell-height, 34px) * 0.62);
 }
 
-.z1r-screen:not([data-mark="none"]) .z1r-screen-mark {
+.z1r-screen:not([data-mark='none']) .z1r-screen-mark {
   display: flex;
 }
 
@@ -720,7 +727,11 @@
   color: var(--z1r-text);
   /* Outlined rather than backed by a plate: over 128 wildly different terrain
      tiles an outline is the only thing that reads everywhere. */
-  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+  text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 #000,
+    1px 0 0 #000,
+    -1px 0 0 #000;
   pointer-events: none;
 }
 
@@ -729,7 +740,7 @@
  * row uses, so a number sits under the item it belongs to rather than in a
  * centred run that has to be counted off against the sprites.
  */
-.z1r-screen-detail[data-prices="true"] {
+.z1r-screen-detail[data-prices='true'] {
   display: flex;
   justify-content: center;
   letter-spacing: 0;
@@ -749,12 +760,12 @@
  * reach 255. The step down is only taken when a wide number is actually on the
  * tile, so the common two-figure price keeps the larger type.
  */
-.z1r-screen-detail[data-digits="3"] .z1r-screen-price {
+.z1r-screen-detail[data-digits='3'] .z1r-screen-price {
   font-size: calc(var(--z1r-text-2xs) - 1px);
   letter-spacing: -0.04em;
 }
 
-.z1r-screen-detail[data-digits="4"] .z1r-screen-price {
+.z1r-screen-detail[data-digits='4'] .z1r-screen-price {
   font-size: calc(var(--z1r-text-2xs) - 2px);
   letter-spacing: -0.06em;
 }
@@ -788,7 +799,7 @@
 }
 
 /* Only when there is a price line to clear. */
-.z1r-screen[data-shop-prices="true"] .z1r-screen-stock {
+.z1r-screen[data-shop-prices='true'] .z1r-screen-stock {
   inset-block-end: calc(var(--z1r-text-2xs) * 1.2);
 }
 
@@ -838,7 +849,7 @@
 }
 
 /* A shop drawing its stock has no use for the empty centre disc. */
-.z1r-screen[data-mark="shop"] .z1r-screen-mark:empty {
+.z1r-screen[data-mark='shop'] .z1r-screen-mark:empty {
   display: none;
 }
 
@@ -849,12 +860,12 @@
  * reach it, and called out properly once the Ladder is in hand. The dashed
  * outline says "known, not yet reachable"; solid says "go now".
  */
-.z1r-screen[data-coast="true"] {
+.z1r-screen[data-coast='true'] {
   outline: 2px dashed var(--z1r-muted);
   outline-offset: -2px;
 }
 
-.z1r-screen[data-coast-ready="true"] {
+.z1r-screen[data-coast-ready='true'] {
   outline: 2px solid var(--z1r-accent);
   animation: z1r-screen-beckon 2.6s ease-in-out infinite;
 }
@@ -867,7 +878,7 @@
  * rather than information. The ring is on top of the outline, so the marker is
  * still identifiable when the animation is off.
  */
-.z1r-screen[data-ready="true"] {
+.z1r-screen[data-ready='true'] {
   outline: 2px solid var(--z1r-accent);
   outline-offset: -2px;
   animation: z1r-screen-beckon 2.6s ease-in-out infinite;
@@ -888,8 +899,8 @@
  * remain — so it can be dropped wholesale.
  */
 @media (prefers-reduced-motion: reduce) {
-  .z1r-screen[data-ready="true"],
-  .z1r-screen[data-coast-ready="true"] {
+  .z1r-screen[data-ready='true'],
+  .z1r-screen[data-coast-ready='true'] {
     animation: none;
     box-shadow: 0 0 6px 2px color-mix(in srgb, var(--z1r-accent) 70%, transparent);
   }
@@ -897,17 +908,16 @@
 
 /* A focused region is called out by a ring, a bolder code, and by every other
    screen dimming — three channels, none of which is colour on its own. */
-.z1r-map:has(.z1r-screen[data-focused="true"]) .z1r-screen:not([data-focused="true"])
-  .z1r-screen-terrain {
+.z1r-map:has(.z1r-screen[data-focused='true']) .z1r-screen:not([data-focused='true']) .z1r-screen-terrain {
   opacity: 0.3;
 }
 
-.z1r-screen[data-focused="true"] {
+.z1r-screen[data-focused='true'] {
   border-color: var(--z1r-accent);
   border-width: 2px;
 }
 
-.z1r-screen[data-focused="true"] .z1r-screen-region {
+.z1r-screen[data-focused='true'] .z1r-screen-region {
   font-weight: 800;
   background: var(--z1r-accent);
   color: var(--z1r-bg);
@@ -966,36 +976,41 @@
 
 /* --------------------------------------------------------- overlay variant */
 
-.z1r-tracker[data-mode="overlay"] {
+.z1r-tracker[data-mode='overlay'] {
   gap: 6px;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-panel {
+.z1r-tracker[data-mode='overlay'] .z1r-panel {
   background: transparent;
   border: 0;
   padding: 0;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-panel-title {
+.z1r-tracker[data-mode='overlay'] .z1r-panel-title {
   display: none;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-item {
+.z1r-tracker[data-mode='overlay'] .z1r-item {
   background: transparent;
   border-color: transparent;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-item[data-owned="true"] {
+.z1r-tracker[data-mode='overlay'] .z1r-item[data-owned='true'] {
   border-color: transparent;
 }
 
 /* Outlines, not a backdrop — the overlay sits on unpredictable colours. */
-.z1r-tracker[data-mode="overlay"] .z1r-item-badge {
-  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 4px #000;
+.z1r-tracker[data-mode='overlay'] .z1r-item-badge {
+  text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 #000,
+    1px 0 0 #000,
+    -1px 0 0 #000,
+    0 0 4px #000;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-sprite[data-sprite-mode="image"],
-.z1r-tracker[data-mode="overlay"] .z1r-sprite[data-sprite-mode="sheet"] {
+.z1r-tracker[data-mode='overlay'] .z1r-sprite[data-sprite-mode='image'],
+.z1r-tracker[data-mode='overlay'] .z1r-sprite[data-sprite-mode='sheet'] {
   filter: drop-shadow(0 0 2px #000);
 }
 
@@ -1060,20 +1075,20 @@
  * layout has none of that ambiguity, and stacked panels need nothing flex
  * offers.
  */
-.z1r-tracker[data-width="xs"] .z1r-pair,
-.z1r-tracker[data-width="sm"] .z1r-pair {
+.z1r-tracker[data-width='xs'] .z1r-pair,
+.z1r-tracker[data-width='sm'] .z1r-pair {
   display: block;
 }
 
-.z1r-tracker[data-width="xs"] .z1r-pair > .z1r-panel,
-.z1r-tracker[data-width="sm"] .z1r-pair > .z1r-panel {
+.z1r-tracker[data-width='xs'] .z1r-pair > .z1r-panel,
+.z1r-tracker[data-width='sm'] .z1r-pair > .z1r-panel {
   min-inline-size: 0;
   max-inline-size: none;
   block-size: auto;
 }
 
-.z1r-tracker[data-width="xs"] .z1r-pair > .z1r-panel + .z1r-panel,
-.z1r-tracker[data-width="sm"] .z1r-pair > .z1r-panel + .z1r-panel {
+.z1r-tracker[data-width='xs'] .z1r-pair > .z1r-panel + .z1r-panel,
+.z1r-tracker[data-width='sm'] .z1r-pair > .z1r-panel + .z1r-panel {
   margin-block-start: var(--z1r-space-md);
 }
 
@@ -1119,11 +1134,11 @@
  * A checked-and-empty screen is deliberately quiet: it is the largest group by
  * the end of a run, and it exists to be skipped over rather than looked at.
  */
-.z1r-screen[data-mark="visited"] .z1r-screen-mark {
+.z1r-screen[data-mark='visited'] .z1r-screen-mark {
   opacity: 0.55;
 }
 
-.z1r-screen[data-mark="visited"] .z1r-screen-terrain {
+.z1r-screen[data-mark='visited'] .z1r-screen-terrain {
   opacity: 0.45;
 }
 
@@ -1179,18 +1194,18 @@
   border-radius: var(--z1r-radius);
 }
 
-.z1r-compact-slot[data-known="true"] {
+.z1r-compact-slot[data-known='true'] {
   color: var(--z1r-text);
 }
 
 /* Collected: solid border and full strength. Unknown or uncollected stays
    dashed and dimmed, so the state never rests on colour. */
-.z1r-compact-slot[data-collected="true"] {
+.z1r-compact-slot[data-collected='true'] {
   border-style: solid;
   border-color: var(--z1r-accent);
 }
 
-.z1r-compact-slot[data-collected="false"] {
+.z1r-compact-slot[data-collected='false'] {
   /* These 9px codes are the smallest text in the app and the only thing naming
      a slot's kind on the dock. 0.7 measured 3.69:1 against the composited
      well; 0.85 measures 4.69:1. The dashed border is the state either way. */
@@ -1211,13 +1226,13 @@
  * thing saying collected — there is no room for a check — and the two facts
  * have to read together.
  */
-.z1r-compact-slot[data-overflow="true"] {
+.z1r-compact-slot[data-overflow='true'] {
   outline: var(--z1r-border-width) dotted var(--z1r-bad);
   outline-offset: 1px;
 }
 
 /* The overlay is read-only and sits over gameplay: no panel chrome at all. */
-.z1r-tracker[data-mode="overlay"] .z1r-locations-compact-panel {
+.z1r-tracker[data-mode='overlay'] .z1r-locations-compact-panel {
   padding: 0;
 }
 
@@ -1227,14 +1242,18 @@
  * The B-slot box and the Triforce panel carry borders that make sense on a page
  * and read as stray rectangles over a game capture.
  */
-.z1r-tracker[data-mode="overlay"] .z1r-item-group[data-group="bslot"] .z1r-item-grid {
+.z1r-tracker[data-mode='overlay'] .z1r-item-group[data-group='bslot'] .z1r-item-grid {
   padding: 0;
   border-color: transparent;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-item-group-label,
-.z1r-tracker[data-mode="overlay"] .z1r-locations-summary {
-  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+.z1r-tracker[data-mode='overlay'] .z1r-item-group-label,
+.z1r-tracker[data-mode='overlay'] .z1r-locations-summary {
+  text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 #000,
+    1px 0 0 #000,
+    -1px 0 0 #000;
 }
 
 /*
@@ -1244,21 +1263,21 @@
  * fewer columns than fit would hug the start edge, and a start-aligned caption
  * above a centred grid reads as a misalignment rather than a heading.
  */
-.z1r-tracker[data-mode="overlay"] .z1r-item-grid {
+.z1r-tracker[data-mode='overlay'] .z1r-item-grid {
   justify-content: center;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-item-group-label {
+.z1r-tracker[data-mode='overlay'] .z1r-item-group-label {
   text-align: center;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-compact-slot {
+.z1r-tracker[data-mode='overlay'] .z1r-compact-slot {
   background: transparent;
 }
 
 /* Fixed composition width: never let a panel push past it. */
-.z1r-tracker[data-mode="overlay"] .z1r-pair > .z1r-items-panel,
-.z1r-tracker[data-mode="overlay"] .z1r-pair > .z1r-triforce-panel {
+.z1r-tracker[data-mode='overlay'] .z1r-pair > .z1r-items-panel,
+.z1r-tracker[data-mode='overlay'] .z1r-pair > .z1r-triforce-panel {
   min-inline-size: 0;
   max-inline-size: none;
 }
@@ -1271,7 +1290,7 @@
  * the triangle in the corner of a 420px panel with a third of the width dead
  * beside it. The item rows centre, so this centres too.
  */
-.z1r-tracker[data-mode="overlay"] .z1r-triforce {
+.z1r-tracker[data-mode='overlay'] .z1r-triforce {
   margin-inline: auto;
   /* Not the full width: the triangle is close to 2:1, so letting it span the
      composition doubles the overlay's height for no extra legibility, and
@@ -1279,9 +1298,13 @@
   max-inline-size: 260px;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-triforce-status {
+.z1r-tracker[data-mode='overlay'] .z1r-triforce-status {
   text-align: center;
-  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+  text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 #000,
+    1px 0 0 #000,
+    -1px 0 0 #000;
 }
 
 /*
@@ -1298,17 +1321,17 @@
  * per-wedge `aria-label` still names the level and its state for screen
  * readers. The dock and the web app keep their numerals.
  */
-.z1r-tracker[data-mode="overlay"] .z1r-tri-piece text {
+.z1r-tracker[data-mode='overlay'] .z1r-tri-piece text {
   display: none;
 }
 
 /* Unheld wedges are near-invisible against dark gameplay without this. */
-.z1r-tracker[data-mode="overlay"] .z1r-tri-piece polygon {
+.z1r-tracker[data-mode='overlay'] .z1r-tri-piece polygon {
   stroke: #000;
   stroke-width: 1.5;
 }
 
-.z1r-tracker[data-mode="overlay"] .z1r-tri-piece[data-on="true"] polygon {
+.z1r-tracker[data-mode='overlay'] .z1r-tri-piece[data-on='true'] polygon {
   stroke: #000;
   stroke-width: 1.5;
 }
@@ -1324,7 +1347,7 @@
 }
 
 /* The whole heading is the hit target, so say so. */
-.z1r-tracker[data-interactive="true"] .z1r-panel-title {
+.z1r-tracker[data-interactive='true'] .z1r-panel-title {
   cursor: pointer;
   user-select: none;
 }
@@ -1338,11 +1361,11 @@
  * Fold everything but the heading. The caret glyph changes with the state as
  * well, so the panel is not identified as folded by its height alone.
  */
-.z1r-panel[data-collapsed="true"] > :not(.z1r-panel-title) {
+.z1r-panel[data-collapsed='true'] > :not(.z1r-panel-title) {
   display: none;
 }
 
-.z1r-panel[data-collapsed="true"] > .z1r-panel-title {
+.z1r-panel[data-collapsed='true'] > .z1r-panel-title {
   margin-block-end: 0;
 }
 
@@ -1354,7 +1377,7 @@
  * A ring plus an offset, so it reads on top of terrain of any colour and does
  * not get lost among the mark outlines the cell may also be carrying.
  */
-.z1r-screen[data-selected="true"] {
+.z1r-screen[data-selected='true'] {
   outline: 3px solid var(--z1r-text);
   outline-offset: -3px;
   z-index: 2;
@@ -1366,13 +1389,13 @@
  * The cursor says the map is in stamping mode, on every cell at once. Cheaper
  * to notice than a toolbar you are not looking at.
  */
-.z1r-map[data-armed="true"] .z1r-screen {
+.z1r-map[data-armed='true'] .z1r-screen {
   cursor: copy;
 }
 
 /* A palette item the overworld cannot hold — the Map, the Compass, a Triforce
    piece — is armed: a click here places nothing, and the pointer says so. */
-.z1r-map[data-refusing="true"] .z1r-screen {
+.z1r-map[data-refusing='true'] .z1r-screen {
   cursor: not-allowed;
 }
 
@@ -1401,8 +1424,13 @@
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--z1r-text);
-  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000,
-    1px 1px 0 #000, -1px -1px 0 #000;
+  text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 #000,
+    1px 0 0 #000,
+    -1px 0 0 #000,
+    1px 1px 0 #000,
+    -1px -1px 0 #000;
   pointer-events: none;
 }
 
@@ -1469,7 +1497,7 @@
   border-radius: var(--z1r-radius);
 }
 
-.z1r-compact-head[data-on="true"] {
+.z1r-compact-head[data-on='true'] {
   border-style: solid;
   border-color: var(--z1r-accent);
 }
@@ -1493,7 +1521,7 @@
   block-size: 20px;
 }
 
-.z1r-compact-head[data-on="false"] .z1r-compact-head-art {
+.z1r-compact-head[data-on='false'] .z1r-compact-head-art {
   opacity: 0.4;
   filter: grayscale(1);
 }
@@ -1524,7 +1552,7 @@
   pointer-events: none;
 }
 
-.z1r-compact-head[data-on="true"] .z1r-compact-numeral {
+.z1r-compact-head[data-on='true'] .z1r-compact-numeral {
   font-weight: 800;
   color: var(--z1r-bg);
 }
@@ -1539,7 +1567,7 @@
   color: var(--z1r-muted);
 }
 
-.z1r-locations-triforce[data-ready="true"] {
+.z1r-locations-triforce[data-ready='true'] {
   color: var(--z1r-good);
 }
 
@@ -1601,8 +1629,11 @@
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
-  text-shadow: 0 1px 0 var(--z1r-text), 0 -1px 0 var(--z1r-text),
-    1px 0 0 var(--z1r-text), -1px 0 0 var(--z1r-text);
+  text-shadow:
+    0 1px 0 var(--z1r-text),
+    0 -1px 0 var(--z1r-text),
+    1px 0 0 var(--z1r-text),
+    -1px 0 0 var(--z1r-text);
 }
 
 .z1r-screen-warp-num:empty {
@@ -1616,7 +1647,7 @@
  * as the page scrolls, so both stay beside whichever map you are dropping onto. The panels stack in
  * the main column to its right, which is the width the layout bands measure.
  */
-.z1r-tracker[data-rail="true"] {
+.z1r-tracker[data-rail='true'] {
   flex-direction: row;
   align-items: flex-start;
 }
@@ -1667,19 +1698,19 @@
  * gap. `min-inline-size: 0` because a flex item floors at its content's
  * minimum otherwise, and both hold a grid wide enough to push past the share.
  */
-.z1r-main[data-maps="side"] {
+.z1r-main[data-maps='side'] {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: flex-start;
 }
 
-.z1r-main[data-maps="side"] > * {
+.z1r-main[data-maps='side'] > * {
   flex: 1 1 100%;
   min-inline-size: 0;
 }
 
-.z1r-main[data-maps="side"] > .z1r-map-panel,
-.z1r-main[data-maps="side"] > .z1r-rooms-panel {
+.z1r-main[data-maps='side'] > .z1r-map-panel,
+.z1r-main[data-maps='side'] > .z1r-rooms-panel {
   flex: 1 1 calc(50% - 8px / 2);
 }
 
@@ -1690,7 +1721,7 @@
  * sitting on the boundary, where a pixel of rounding would drop the card back
  * under the sheet. Stacked, the sheet has the room for its full size.
  */
-.z1r-main[data-maps="side"] > .z1r-rooms-panel {
+.z1r-main[data-maps='side'] > .z1r-rooms-panel {
   --z1r-room-sheet: 300px;
 }
 
@@ -1774,8 +1805,8 @@
  * nothing about this feature should change what a viewer sees; the attribute is
  * still set there, so a Custom CSS rule can opt back in.
  */
-.z1r-tracker:not([data-mode="overlay"]) .z1r-item[data-placed="true"]::after {
-  content: "\25e5";
+.z1r-tracker:not([data-mode='overlay']) .z1r-item[data-placed='true']::after {
+  content: '\25e5';
   position: absolute;
   inset-block-start: 0;
   inset-inline-end: 1px;
@@ -1923,13 +1954,13 @@
 }
 
 /* While an item is armed, the whole sheet says a click will place it. */
-.z1r-room-paper[data-arming="true"],
-.z1r-room-paper[data-arming="true"] .z1r-room {
+.z1r-room-paper[data-arming='true'],
+.z1r-room-paper[data-arming='true'] .z1r-room {
   cursor: copy;
 }
 
 /* An overworld-only item armed: a click here places nothing, as on the map. */
-.z1r-room-paper[data-refusing="true"] .z1r-room {
+.z1r-room-paper[data-refusing='true'] .z1r-room {
   cursor: not-allowed;
 }
 
@@ -1996,8 +2027,8 @@
  * you would draw it over the squares. Unvisited is left as bare paper, so the
  * difference is a drawn shape rather than a shade.
  */
-.z1r-room[data-visited="true"]::before {
-  content: "";
+.z1r-room[data-visited='true']::before {
+  content: '';
   position: absolute;
   inset: 3px;
   background: color-mix(in srgb, var(--z1r-room-ink) 7%, transparent);
@@ -2009,7 +2040,7 @@
    past it. Decoration on top of the box, which already says "visited" by its
    shape. A shadow rather than a background, because at a dock's cell size the
    box covers nearly all of the cell and a background glow hid under it. */
-.z1r-room[data-visited="true"]::before {
+.z1r-room[data-visited='true']::before {
   box-shadow: 0 0 7px 1px var(--z1r-room-glow);
 }
 
@@ -2019,15 +2050,15 @@
  * family, but a dashed line against a solid one rather than a shade apart.
  * A walked room drops it, since the solid box says more.
  */
-.z1r-room[data-known="true"][data-visited="false"]::before {
-  content: "";
+.z1r-room[data-known='true'][data-visited='false']::before {
+  content: '';
   position: absolute;
   inset: 4px;
   border: var(--z1r-border-width-thick) dashed color-mix(in srgb, var(--z1r-room-ink) 62%, transparent);
   pointer-events: none;
 }
 
-.z1r-room[aria-current="true"] {
+.z1r-room[aria-current='true'] {
   outline: var(--z1r-border-width-thick) solid var(--z1r-accent);
   outline-offset: -2px;
 }
@@ -2085,7 +2116,7 @@
 }
 
 .z1r-room-door::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   margin: auto;
@@ -2119,19 +2150,14 @@
  * state now means. Every edge also names its state, with the model's own
  * two-letter tag, in its tooltip.
  */
-.z1r-room-door.n[data-door="open"]::after,
-.z1r-room-door.s[data-door="open"]::after {
+.z1r-room-door.n[data-door='open']::after,
+.z1r-room-door.s[data-door='open']::after {
   block-size: 3px;
-  background: linear-gradient(
-    to right,
-    var(--z1r-good) 0 32%,
-    transparent 32% 68%,
-    var(--z1r-good) 68% 100%
-  );
+  background: linear-gradient(to right, var(--z1r-good) 0 32%, transparent 32% 68%, var(--z1r-good) 68% 100%);
 }
 
-.z1r-room-door.e[data-door="open"]::after,
-.z1r-room-door.w[data-door="open"]::after {
+.z1r-room-door.e[data-door='open']::after,
+.z1r-room-door.w[data-door='open']::after {
   inline-size: 3px;
   background: linear-gradient(
     to bottom,
@@ -2141,11 +2167,11 @@
   );
 }
 
-.z1r-room-door[data-door="wall"]::after {
+.z1r-room-door[data-door='wall']::after {
   border-block-start: 3px solid var(--z1r-room-ink);
 }
 
-.z1r-room-door[data-door="bombed"]::after {
+.z1r-room-door[data-door='bombed']::after {
   border-block-start: 3px solid var(--z1r-bad);
 }
 
@@ -2155,8 +2181,8 @@
  * across the line — upright on a north or south edge, flat on an east or west
  * one — and stays inside the 10px edge so it cannot reach into the cell art.
  */
-.z1r-room-door[data-door="bombed"]::before {
-  content: "";
+.z1r-room-door[data-door='bombed']::before {
+  content: '';
   position: absolute;
   inset: 0;
   margin: auto;
@@ -2165,40 +2191,40 @@
   background: var(--z1r-bad);
 }
 
-.z1r-room-door[data-door="locked"]::after {
+.z1r-room-door[data-door='locked']::after {
   border-block-start: 3px double var(--z1r-accent);
 }
 
-.z1r-room-door[data-door="shutter"]::after {
+.z1r-room-door[data-door='shutter']::after {
   border-block-start: 3px dotted var(--z1r-stair);
 }
 
-.z1r-room-door.e[data-door="wall"]::after,
-.z1r-room-door.w[data-door="wall"]::after {
+.z1r-room-door.e[data-door='wall']::after,
+.z1r-room-door.w[data-door='wall']::after {
   border-block-start: 0;
   border-inline-start: 3px solid var(--z1r-room-ink);
 }
 
-.z1r-room-door.e[data-door="bombed"]::after,
-.z1r-room-door.w[data-door="bombed"]::after {
+.z1r-room-door.e[data-door='bombed']::after,
+.z1r-room-door.w[data-door='bombed']::after {
   border-block-start: 0;
   border-inline-start: 3px solid var(--z1r-bad);
 }
 
-.z1r-room-door.e[data-door="bombed"]::before,
-.z1r-room-door.w[data-door="bombed"]::before {
+.z1r-room-door.e[data-door='bombed']::before,
+.z1r-room-door.w[data-door='bombed']::before {
   inline-size: 9px;
   block-size: 3px;
 }
 
-.z1r-room-door.e[data-door="locked"]::after,
-.z1r-room-door.w[data-door="locked"]::after {
+.z1r-room-door.e[data-door='locked']::after,
+.z1r-room-door.w[data-door='locked']::after {
   border-block-start: 0;
   border-inline-start: 3px double var(--z1r-accent);
 }
 
-.z1r-room-door.e[data-door="shutter"]::after,
-.z1r-room-door.w[data-door="shutter"]::after {
+.z1r-room-door.e[data-door='shutter']::after,
+.z1r-room-door.w[data-door='shutter']::after {
   border-block-start: 0;
   border-inline-start: 3px dotted var(--z1r-stair);
 }
@@ -2316,7 +2342,7 @@
   filter: drop-shadow(0 0 1px var(--z1r-bg)) drop-shadow(0 0 1px var(--z1r-bg));
 }
 
-.z1r-room[data-ladder="clear"] .z1r-room-ladder > .z1r-sprite {
+.z1r-room[data-ladder='clear'] .z1r-room-ladder > .z1r-sprite {
   opacity: 0.45;
 }
 
@@ -2329,7 +2355,11 @@
   font-weight: 700;
   line-height: 1;
   color: var(--z1r-good);
-  text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
+  text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 #000,
+    1px 0 0 #000,
+    -1px 0 0 #000;
 }
 
 /*
@@ -2490,32 +2520,32 @@
   cursor: default;
 }
 
-.z1r-door-wall[data-side="n"],
-.z1r-door-wall[data-side="s"] {
+.z1r-door-wall[data-side='n'],
+.z1r-door-wall[data-side='s'] {
   inset-inline: var(--wall);
   block-size: var(--wall);
 }
 
-.z1r-door-wall[data-side="n"] {
+.z1r-door-wall[data-side='n'] {
   inset-block-start: 0;
 }
 
-.z1r-door-wall[data-side="s"] {
+.z1r-door-wall[data-side='s'] {
   inset-block-end: 0;
 }
 
-.z1r-door-wall[data-side="w"],
-.z1r-door-wall[data-side="e"] {
+.z1r-door-wall[data-side='w'],
+.z1r-door-wall[data-side='e'] {
   inset-block: var(--wall);
   inline-size: var(--wall);
   flex-direction: column;
 }
 
-.z1r-door-wall[data-side="w"] {
+.z1r-door-wall[data-side='w'] {
   inset-inline-start: 0;
 }
 
-.z1r-door-wall[data-side="e"] {
+.z1r-door-wall[data-side='e'] {
   inset-inline-end: 0;
 }
 
@@ -2537,39 +2567,34 @@
   border-radius: var(--z1r-radius-cell);
 }
 
-.z1r-door-wall[data-side="w"] .z1r-door-line,
-.z1r-door-wall[data-side="e"] .z1r-door-line {
+.z1r-door-wall[data-side='w'] .z1r-door-line,
+.z1r-door-wall[data-side='e'] .z1r-door-line {
   inline-size: 7px;
   block-size: 18px;
 }
 
-.z1r-door-wall[data-side="n"] .z1r-door-line,
-.z1r-door-wall[data-side="s"] .z1r-door-line {
+.z1r-door-wall[data-side='n'] .z1r-door-line,
+.z1r-door-wall[data-side='s'] .z1r-door-line {
   inline-size: 28px;
 }
 
-.z1r-door-wall[data-side="w"] .z1r-door-line,
-.z1r-door-wall[data-side="e"] .z1r-door-line {
+.z1r-door-wall[data-side='w'] .z1r-door-line,
+.z1r-door-wall[data-side='e'] .z1r-door-line {
   block-size: 28px;
 }
 
 /* Unknown: a dashed outline, an edge nobody has looked at yet. */
-[data-door="unknown"] > .z1r-door-line {
+[data-door='unknown'] > .z1r-door-line {
   border: var(--z1r-border-width) dashed var(--z1r-muted);
 }
 
 /* Open: two stubs with a gap — a doorway, drawn the way paper draws one. */
-[data-door="open"] > .z1r-door-line {
-  background: linear-gradient(
-    to right,
-    var(--z1r-good) 0 32%,
-    transparent 32% 68%,
-    var(--z1r-good) 68% 100%
-  );
+[data-door='open'] > .z1r-door-line {
+  background: linear-gradient(to right, var(--z1r-good) 0 32%, transparent 32% 68%, var(--z1r-good) 68% 100%);
 }
 
-.z1r-door-wall[data-side="w"][data-door="open"] > .z1r-door-line,
-.z1r-door-wall[data-side="e"][data-door="open"] > .z1r-door-line {
+.z1r-door-wall[data-side='w'][data-door='open'] > .z1r-door-line,
+.z1r-door-wall[data-side='e'][data-door='open'] > .z1r-door-line {
   background: linear-gradient(
     to bottom,
     var(--z1r-good) 0 32%,
@@ -2579,17 +2604,17 @@
 }
 
 /* Wall: solid. */
-[data-door="wall"] > .z1r-door-line {
+[data-door='wall'] > .z1r-door-line {
   background: var(--z1r-text);
 }
 
 /* Bombed: the wall's solid line with a tick across it, the bomb spent. */
-[data-door="bombed"] > .z1r-door-line {
+[data-door='bombed'] > .z1r-door-line {
   background: var(--z1r-bad);
 }
 
-[data-door="bombed"] > .z1r-door-line::after {
-  content: "";
+[data-door='bombed'] > .z1r-door-line::after {
+  content: '';
   position: absolute;
   inset: -3px 0;
   margin-inline: auto;
@@ -2598,8 +2623,8 @@
   box-shadow: 0 0 0 1px var(--z1r-panel);
 }
 
-.z1r-door-wall[data-side="w"][data-door="bombed"] > .z1r-door-line::after,
-.z1r-door-wall[data-side="e"][data-door="bombed"] > .z1r-door-line::after {
+.z1r-door-wall[data-side='w'][data-door='bombed'] > .z1r-door-line::after,
+.z1r-door-wall[data-side='e'][data-door='bombed'] > .z1r-door-line::after {
   inset: 0 -3px;
   margin-inline: 0;
   margin-block: auto;
@@ -2608,30 +2633,22 @@
 }
 
 /* Locked: double. */
-[data-door="locked"] > .z1r-door-line {
+[data-door='locked'] > .z1r-door-line {
   border-block: 2px solid var(--z1r-accent);
 }
 
-.z1r-door-wall[data-side="w"][data-door="locked"] > .z1r-door-line,
-.z1r-door-wall[data-side="e"][data-door="locked"] > .z1r-door-line {
+.z1r-door-wall[data-side='w'][data-door='locked'] > .z1r-door-line,
+.z1r-door-wall[data-side='e'][data-door='locked'] > .z1r-door-line {
   border-block: 0;
   border-inline: 2px solid var(--z1r-accent);
 }
 
 /* Shutter: bars. */
-[data-door="shutter"] > .z1r-door-line {
-  background: repeating-linear-gradient(
-    to right,
-    var(--z1r-stair) 0 2px,
-    transparent 2px 4px
-  );
+[data-door='shutter'] > .z1r-door-line {
+  background: repeating-linear-gradient(to right, var(--z1r-stair) 0 2px, transparent 2px 4px);
 }
 
-.z1r-door-wall[data-side="w"][data-door="shutter"] > .z1r-door-line,
-.z1r-door-wall[data-side="e"][data-door="shutter"] > .z1r-door-line {
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--z1r-stair) 0 2px,
-    transparent 2px 4px
-  );
+.z1r-door-wall[data-side='w'][data-door='shutter'] > .z1r-door-line,
+.z1r-door-wall[data-side='e'][data-door='shutter'] > .z1r-door-line {
+  background: repeating-linear-gradient(to bottom, var(--z1r-stair) 0 2px, transparent 2px 4px);
 }

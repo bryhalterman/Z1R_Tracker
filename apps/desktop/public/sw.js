@@ -22,7 +22,10 @@ self.addEventListener('install', (event) => {
   // The precise asset names are hashed at build time, so warm the entry point
   // only and let the fetch handler fill in the rest on first run.
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(['./', './index.html'])).catch(() => {}),
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) => cache.addAll(['./', './index.html']))
+      .catch(() => {}),
   );
   self.skipWaiting();
 });
@@ -33,9 +36,7 @@ self.addEventListener('activate', (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys
-            .filter((key) => key !== SHELL_CACHE && key !== SPRITE_CACHE)
-            .map((key) => caches.delete(key)),
+          keys.filter((key) => key !== SHELL_CACHE && key !== SPRITE_CACHE).map((key) => caches.delete(key)),
         ),
       )
       .then(() => self.clients.claim()),
@@ -88,8 +89,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin === self.location.origin) {
     // A navigation or the sprite manifest must never pin the app to an old
     // build; everything else same-origin is content-hashed and safe to keep.
-    const mustBeFresh =
-      request.mode === 'navigate' || url.pathname.endsWith('/sprites.json');
+    const mustBeFresh = request.mode === 'navigate' || url.pathname.endsWith('/sprites.json');
     event.respondWith(mustBeFresh ? networkFirst(request) : cacheFirst(request));
   } else if (request.destination === 'image') {
     event.respondWith(staleWhileRevalidate(request));

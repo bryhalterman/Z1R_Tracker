@@ -67,20 +67,20 @@ body {
  * The subtraction is the page's own chrome: 16px of body padding top and
  * bottom, the 61px header, and the footer line.
  */
-#tracker.z1r-tracker[data-mode="full"] > .z1r-main > .z1r-map-panel {
+#tracker.z1r-tracker[data-mode='full'] > .z1r-main > .z1r-map-panel {
   display: flex;
   flex-direction: column;
   max-block-size: calc(100vh - 128px);
 }
 
-#tracker.z1r-tracker[data-mode="full"] > .z1r-main > .z1r-map-panel > * {
+#tracker.z1r-tracker[data-mode='full'] > .z1r-main > .z1r-map-panel > * {
   /* Only the row holding the grid and the screen card gives up height. The
      title and the marker brushes are a fixed handful of rows, and brushes that
      scrolled away from the map they stamp would be worse than a shorter map. */
   flex: none;
 }
 
-#tracker.z1r-tracker[data-mode="full"] > .z1r-main > .z1r-map-panel > .z1r-map-row {
+#tracker.z1r-tracker[data-mode='full'] > .z1r-main > .z1r-map-panel > .z1r-map-row {
   flex: 0 1 auto;
   /* Flex items floor at their content height without this, so the cap above
      would be ignored and the panel would overflow instead of scrolling. */

@@ -204,9 +204,13 @@ export function CompactLocations(props: CompactLocationsProps) {
         {[...groups].map(([label, list]) => {
           const level = /^L([1-9])$/.exec(label)?.[1];
           const groupLevel = list[0]?.level;
-          const overflow = groupLevel === undefined ? derived.overworldOverflow : (derived.overflow.get(groupLevel) ?? []);
+          const overflow =
+            groupLevel === undefined ? derived.overworldOverflow : (derived.overflow.get(groupLevel) ?? []);
           return (
-            <div key={label} className={cn('flex items-center gap-1', rows ? 'flex-row flex-wrap' : 'flex-col')}>
+            <div
+              key={label}
+              className={cn('flex items-center gap-1', rows ? 'flex-row flex-wrap' : 'flex-col')}
+            >
               {level && Number(level) <= TRIFORCE_REQUIRED_FOR_L9 ? (
                 <PieceHead level={level} {...props} />
               ) : (
@@ -233,7 +237,9 @@ export function CompactLocations(props: CompactLocationsProps) {
               {overflow.map((placement, index) => (
                 <Chip
                   key={`overflow-${index}`}
-                  kind={'kind' in placement && typeof placement.kind === 'string' ? placement.kind : 'overworld'}
+                  kind={
+                    'kind' in placement && typeof placement.kind === 'string' ? placement.kind : 'overworld'
+                  }
                   location={null}
                   placement={placement}
                   resolver={resolver}

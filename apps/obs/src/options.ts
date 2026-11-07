@@ -6,13 +6,7 @@
  * every entry file got noisy. One import site, one place to change.
  */
 
-export {
-  attachPersistence,
-  createInitialState,
-  createStore,
-  load,
-  loadResolver,
-} from '@z1r/core';
+export { attachPersistence, createInitialState, createStore, load, loadResolver } from '@z1r/core';
 
 export type { TrackerSection as TrackerSectionName } from '@z1r/ui';
 
@@ -92,7 +86,5 @@ export function allowedSections(requested: readonly string[]): readonly TrackerS
   const allowed = requested.filter((name): name is TrackerSection =>
     OVERLAY_ALLOWED_SECTIONS.includes(name as TrackerSection),
   );
-  return allowed.length
-    ? allowed
-    : (OVERLAY_DEFAULT_SECTIONS.split(',') as TrackerSection[]);
+  return allowed.length ? allowed : (OVERLAY_DEFAULT_SECTIONS.split(',') as TrackerSection[]);
 }

@@ -1,10 +1,4 @@
-import {
-  attachPersistence,
-  createInitialState,
-  createStore,
-  load,
-  loadResolver,
-} from '@z1r/core';
+import { attachPersistence, createInitialState, createStore, load, loadResolver } from '@z1r/core';
 import { mountControls, mountTracker } from '@z1r/ui';
 import '@z1r/ui/styles.css';
 import './app.css';

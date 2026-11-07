@@ -1,0 +1,12 @@
+// Core alone, without the Node or Vite types the root config adds for the apps
+// and the tests: its source runs in the browser and must not reach for Node
+// globals. Part of `npm run typecheck`.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

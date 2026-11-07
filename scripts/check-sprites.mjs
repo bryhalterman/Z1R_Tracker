@@ -12,12 +12,8 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const MANIFEST_PATH = fileURLToPath(
-  new URL('../packages/core/src/sprites/manifest.json', import.meta.url),
-);
-const VECTORS_PATH = fileURLToPath(
-  new URL('../packages/core/src/sprites/vectors.ts', import.meta.url),
-);
+const MANIFEST_PATH = fileURLToPath(new URL('../packages/core/src/sprites/manifest.json', import.meta.url));
+const VECTORS_PATH = fileURLToPath(new URL('../packages/core/src/sprites/vectors.ts', import.meta.url));
 
 /**
  * Which keys have a drawn vector.

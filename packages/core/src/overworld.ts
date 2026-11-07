@@ -235,9 +235,7 @@ export function conformSpot(screen: string, spot: string, item: string, mirrored
 /** The item the coast ledge is only reachable with. */
 export const COAST_ITEM_REQUIRES = 'ladder';
 
-export const MARKS_BY_KIND: ReadonlyMap<MarkKind, MarkDef> = new Map(
-  MARKS.map((m) => [m.kind, m]),
-);
+export const MARKS_BY_KIND: ReadonlyMap<MarkKind, MarkDef> = new Map(MARKS.map((m) => [m.kind, m]));
 
 const MARK_ORDER: readonly MarkKind[] = MARKS.map((m) => m.kind);
 

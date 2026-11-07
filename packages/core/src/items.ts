@@ -194,9 +194,7 @@ export const ITEMS: readonly ItemDef[] = [
   },
 ];
 
-export const ITEMS_BY_ID: ReadonlyMap<string, ItemDef> = new Map(
-  ITEMS.map((item) => [item.id, item]),
-);
+export const ITEMS_BY_ID: ReadonlyMap<string, ItemDef> = new Map(ITEMS.map((item) => [item.id, item]));
 
 /** Highest value `id` can hold. Toggles cap at 1, progressives at their stage count. */
 export function maxValue(def: ItemDef): number {

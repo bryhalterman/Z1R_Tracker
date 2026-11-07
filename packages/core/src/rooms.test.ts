@@ -584,7 +584,10 @@ test('every layout is a full grid of known squares, with a unique id and game in
     for (const row of layout.rows) {
       assert.match(row, new RegExp(`^[.#o=~:x]{${ROOM_LAYOUT_COLUMNS}}$`), layout.id);
     }
-    assert.ok(ROOM_LAYOUT_GROUPS.some((group) => group.id === layout.group), layout.id);
+    assert.ok(
+      ROOM_LAYOUT_GROUPS.some((group) => group.id === layout.group),
+      layout.id,
+    );
   }
 });
 
@@ -595,7 +598,12 @@ test('a room can be given a layout, and that alone keeps it', () => {
   state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: 'moat' } });
   assert.equal(state.rooms['2']?.B5?.layout, 'moat');
   // An id that names no layout is refused, not stored.
-  const refused = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: 'diagonal-moat' } });
+  const refused = reduce(state, {
+    type: 'setRoomNote',
+    level: 2,
+    room: 'B5',
+    patch: { layout: 'diagonal-moat' },
+  });
   assert.equal(refused, state);
   // Clearing it leaves nothing worth keeping, so the room goes.
   state = reduce(state, { type: 'setRoomNote', level: 2, room: 'B5', patch: { layout: '' } });
@@ -692,7 +700,9 @@ test('push block and cleared survive a save, and default in older or damaged one
 /* ------------------------------------------------ push blocks and stairs */
 
 test('a push block needs a block in the middle row, as the game looks for it', () => {
-  const push = ROOM_LAYOUTS.filter(layoutCanPush).map((layout) => layout.id).sort();
+  const push = ROOM_LAYOUTS.filter(layoutCanPush)
+    .map((layout) => layout.id)
+    .sort();
   assert.deepEqual(push, [
     'arch',
     'arrows',
@@ -722,7 +732,9 @@ test('a push block needs a block in the middle row, as the game looks for it', (
 });
 
 test('stairs come from the layout itself or from a push block, so some rooms never have any', () => {
-  const builtIn = ROOM_LAYOUTS.filter(layoutHasStairs).map((layout) => layout.id).sort();
+  const builtIn = ROOM_LAYOUTS.filter(layoutHasStairs)
+    .map((layout) => layout.id)
+    .sort();
   assert.deepEqual(builtIn, ['diamond', 'spiral', 'wedge']);
   assert.equal(ROOM_LAYOUTS.filter(layoutCanHaveStairs).length, 21);
   const corners = ROOM_LAYOUTS_BY_ID.get('corner-statues');

@@ -31,6 +31,8 @@ export function askToConfirm(text: ConfirmLossText): Promise<boolean> {
       resolve(ok);
     };
     settlePending = settle;
-    shown.render(<ConfirmLoss open {...text} onConfirm={() => settle(true)} onCancel={() => settle(false)} />);
+    shown.render(
+      <ConfirmLoss open {...text} onConfirm={() => settle(true)} onCancel={() => settle(false)} />,
+    );
   });
 }

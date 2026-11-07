@@ -16,6 +16,7 @@ const MAPS = source('./assets/maps');
  * of truth, and stops the fetch from 404-ing on every page load — a console
  * error that looks like a fault but isn't.
  */
+/** @returns {import('vite').Plugin} */
 export function spriteManifest() {
   return {
     name: 'z1r-sprite-manifest',
@@ -54,6 +55,7 @@ export function spriteManifest() {
  * Emitted from one shared folder rather than copied into each app's `public`,
  * for the same reason the manifest is.
  */
+/** @returns {import('vite').Plugin} */
 export function localMaps() {
   const emit = (plugin) => {
     for (const name of readdirSync(MAPS)) {

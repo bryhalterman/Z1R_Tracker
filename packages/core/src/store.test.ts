@@ -223,4 +223,3 @@ test('loadResolver uses a served manifest, and falls back to the bundled one', a
     globalThis.fetch = realFetch;
   }
 });
-

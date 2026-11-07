@@ -79,9 +79,7 @@ export const DUNGEONS: readonly DungeonDef[] = [
   },
 ];
 
-export const DUNGEONS_BY_LEVEL: ReadonlyMap<number, DungeonDef> = new Map(
-  DUNGEONS.map((d) => [d.level, d]),
-);
+export const DUNGEONS_BY_LEVEL: ReadonlyMap<number, DungeonDef> = new Map(DUNGEONS.map((d) => [d.level, d]));
 
 /** Triforce pieces needed before Level 9's entrance opens. */
 export const TRIFORCE_REQUIRED_FOR_L9 = 8;

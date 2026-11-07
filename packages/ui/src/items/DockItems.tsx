@@ -14,7 +14,15 @@
  */
 
 import type { MouseEvent, KeyboardEvent } from 'react';
-import { ITEMS, labelFor, maxValue, spriteFor, type ItemDef, type SpriteResolver, type TrackerState } from '@z1r/core';
+import {
+  ITEMS,
+  labelFor,
+  maxValue,
+  spriteFor,
+  type ItemDef,
+  type SpriteResolver,
+  type TrackerState,
+} from '@z1r/core';
 import { Sprite } from '../shared/Sprite.js';
 import { placedSuffix } from '../placed.js';
 import { roomItemsForInventory } from '../rooms.js';
@@ -39,7 +47,15 @@ const COVERS = new Map(ITEMS.map((def) => [def.id, roomItemsForInventory(def)]))
 export function DockItems({ state, placedAt, resolver, itemSize, step }: DockItemsProps) {
   const cells = (group: ItemDef['group']) =>
     ITEMS.filter((def) => def.group === group).map((def) => (
-      <ItemCell key={def.id} def={def} value={state.items[def.id] ?? 0} placedAt={placedAt} resolver={resolver} itemSize={itemSize} step={step} />
+      <ItemCell
+        key={def.id}
+        def={def}
+        value={state.items[def.id] ?? 0}
+        placedAt={placedAt}
+        resolver={resolver}
+        itemSize={itemSize}
+        step={step}
+      />
     ));
 
   return (

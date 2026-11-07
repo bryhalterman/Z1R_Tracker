@@ -222,7 +222,12 @@ const RoomCell = memo(function RoomCell({
           {/* Drawn shapes, not tints, so the two kinds of staircase read apart
               without colour. */}
           {stairs === 'item' && (
-            <SpriteArt resolver={resolver} spriteKey="ui.stairs" size={MARK_ART_SIZE} className="z1r-room-stairs" />
+            <SpriteArt
+              resolver={resolver}
+              spriteKey="ui.stairs"
+              size={MARK_ART_SIZE}
+              className="z1r-room-stairs"
+            />
           )}
           {transport ? <span className="z1r-room-transport">{transport}</span> : null}
           {itemDef && <SpriteArt resolver={resolver} spriteKey={itemDef.sprite} size={MARK_ART_SIZE} />}

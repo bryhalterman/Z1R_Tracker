@@ -18,9 +18,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const MANIFEST_PATH = fileURLToPath(
-  new URL('../packages/core/src/sprites/manifest.json', import.meta.url),
-);
+const MANIFEST_PATH = fileURLToPath(new URL('../packages/core/src/sprites/manifest.json', import.meta.url));
 
 /** Minimal RFC4180 parser — handles quoted fields, embedded commas and "" escapes. */
 function parseCsv(text) {
@@ -67,13 +65,16 @@ function parseCsv(text) {
   return rows.filter((entry) => entry.some((value) => value.trim() !== ''));
 }
 
+/**
+ * @param {string} message
+ * @returns {never}
+ */
 function fail(message) {
   console.error(`error: ${message}`);
   process.exit(1);
 }
 
-const csvPath = process.argv[2];
-if (!csvPath) fail('usage: npm run sprites:import -- <sprites.csv>');
+const csvPath = process.argv[2] ?? fail('usage: npm run sprites:import -- <sprites.csv>');
 
 const [csvText, manifestText] = await Promise.all([
   readFile(csvPath, 'utf8').catch(() => fail(`cannot read ${csvPath}`)),
@@ -103,10 +104,7 @@ if (keyColumn === -1 && nameColumn === -1) fail('the CSV needs either a `key` or
 
 // name -> key, so a CSV keyed by display name can still find its entry.
 const byName = new Map(
-  Object.entries(manifest.sprites).map(([key, entry]) => [
-    String(entry.name).trim().toLowerCase(),
-    key,
-  ]),
+  Object.entries(manifest.sprites).map(([key, entry]) => [String(entry.name).trim().toLowerCase(), key]),
 );
 
 let updated = 0;

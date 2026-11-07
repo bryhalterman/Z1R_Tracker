@@ -93,7 +93,5 @@ export function screensInRegion(regionId: string, mirrored = false): string[] {
     if (id === regionId) screens.push(mirrored ? mirrorScreen(screen) : screen);
   }
   // Row letter, then column as a number: a plain sort put A10 before A2.
-  return screens.sort(
-    (x, y) => x.charCodeAt(0) - y.charCodeAt(0) || Number(x.slice(1)) - Number(y.slice(1)),
-  );
+  return screens.sort((x, y) => x.charCodeAt(0) - y.charCodeAt(0) || Number(x.slice(1)) - Number(y.slice(1)));
 }

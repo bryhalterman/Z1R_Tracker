@@ -3,12 +3,7 @@ import { test } from 'node:test';
 
 import { migrate } from './persistence.js';
 import { createInitialState, reduce, type TrackerState } from './state.js';
-import {
-  MARKS,
-  MARKS_BY_KIND,
-  OVERWORLD_STAIRWAY_COUNT,
-  type MarkKind,
-} from './overworld.js';
+import { MARKS, MARKS_BY_KIND, OVERWORLD_STAIRWAY_COUNT, type MarkKind } from './overworld.js';
 import { VECTORS } from './sprites/vectors.js';
 import { bundledManifest } from './index.js';
 
@@ -20,10 +15,18 @@ function marked(screen: string, mark: MarkKind): TrackerState {
 }
 
 test('the mark kinds are the ones the toolbar offers', () => {
-  assert.deepEqual(
-    [...MARKS_BY_KIND.keys()].sort(),
-    ['doorRepair', 'dungeon', 'gamble', 'hintroom', 'item', 'none', 'rupeeSecret', 'shop', 'stairway', 'visited'],
-  );
+  assert.deepEqual([...MARKS_BY_KIND.keys()].sort(), [
+    'doorRepair',
+    'dungeon',
+    'gamble',
+    'hintroom',
+    'item',
+    'none',
+    'rupeeSecret',
+    'shop',
+    'stairway',
+    'visited',
+  ]);
 });
 
 test('a dungeon mark records which level', () => {
@@ -211,11 +214,7 @@ test('a shop price is optional and clamps to a whole number of rupees', () => {
       stock: 'bomb',
       price: input,
     });
-    assert.equal(
-      state.screenNotes['E2']?.shopPrices['bomb'] ?? 0,
-      expected,
-      `price ${String(input)}`,
-    );
+    assert.equal(state.screenNotes['E2']?.shopPrices['bomb'] ?? 0, expected, `price ${String(input)}`);
   }
 });
 
@@ -414,7 +413,11 @@ test('a dungeon carries its blockers when it moves', () => {
 });
 
 test('placeDungeon clamps to a real level', () => {
-  for (const [input, expected] of [[0, 1], [12, 9], [-4, 1]] as const) {
+  for (const [input, expected] of [
+    [0, 1],
+    [12, 9],
+    [-4, 1],
+  ] as const) {
     const state = reduce(createInitialState(), {
       type: 'placeDungeon',
       screen: 'A1',
@@ -455,7 +458,11 @@ test('two stairways with different numbers both stand', () => {
 });
 
 test('placeStairway clamps to one of the four', () => {
-  for (const [input, expected] of [[0, 1], [7, OVERWORLD_STAIRWAY_COUNT], [-4, 1]] as const) {
+  for (const [input, expected] of [
+    [0, 1],
+    [7, OVERWORLD_STAIRWAY_COUNT],
+    [-4, 1],
+  ] as const) {
     const state = reduce(createInitialState(), {
       type: 'placeStairway',
       screen: 'A1',
@@ -701,10 +708,18 @@ test('markScreen sets the mark and the note in one edit', () => {
   assert.equal(placed.marks['C2'], 'item');
   assert.equal(placed.screenNotes['C2']?.item, 'bow');
   assert.equal(placed.rev, base.rev + 1, 'one edit, one rev');
-  const secret = reduce(base, { type: 'markScreen', screen: 'C2', mark: 'rupeeSecret', patch: { secret: 'small' } });
+  const secret = reduce(base, {
+    type: 'markScreen',
+    screen: 'C2',
+    mark: 'rupeeSecret',
+    patch: { secret: 'small' },
+  });
   assert.equal(secret.screenNotes['C2']?.secret, 'small');
   // Marking again with nothing new is not an edit.
-  assert.equal(reduce(placed, { type: 'markScreen', screen: 'C2', mark: 'item', patch: { item: 'bow' } }), placed);
+  assert.equal(
+    reduce(placed, { type: 'markScreen', screen: 'C2', mark: 'item', patch: { item: 'bow' } }),
+    placed,
+  );
 });
 
 test('a region lists its screens in reading order', () => {

@@ -98,7 +98,11 @@ export class SpriteResolver {
     }
     const vector = VECTORS[key];
     if (vector) return { kind: 'svg', vector, name: entry.name };
-    return { kind: 'glyph', text: entry.glyph ?? String(entry.name ?? key).slice(0, 2), name: entry.name ?? key };
+    return {
+      kind: 'glyph',
+      text: entry.glyph ?? String(entry.name ?? key).slice(0, 2),
+      name: entry.name ?? key,
+    };
   }
 
   /**

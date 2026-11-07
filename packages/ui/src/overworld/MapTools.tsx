@@ -109,7 +109,10 @@ export interface MapBrushesProps {
 }
 
 /** What the next click on the map does, in the order the controls read. */
-function statusLine({ state, view }: Pick<MapBrushesProps, 'state' | 'view'>): { text: string; waiting: boolean } {
+function statusLine({ state, view }: Pick<MapBrushesProps, 'state' | 'view'>): {
+  text: string;
+  waiting: boolean;
+} {
   const { selected, armed, armedLevel, armedStairway, armedSecret } = view;
   if (armed === 'dungeon' && !armedLevel) return { text: 'Pick a level', waiting: true };
   if (armed === 'stairway' && !armedStairway) return { text: 'Pick a warp', waiting: true };
@@ -123,7 +126,10 @@ function statusLine({ state, view }: Pick<MapBrushesProps, 'state' | 'view'>): {
   if (armed) return { text: `Placing ${MARKS_BY_KIND.get(armed)?.name ?? armed}`, waiting: false };
   if (selected) {
     const mark = state.marks[selected];
-    return { text: `${selected} selected${mark ? ` · ${MARKS_BY_KIND.get(mark)?.name ?? mark}` : ''}`, waiting: false };
+    return {
+      text: `${selected} selected${mark ? ` · ${MARKS_BY_KIND.get(mark)?.name ?? mark}` : ''}`,
+      waiting: false,
+    };
   }
   return { text: 'Pick a screen, or a marker to place', waiting: false };
 }
@@ -140,7 +146,9 @@ export function MapBrushes(props: MapBrushesProps) {
         {MARKS.map((mark) => {
           const armed = view.armed === mark.kind;
           const text =
-            mark.kind === 'none' ? 'Clear screens. Click again to stop.' : `Place ${mark.name}. Click again to stop.`;
+            mark.kind === 'none'
+              ? 'Clear screens. Click again to stop.'
+              : `Place ${mark.name}. Click again to stop.`;
           return (
             <Tip key={mark.kind} text={text}>
               <TooltipTrigger
@@ -177,7 +185,10 @@ export function MapBrushes(props: MapBrushesProps) {
           </TooltipTrigger>
         </Tip>
         <span
-          className={cn('ml-2 truncate text-xs', status.waiting ? 'font-medium text-primary' : 'text-muted-foreground')}
+          className={cn(
+            'ml-2 truncate text-xs',
+            status.waiting ? 'font-medium text-primary' : 'text-muted-foreground',
+          )}
           aria-live="polite"
         >
           {status.text}
@@ -250,14 +261,29 @@ function Numbers({
 /** A ToggleGroup value for a 1-n number; 0 is none chosen. */
 const numberValue = (value: number) => (value ? String(value) : '');
 
-const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => ({ value: String(level), text: String(level), title: `Level ${level}` }));
-const WARPS = [1, 2, 3, 4].map((warp) => ({ value: String(warp), text: String(warp), title: `Warp ${warp}` }));
+const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => ({
+  value: String(level),
+  text: String(level),
+  title: `Level ${level}`,
+}));
+const WARPS = [1, 2, 3, 4].map((warp) => ({
+  value: String(warp),
+  text: String(warp),
+  title: `Warp ${warp}`,
+}));
 const SIZES = SECRET_SIZES.map((size) => ({
   value: size.id,
   text: size.code,
   title: `${size.name} — ${size.range} rupees when shop items are shuffled`,
 }));
-const ITEM_GROUPS = [{ options: [{ value: '', label: 'Item unknown' }, ...SCREEN_ITEMS.map((entry) => ({ value: entry.id, label: entry.name }))] }];
+const ITEM_GROUPS = [
+  {
+    options: [
+      { value: '', label: 'Item unknown' },
+      ...SCREEN_ITEMS.map((entry) => ({ value: entry.id, label: entry.name })),
+    ],
+  },
+];
 // The coast is not offered: it is always `coastScreen()`, never a tag.
 const SPOTS = [
   { value: '', label: 'Unnamed spot' },
@@ -303,7 +329,8 @@ export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) 
   // The rows shown are for whichever the card is describing: the marker being
   // armed, or the screen being edited.
   const showing: MarkKind | 'start' | '' = armed || (selected ? mark : '');
-  const markName = showing && showing !== 'start' && showing !== 'none' ? MARKS_BY_KIND.get(showing)?.name : '';
+  const markName =
+    showing && showing !== 'start' && showing !== 'none' ? MARKS_BY_KIND.get(showing)?.name : '';
   const placed = note?.item ? SCREEN_ITEMS_BY_ID.get(note.item) : undefined;
   const got = !!placed && !!note?.collected;
 
@@ -356,7 +383,12 @@ export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) 
                         className={iconTile({ current: on })}
                         onClick={() => actions.toggleBlock(block.id)}
                       >
-                        <span className={cn('grid place-items-center', !on && '[&_.z1r-sprite]:opacity-40 [&_.z1r-sprite]:grayscale')}>
+                        <span
+                          className={cn(
+                            'grid place-items-center',
+                            !on && '[&_.z1r-sprite]:opacity-40 [&_.z1r-sprite]:grayscale',
+                          )}
+                        >
                           <Sprite resolver={resolver} spriteKey={block.sprite} size={18} />
                         </span>
                       </TooltipTrigger>
@@ -404,7 +436,12 @@ export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) 
                       className={iconTile({ current: stocked })}
                       onClick={() => actions.toggleStock(stock.id)}
                     >
-                      <span className={cn('grid place-items-center', !stocked && '[&_.z1r-sprite]:opacity-40 [&_.z1r-sprite]:grayscale')}>
+                      <span
+                        className={cn(
+                          'grid place-items-center',
+                          !stocked && '[&_.z1r-sprite]:opacity-40 [&_.z1r-sprite]:grayscale',
+                        )}
+                      >
                         <Sprite resolver={resolver} spriteKey={stock.sprite} size={18} />
                       </span>
                     </TooltipTrigger>
@@ -433,7 +470,10 @@ export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) 
               {selected === coastScreen(state.seed.mirroredOverworld) ? (
                 // The coast is this screen and no other, so there is nothing to
                 // pick: its item fills the Coast spot.
-                <span className="pt-1.5 text-sm" title="The coast ledge is always this screen; only its item is shuffled">
+                <span
+                  className="pt-1.5 text-sm"
+                  title="The coast ledge is always this screen; only its item is shuffled"
+                >
                   Coast
                 </span>
               ) : (
@@ -442,7 +482,11 @@ export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) 
                   value={note?.spot ?? ''}
                   onValueChange={(value) => actions.patchNote({ spot: (value as string | null) ?? '' })}
                 >
-                  <SelectTrigger size="sm" className="w-full" aria-label="Which named overworld spot this screen is">
+                  <SelectTrigger
+                    size="sm"
+                    className="w-full"
+                    aria-label="Which named overworld spot this screen is"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="z1r-ui">
@@ -489,9 +533,10 @@ export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) 
         ) : null}
 
         {markName && !['dungeon', 'stairway', 'rupeeSecret', 'shop', 'item'].includes(showing) ? (
-          <p className="text-xs text-muted-foreground">Nothing more to record for {markName.toLowerCase()}.</p>
+          <p className="text-xs text-muted-foreground">
+            Nothing more to record for {markName.toLowerCase()}.
+          </p>
         ) : null}
-
       </div>
     </TooltipProvider>
   );
@@ -524,7 +569,10 @@ export function MapHeading({ regions, onRegions, warpsFound, warpsTotal, focus, 
         {regions ? <CheckIcon data-icon="inline-start" /> : null}
         Regions
       </Toggle>
-      <span className="text-muted-foreground tabular-nums" title="Warp staircases marked, out of the four a seed has">
+      <span
+        className="text-muted-foreground tabular-nums"
+        title="Warp staircases marked, out of the four a seed has"
+      >
         Warps {warpsFound}/{warpsTotal}
       </span>
       {focus ? <span className="truncate text-primary">{focus}</span> : null}

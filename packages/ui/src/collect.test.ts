@@ -9,7 +9,11 @@ test('an empty slot has nothing to collect', () => {
 });
 
 test('a slot read off a room collects the room, and toggles', () => {
-  const placement = { item: 'bow', collected: false, source: { kind: 'room', level: 2, room: 'C3' } } as const;
+  const placement = {
+    item: 'bow',
+    collected: false,
+    source: { kind: 'room', level: 2, room: 'C3' },
+  } as const;
   assert.deepEqual(collectAction(placement), {
     type: 'collectRoom',
     level: 2,

@@ -1,0 +1,16 @@
+// The Node-side JavaScript: build scripts, the shared Vite helpers, and the
+// launchers shipped with the desktop and OBS builds. Checked, never emitted;
+// `noImplicitAny` is off because the files are plain JavaScript without
+// annotations. Part of `npm run typecheck`.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "noImplicitAny": false,
+    "checkJs": true,
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.mjs", "vite.shared.mjs", "apps/*/public/**/*.mjs"]
+}

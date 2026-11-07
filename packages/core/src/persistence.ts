@@ -105,13 +105,9 @@ function pruneDungeons(
   return result;
 }
 
-const QUESTS = new Set([
-  '1st', '2nd', 'mixed', 'shapes', 'mixed-shapes', 'random-no-shapes', 'random',
-]);
+const QUESTS = new Set(['1st', '2nd', 'mixed', 'shapes', 'mixed-shapes', 'random-no-shapes', 'random']);
 const OVERWORLD_QUEST_VALUES = new Set(['1st', '2nd', 'mixed-1st', 'mixed-2nd', 'random']);
-const SHUFFLES = new Set([
-  'none', 'dungeon', 'anywhere-hearts-in-dungeons', 'items-hearts', 'random',
-]);
+const SHUFFLES = new Set(['none', 'dungeon', 'anywhere-hearts-in-dungeons', 'items-hearts', 'random']);
 
 /** Highest id in use, so a new hint can never reuse one. */
 function hintSeqFrom(saved: unknown, hints: HintEntry[]): number {
@@ -322,12 +318,10 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
 
       // Strictly true, so a truthy string or 1 does not read as visited.
       const visited = note.visited === true;
-      const item =
-        typeof note.item === 'string' && ROOM_ITEMS_BY_ID.has(note.item) ? note.item : '';
+      const item = typeof note.item === 'string' && ROOM_ITEMS_BY_ID.has(note.item) ? note.item : '';
       // Ganon and Zelda on any level but 9 are dropped rather than moved: the
       // room they were recorded in cannot exist, so neither can the boss.
-      const boss =
-        typeof note.boss === 'string' && bossAllowedOnLevel(note.boss, number) ? note.boss : '';
+      const boss = typeof note.boss === 'string' && bossAllowedOnLevel(note.boss, number) ? note.boss : '';
       const stairs: RoomStairKind =
         typeof note.stairs === 'string' && ROOM_STAIRS_BY_ID.has(note.stairs)
           ? (note.stairs as RoomStairKind)
@@ -372,9 +366,7 @@ function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> 
         // Absent before it existed, which is no layout recorded. A save from
         // when chutes were marked by direction keeps them as the two chute
         // layouts; an id no longer known reads as unrecorded.
-        layout: isRoomLayout(note.layout)
-          ? note.layout
-          : layoutFromChute((raw as { chute?: unknown }).chute),
+        layout: isRoomLayout(note.layout) ? note.layout : layoutFromChute((raw as { chute?: unknown }).chute),
         // Both absent before they existed: nothing tried, nothing cleared.
         pushBlock: isRoomPushBlock(note.pushBlock) ? note.pushBlock : '',
         cleared: note.cleared === true,
@@ -518,10 +510,7 @@ export function migrate(raw: unknown): TrackerState | null {
     marks,
     // After the seed, which says whether the coast is F16 or F1, and after
     // the marks, which say which numbers a note may still carry.
-    screenNotes: fitNotesToMarks(
-      conformScreenNotes(candidate.screenNotes, seed.mirroredOverworld),
-      marks,
-    ),
+    screenNotes: fitNotesToMarks(conformScreenNotes(candidate.screenNotes, seed.mirroredOverworld), marks),
     // Absent in every save written before v11, which loads as no rooms.
     rooms: conformRooms(candidate.rooms),
     // v1 saves predate seed tracking; merging over the defaults fills in any
@@ -600,8 +589,7 @@ export function attachPersistence(store: Store, options: SyncOptions = {}): () =
   // A remote update must not be re-broadcast, or two windows ping-pong forever.
   let applyingRemote = false;
 
-  const channel =
-    typeof BroadcastChannel === 'function' ? new BroadcastChannel(CHANNEL_NAME) : null;
+  const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel(CHANNEL_NAME) : null;
 
   const applyRemote = (state: TrackerState | null) => {
     if (!state) return;

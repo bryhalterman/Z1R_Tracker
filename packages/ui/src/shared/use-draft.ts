@@ -11,7 +11,7 @@
  * an edit made in another window still shows.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** How long typing has to pause before the draft is committed. */
 const PAUSE_MS = 300;
@@ -22,8 +22,11 @@ export function useDraft(stored: string, commit: (value: string) => void) {
   const pending = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The latest commit, so a timer or the unmount never calls a stale one.
+  // Kept current after each render rather than during it.
   const latest = useRef(commit);
-  latest.current = commit;
+  useLayoutEffect(() => {
+    latest.current = commit;
+  });
 
   if (!editing && draft !== stored) setDraft(stored);
 

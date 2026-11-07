@@ -9,7 +9,11 @@ import { ToggleGroup, ToggleGroupItem } from '#components/ui/toggle-group';
 import { mapsLayout, type MapsLayout } from '../maps-layout.js';
 
 const CHOICES: readonly { value: MapsLayout; label: string; title: string }[] = [
-  { value: 'auto', label: 'Auto', title: 'Side by side when the window is wide enough, stacked when it is not' },
+  {
+    value: 'auto',
+    label: 'Auto',
+    title: 'Side by side when the window is wide enough, stacked when it is not',
+  },
   { value: 'side', label: 'Side by side', title: 'Overworld and Levels side by side at every width' },
   { value: 'stacked', label: 'Stacked', title: 'Overworld above Levels at every width' },
 ];

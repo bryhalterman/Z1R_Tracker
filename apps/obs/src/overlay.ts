@@ -70,8 +70,7 @@ async function main(): Promise<void> {
    */
   const centre = (scale: number, height: number, gutter: number) => {
     const view = document.documentElement;
-    const spare = (extent: number, content: number) =>
-      `${Math.max(0, (extent - content * scale) / 2)}px`;
+    const spare = (extent: number, content: number) => `${Math.max(0, (extent - content * scale) / 2)}px`;
     document.body.style.setProperty('--overlay-x', spare(view.clientWidth, baseWidth + gutter));
     document.body.style.setProperty('--overlay-y', spare(view.clientHeight, height + gutter));
   };
@@ -91,9 +90,7 @@ async function main(): Promise<void> {
      * against a width the overlay never occupies, and the result overflows by
      * a little at every size. Add it to the content instead.
      */
-    const pad = Number.parseFloat(
-      getComputedStyle(document.body).getPropertyValue('--overlay-pad') || '8',
-    );
+    const pad = Number.parseFloat(getComputedStyle(document.body).getPropertyValue('--overlay-pad') || '8');
     const gutter = 2 * (Number.isFinite(pad) ? pad : 8);
     /*
      * `documentElement.clientWidth`, not `window.innerWidth`.
@@ -103,10 +100,7 @@ async function main(): Promise<void> {
      * space the layout does not actually have.
      */
     const view = document.documentElement;
-    const factor = Math.min(
-      view.clientWidth / (baseWidth + gutter),
-      view.clientHeight / (height + gutter),
-    );
+    const factor = Math.min(view.clientWidth / (baseWidth + gutter), view.clientHeight / (height + gutter));
     const scale = Math.max(factor, 0.1);
     const next = String(scale);
     // Compare before writing: a ResizeObserver that always writes re-triggers
@@ -147,8 +141,7 @@ async function main(): Promise<void> {
     if (document.querySelector('.z1r-readonly-note')) return;
     const note = document.createElement('p');
     note.className = 'z1r-readonly-note';
-    note.textContent =
-      'Read-only overlay. Add dock.html as a Custom Browser Dock to make changes.';
+    note.textContent = 'Read-only overlay. Add dock.html as a Custom Browser Dock to make changes.';
     document.body.append(note);
     window.setTimeout(() => note.remove(), 8000);
   });

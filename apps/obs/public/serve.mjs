@@ -79,6 +79,7 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`Z1R Tracker running at ${url}`);
   console.log('Press Ctrl+C to stop.');
 
+  /** @type {[string, string[]]} */
   const opener =
     process.platform === 'win32'
       ? ['cmd', ['/c', 'start', '', url]]
@@ -94,7 +95,7 @@ process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection (continuing):', reason);
 });
 
-server.on('error', (error) => {
+server.on('error', (/** @type {NodeJS.ErrnoException} */ error) => {
   if (error.code === 'EADDRINUSE') {
     console.error(`Port ${PORT} is busy. Try: node serve.mjs ${PORT + 1}`);
     process.exit(1);
