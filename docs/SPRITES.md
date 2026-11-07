@@ -42,7 +42,7 @@ you clone it. Items with real detail were never going to be drawn by hand — a 
 approximation of a recognisable sprite looks worse than honest letters — so those are the ones the
 manifest points at real art for.
 
-Overworld marks are drawn as **distinct silhouettes**, not coloured squares. That is deliberate —
+Overworld marks are drawn as **distinct silhouettes**, not colored squares. That is deliberate —
 see the accessibility rule in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 An image that fails to load — dead host, hotlink blocking, offline — **downgrades to its glyph** at
@@ -68,7 +68,7 @@ and the host runs no hotlink protection. What it does *not* send is any CORS hea
 deliberately doesn't request `crossOrigin='anonymous'`, because an anonymous request to a host with
 no `Access-Control-Allow-Origin` fails outright and drops a perfectly good sprite to a glyph. The
 consequence to remember: **those images would taint a canvas**. Any future feature that reads pixels
-back — recolouring, a generated sheet, a screenshot composite — won't work on them, and would need
+back — recoloring, a generated sheet, a screenshot composite — won't work on them, and would need
 either a CORS-sending mirror or locally hosted copies.
 
 ### Why the level numerals stay as glyphs
@@ -85,7 +85,7 @@ as a picture of one, at any size, offline, with no host involved. This isn't an 
 npm run sprites:import -- sprites.csv
 ```
 
-Header row required. Recognised columns, case-insensitive:
+Header row required. Recognized columns, case-insensitive:
 
 | Column | Aliases | Required | Notes |
 | --- | --- | --- | --- |

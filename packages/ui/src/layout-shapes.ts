@@ -1,8 +1,8 @@
 /**
  * A room layout as shapes: one per square, in the 12x7 grid's own units.
  *
- * Shared by the sheet's cells, which build SVG by hand, and the React room
- * card, so the two can never draw the same layout differently. Each kind of
+ * Shared by the sheet's cells and the room card, both through `LayoutArt`,
+ * so the two can never draw the same layout differently. Each kind of
  * square is its own shape as well as its own fill — a block is a solid
  * square, a statue a ring, water a filled square with a line through it, sand
  * a dot, stairs two rungs — so the picture still reads with the colour taken

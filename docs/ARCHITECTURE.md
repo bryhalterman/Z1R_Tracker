@@ -8,7 +8,7 @@
                     └────────┬────────┘
                              │
                     ┌────────┴────────┐
-                    │ packages/ui     │  DOM rendering, no framework
+                    │ packages/ui     │  React panels in a plain-DOM host
                     └────────┬────────┘
               ┌──────────────┼──────────────┐
         ┌─────┴─────┐  ┌─────┴─────┐  ┌─────┴─────┐
@@ -16,8 +16,9 @@
         └───────────┘  └───────────┘  └───────────┘
 ```
 
-Dependencies point one way only. `core` knows nothing about the DOM; `ui` knows nothing about which
-app it's inside; apps hold only their own wiring and build config.
+Dependencies point one way only. `core` renders nothing: its only browser APIs are storage and
+`BroadcastChannel` for persistence, and `fetch` and `Image` for loading sprites. `ui` knows nothing
+about which app it's inside; apps hold only their own wiring and build config.
 
 Apps import workspace packages as **TypeScript source**, aliased in `vite.shared.mjs`. There is no
 package build step and no ordering constraint — `npm run dev` hot-reloads across package
@@ -25,7 +26,7 @@ boundaries.
 
 ## State
 
-One plain serialisable object, one reducer (`packages/core/src/state.ts`). The same value is:
+One plain serializable object, one reducer (`packages/core/src/state.ts`). The same value is:
 
 - written to `localStorage`,
 - posted over a `BroadcastChannel` to sync the OBS dock with the OBS overlay,
@@ -52,62 +53,84 @@ the sender's `rev` verbatim so both windows converge on one counter. `import` (a
 opened in *this* window) lifts `rev` above both sides, because it should outrank whatever peers are
 holding rather than be judged stale against it.
 
-`STATE_VERSION` is **3**. Version 3 dropped the `game` field, along with the Randomizer/Vanilla
-toggle that was its only reader. `migrate` is what makes a removal like that safe: it rebuilds the
-state from the current model rather than spreading the saved object over the new one, so a field
-that no longer exists doesn't survive a load and get written back into the next export.
+`STATE_VERSION` is **13**. `migrate` is what makes changing the model safe: it rebuilds the state
+from the current model rather than spreading the saved object over the new one, so a field that no
+longer exists — the old `game` field, the hand-added extra floor slots — doesn't survive a load and
+get written back into the next export. It also repairs what an older build could leave behind, such
+as a level number on a screen no longer marked as that level. Removing a field needs no version
+bump; a bump is only for a change an older build must refuse to load.
 
 ## Rendering
 
-`mountTracker` builds its DOM once and then patches it. Each section pushes a `Patch` closure that
-takes the new state and updates just the nodes it owns.
+`mountTracker` builds each panel's shell — the section and its heading — as plain DOM once.
+Everything inside a panel is a React component (shadcn/ui on Base UI, with Tailwind scoped to
+`.z1r-ui`) rendered into its own root. Each panel registers a `Patch` that takes the new state
+and re-renders its root, so every store change reconciles every root with the whole state.
 
-A full re-render would be simpler and is the obvious first instinct. It's the wrong call here: this
-view runs inside an OBS browser source next to a game capture, and replacing hundreds of nodes on
-every click is exactly the kind of thing that shows up as a dropped frame on stream.
+That is the accepted model, not an accident. Reconciling is cheap at this size, and the work it
+does is kept down where it would add up:
 
-The locations panel is the one exception, and only when the derived slot list changes *shape* — see
-below. Everything else, items included, is patched in place.
+- The map's 128 cells, the room sheet's cells and the palette's tiles are memoized and receive
+  only the values they draw, so an edit that does not touch a cell skips it.
+- `deriveItemLocations` is cached per state object. The store replaces the state on every edit and
+  never mutates one, so one edit derives the item locations once however many panels ask.
 
-The items panel used to rebuild wholesale whenever the Randomizer/Vanilla toggle flipped. Both the
-toggle and the game concept behind it are gone: every item in `items.ts` carried both games, so the
-filter filtered nothing and the switch cost a full rebuild to produce an identical grid. The
-summary bar (Triforce count, found count, "8 to go") went at the same time — it restated what the
-grid above it already showed.
+Three things stay plain DOM on purpose. The OBS overlay's item grid, its Item locations columns and
+the Triforce panel draw synchronously, because the overlay measures its first paint to fit itself to
+the browser source. The dock's item grid and locations columns are the React versions of the first
+two.
+
+Every root comes from `createPanelRoot` (`shared/panel-root.tsx`), which does two things. It wraps
+the panel in an error boundary, so a render error replaces that one panel with a notice instead of
+emptying it — `runPatches` cannot catch it, because `root.render` only schedules the work. And it
+registers the root's unmount with the mount being built (`shared/disposers.ts`), so the function
+`mountTracker` returns unmounts every root and removes its document listeners.
+
+Only the mounts the three apps ship are supported. The overlay, the one read-only mount, never shows
+the map or the rooms, so those two are always interactive; the Triforce panel, which only the
+overlay builds, is always display only.
 
 ## Accessibility
 
-**No state may be signalled by colour alone.** The maintainer is colour blind, and a tracker whose
-"do I have this" cue is a green-vs-grey tint is unusable to a chunk of its audience besides.
+**No state may be signaled by color alone.** The maintainer is color blind, and a tracker whose
+"do I have this" cue is a green-vs-gray tint is unusable to a chunk of its audience besides.
 
-Every stateful element carries a second, non-colour channel:
+Every stateful element carries a second, non-color channel:
 
-| Element | Colour | Also |
+| Element | Color | Also |
 | --- | --- | --- |
 | Item cell | accent border when held | dashed border + desaturated + dimmed when not |
-| Dungeon flag | accent border when on | dashed border + desaturated when off |
-| Location slot kind | per-kind tint | the words `FLOOR` / `STAIR` / `HEART` / `OW` |
+| Triforce piece (Item locations column head) | full color when held | gray, faded triangle and a lighter numeral when not; the overlay's plain heads use solid vs dashed borders |
+| Location slot kind | per-kind tint | a letter code per kind (`F`, `S`, `H`, …) |
 | Overworld mark | per-mark tint | a distinct drawn shape per mark |
 | Overworld region | faint region tint | a two-letter code (`DM`, `LK`, …) on every screen |
-| Focused hint region | raised tint | 2px solid ring, brightened code, `◉ on map` on the button |
-| Location collected | dimmed row | the checkbox itself |
+| Focused hint region | accent ring and code | 2px border, bolder code, every other screen dimmed, the button reads **On map** |
+| Location collected | raised chip with a solid ring | hollow chip, gray faded sprite; the overlay's plain chips use solid vs dashed borders |
 | Level 9 status | green when open | the sentence changes |
-| Select option / optgroup | explicit opaque pair, never inherited | the option's own text; see below |
+| Levels strip, not found | muted numeral | thin weight; found and complete are bold |
+| Levels strip, found vs complete | bright vs gold | **color only** — see below |
 
 When adding a panel, pick the second channel first — shape, text, a mark, or a border style — and
-treat colour as reinforcement. The mark-shape requirement is also why `mark.*` sprites are drawn as
-distinct silhouettes rather than as coloured squares.
+treat color as reinforcement. The mark-shape requirement is also why `mark.*` sprites are drawn as
+distinct silhouettes rather than as colored squares.
+
+The Levels strip's found versus complete is the one exception, and a deliberate one: the maintainer
+chose bright versus gold numerals over a second mark. The hover title and the accessible label both
+say the state in words, so it can still be read without the color.
 
 ### The one that got through: `<option>`
 
+History now — the selects are Base UI components rendered in the page, and no native `<select>`
+remains — but the rules it produced still apply.
+
 Nothing in the stylesheet targeted `<option>` or `<optgroup>`. A native select popup is drawn by the
-platform, not by the page, so the list inherited the control's muted placeholder colour and landed
-it on the operating system's own grey popup background. Grey on grey: the item picker and the hint
+platform, not by the page, so the list inherited the control's muted placeholder color and landed
+it on the operating system's own gray popup background. Gray on gray: the item picker and the hint
 region list were effectively unreadable while open.
 
 It survived review because the part you look at was fine. The *closed* control measured 5.9:1 —
 comfortably passing — and the popup only exists while the mouse is down. Options and optgroups now
-carry explicit opaque colours of their own rather than inheriting; measured 13.5:1 after.
+carry explicit opaque colors of their own rather than inheriting; measured 13.5:1 after.
 
 Two rules came out of it. Any element the platform composites against a surface we don't own must
 set both `color` and `background-color` explicitly, never inherit them. And contrast gets measured,
@@ -141,8 +164,8 @@ on screen changed. Two of those choices are worth keeping in mind when editing:
 Nothing re-derives the values from a design system any more, so the check below is the guarantee.
 `npm run theme:check` (`scripts/theme-report.mjs`) reads the aliases from `theme.css` and fails if
 any foreground/background pair the tracker renders drops below 4.5:1, including the reversed ones
-where page-colored text sits on a filled tag. CI runs it on pushes to `main` and on pull requests. It exists because the one
-accessibility bug that shipped came from picking a color by eye.
+where page-colored text sits on a filled tag. CI runs it on pushes to `main` and on pull requests.
+It exists because the one accessibility bug that shipped came from picking a color by eye.
 
 The import used to cost most of the stylesheet: every Spectrum dark and medium token shipped though
 about 25 were read. Dropping it took the web build's stylesheet from about 219KB raw / 32KB gzipped
@@ -150,16 +173,16 @@ to about 99KB raw / 16KB gzipped.
 
 ## Seeds and derived locations
 
-`seed.ts` holds the randomizer settings; `deriveLocations(settings)` turns them
-into the list of findable slots. The list is **derived on every render, never stored**.
+`seed.ts` holds the randomizer settings; `deriveLocations(settings)` turns them into the list of
+findable slots. The list is **derived, never stored**.
 
 That's the important call. Storing the slot list would mean reconciling it whenever a setting
-changed — a migration problem for something that is a pure function of the settings. Deriving it means
-switching Dungeon Quest simply produces a different list. State keys off the slot **id**, so
+changed — a migration problem for something that is a pure function of the settings. Deriving it
+means switching Dungeon Quest simply produces a different list. State keys off the slot **id**, so
 switching to 2nd Quest and back leaves everything already recorded intact rather than orphaned.
 
-The locations panel rebuilds only when the derived list's *shape* changes (it compares a signature
-of the ids), and otherwise patches rows in place, same as everything else.
+The overlay's plain-DOM locations columns rebuild only when the derived list's *shape* changes (they
+compare a signature of the ids) and otherwise patch their chips in place.
 
 Only settings that change that structure get typed fields. The rest of Z1R's flags round-trip
 through a free-text box — see [SEEDS.md](SEEDS.md) for where that line falls and why.
@@ -175,7 +198,9 @@ wrong under some seed.
 
 It used to hold a capability table behind a "Can I…" panel. That panel was removed at the
 maintainer's request, and the table went with it — a model of every obstacle that nothing renders is
-just weight. All that survives is the Level 9 gate, which the Triforce panel reads.
+just weight. What remains reads the tracker's own records: the Level 9 gate and Ganon check, the
+items a numbered dungeon screen holds, where each warp staircase leads, and `levelProgress` — not
+found, found, or complete — for the Levels strip.
 
 `dungeons.ts` used to carry `vanilla*` fields (screen, item, boss). They were never rendered by any
 build and never read as logic, so they've been removed rather than left as furniture.
@@ -192,10 +217,10 @@ without touching a line of game data.
 | --- | --- | --- | --- |
 | Vite `base` | `/Z1R_Tracker/` | `./` | `./` |
 | Output format | ES modules | **IIFE** | ES modules |
-| Entry points | 1 | 1 | 2 |
+| Entry points | 1 | 1 | 4: setup page, overlay, dock, map dock |
 | Service worker | no | yes | no |
-| Interactive | yes | yes | dock only |
-| Panels offered | all | all | six — no overworld |
+| Interactive | yes | yes | both docks; the overlay is read-only |
+| Panels offered | all | all | overlay: seed, items, Triforce, locations, hints; dock: items, locations; map dock: seed, hints, overworld, levels |
 
 The desktop IIFE build is the only genuinely unusual choice. Browsers refuse `type="module"` scripts
 over `file://` because they're treated as cross-origin requests, so a module build would open to a
@@ -211,12 +236,14 @@ else; every build picks it up.
 **A new overworld mark** — add a `MarkDef` to `overworld.ts` and a `mark.*` manifest key. It joins
 the click cycle automatically.
 
-**A new panel** — add a builder to `tracker.ts`, register it in the `builders` map, add its name to
-`TrackerSection`. That's enough for the web and desktop apps. To offer it on stream as well, add it
-to `OBS_SECTIONS` in `apps/obs/src/options.ts` — that list is both the dock's contents and the
-allow-list `allowedSections()` filters `?sections=` against, so an excluded or misspelled name is
-dropped instead of rendering an empty panel live. The overworld grid is the deliberate exclusion:
-128 cells, each carrying a region code, is unreadable at dock size.
+**A new panel** — write it as a React component, give it a `mount.tsx` that renders it through
+`createPanelRoot`, add a builder to `tracker.ts`, register it in the `builders` map, and add its
+name to `TrackerSection`. That's enough for the web and desktop apps. The OBS lists are in
+`apps/obs/src/options.ts`: `DOCK_SECTIONS` and `MAP_SECTIONS` are what the two docks mount, and
+`OVERLAY_ALLOWED_SECTIONS` is the allow-list `allowedSections()` filters the overlay's `?sections=`
+against, so an excluded or misspelled name is dropped instead of rendering an empty panel live. The
+overworld and the levels are the deliberate exclusions from the overlay: they only make sense as
+something you click.
 
 ## Testing
 
@@ -228,13 +255,15 @@ npm test
 built-in test runner. The bundle step exists because the sources import each other with `.js`
 specifiers that only a bundler resolves; there's no framework and no config.
 
-Coverage is deliberately narrow: the reducer and `migrate` are pure functions over plain data, and
-they're where the bugs have actually been. Pure helpers in `packages/ui` are tested the same way —
-`collect.ts` and `placed.ts` turn derived locations into actions and labels with no DOM — so logic
-worth a test is moved out of a panel into a module like those rather than tested through rendering. `migrate` in particular earned its tests — a plain spread
-merge silently kept item keys and dungeon fields that had been removed from the model, so they
-survived every load and got written back into exported saves. Browser testing couldn't confirm the
-fix (the page wasn't re-executing), which is what prompted the harness.
+Coverage is deliberately narrow: the reducer, `migrate` and the derivations are pure functions over
+plain data, and they're where the bugs have actually been. `migrate` in particular earned its tests —
+a plain spread merge silently kept item keys and dungeon fields that had been removed from the
+model, so they survived every load and got written back into exported saves. Browser testing
+couldn't confirm the fix (the page wasn't re-executing), which is what prompted the harness.
 
-Rendering isn't covered. It's DOM-patching against a live store; the cost of testing it well is high
-and the failure mode is visible the moment you open the page.
+Pure helpers in `packages/ui` are tested the same way — `collect.ts`, `placed.ts` and
+`shared/disposers.ts` work with no DOM — so logic worth a test is moved out of a panel into a module
+like those rather than tested through rendering.
+
+Rendering itself isn't covered. The panels are React components re-rendered from a live store; the
+cost of testing them well is high and the failure mode is visible the moment you open the page.

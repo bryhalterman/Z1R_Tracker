@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Rendering layer shared by the web, desktop and OBS builds: plain DOM, with React for the room card.",
+  "description": "Rendering layer shared by the web, desktop and OBS builds: React panels in a plain-DOM host.",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",

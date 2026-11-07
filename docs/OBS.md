@@ -118,7 +118,7 @@ body { --overlay-pad: 0px; }
 ```
 
 Use `--overlay-pad`, not `padding`. The auto-fit reads that variable when it measures, so the scale
-stays correct; setting `padding` directly both loses on specificity and desynchronises the fit.
+stays correct; setting `padding` directly both loses on specificity and desynchronizes the fit.
 
 Don't set `zoom` or `transform` on the body. The overlay already transforms itself to fit, and a
 second one compounds rather than replaces it. Change `?width=` instead.
@@ -134,7 +134,8 @@ second one compounds rather than replaces it. Change `?width=` instead.
 
 Apply, then drag the dock wherever you like. Click in it and the overlay updates immediately.
 
-This carries the seed, items, Triforce, locations and hints — everything except the map.
+This carries the item grid and the Item locations columns. Its header bar opens the seed form and
+the hint log, and holds Export, Import and Reset.
 
 ## 4. Add the map dock
 
@@ -145,15 +146,16 @@ This carries the seed, items, Triforce, locations and hints — everything excep
 | Dock Name | `Z1R Map` |
 | URL | `http://127.0.0.1:4178/map.html` |
 
-The overworld on its own. It's a separate window because it wants to be large and to stay put —
-sharing a column with the seed form and the inventory meant it was either squeezed narrow or
-reached by scrolling past everything else, mid-run, which is when neither is acceptable.
+The overworld and the level room sheet, with the seed and hint log beside them. It's a separate
+window because the maps want to be large and to stay put — sharing a column with the inventory meant
+they were either squeezed narrow or reached by scrolling past everything else, mid-run, which is
+when neither is acceptable.
 
 Dock it along the bottom or on a second monitor and give it room. Marking a screen here shows up in
 the main dock and on the overlay at once; they are one run, not two.
 
 It has no Export/Import/Reset bar. Those live in the main dock, and a second Reset button on a
-single-panel window is a way to lose a run by misclick.
+window you click into all run is a way to lose a run by misclick.
 
 ## Same-origin
 

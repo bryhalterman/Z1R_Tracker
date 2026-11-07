@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   const note = document.querySelector<HTMLElement>('#mode-note');
   if (note && isFileProtocol) {
     note.textContent =
-      'Items: left click adds, right click or Shift+click removes. Map: click a screen to pick a marker. Running from a local file — run start.cmd for offline sprite caching.';
+      'Items: drag one onto a room or a map screen, or right-click it to arm it and then click there; Esc puts it down. Click an item to mark it held. Map: click a screen to edit it, or pick a marker to place it. Running from a local file — run start.cmd for offline sprite caching.';
   }
 
   if (!isFileProtocol && 'serviceWorker' in navigator) {

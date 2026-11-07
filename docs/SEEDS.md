@@ -14,10 +14,12 @@ So the seed settings are:
 | Seed | Bookkeeping — which seed this run is |
 | Flags | The whole flag string, stored as typed |
 | Dungeon Quest | **Determines every dungeon's item slots** |
+| Overworld Quest | Which overworld map the map panel is drawn on |
 | Item Shuffle | Records what pool is in play |
 | Shuffle dungeon drops | Triforce / hearts / keys / compass / map join the shuffle |
 | Shuffle minor drops | Records that a dungeon can hold **extra floor items** |
 | Important items in 9 | Ladder, raft, bracelet, recorder, bow may be in Level 9 |
+| Mirrored overworld | Flips the overworld map and its hint regions left to right |
 | Quest split | Which quest levels 1-6 and 7-9 turned out to be |
 | Notes | Hints, routing, anything |
 
@@ -69,27 +71,28 @@ spots are full it is listed as an extra chip beside that level's slots.
 
 ## Recording a find
 
-Each location row has three parts:
+Item locations are read off the maps, not entered slot by slot. Record an item where you found it —
+drag it from the palette onto a room on the level sheet or onto an overworld screen — and the slot
+it fills shows in the **Item locations** columns: a column per level, a chip per slot, lettered by
+kind (`F` floor, `S` stair, `H` heart) or by overworld spot (`WS`, `AR`, `CO`). The items
+that can go in a slot are the shuffle pool from the
+[Dungeon Items flags](https://z1r.wiki/wiki/Dungeon_Items_(Flags)) page.
 
-1. **Slot chip** — `FLOOR`, `STAIR`, `HEART` or `OW`. Text, not just a colour.
-2. **Item picker** — the 15-item shuffle pool, verbatim from the
-   [Dungeon Items flags](https://z1r.wiki/wiki/Dungeon_Items_(Flags)) page. Leave it on `—` if you
-   know a slot exists but not what's in it.
-3. **Collected checkbox** — you've actually picked it up.
+A chip toggles **collected** on the room or screen it was read from. Recording an item and taking it
+are separate on purpose: a hint can tell you the Raft is in Level 3 long before you can get there,
+and the tracker should be able to hold "known but not taken".
 
-The picker and the checkbox are separate on purpose: a hint can tell you the Raft is in Level 3
-long before you can get there, and the tracker should be able to hold "known but not taken".
-
-**Ticking collected also marks the item found.** Unticking never removes it — unwinding an
-inventory change from a checkbox is ambiguous once two locations can grant the same thing, so the
-tracker refuses to guess. Fix a mistake on the item grid directly.
+**Collecting also marks the item held.** Un-collecting never removes it — unwinding an inventory
+change from a chip is ambiguous once two locations can grant the same thing, so the tracker refuses
+to guess. Fix a mistake in the item palette directly.
 
 Heart Containers are the exception: they're placeable, so they get location slots, but there's no
 inventory item to mark. Your heart total is on the game's HUD.
 
 ## Named overworld locations
 
-Three overworld spots are shuffled independently of dungeons and get their own rows:
+Three overworld spots are shuffled independently of dungeons and get their own chips, in the `OW`
+column:
 
 - **White Sword Cave** — gated behind 4-6 Heart Containers depending on the shops flags.
 - **Armos** — the item under an Armos statue.
@@ -116,7 +119,7 @@ The **Regions** toggle in the Overworld panel turns the codes off if you want a 
 map** still opens the original wiki reference image.
 
 The region table was extracted from that map by matching each screen against the map's flat fill
-colours — every screen resolved at ≥92% agreement, so this isn't eyeballed.
+colors — every screen resolved at ≥92% agreement, so this isn't eyeballed.
 
 ### The hint log
 
@@ -125,17 +128,16 @@ Each row in the **Hints** log is one hint:
 1. **Subject** — a dungeon, listed by the phrase you actually hear (`Digdogger gazes… (L5)`), or an
    item from the shuffle pool.
 2. **Region** — one of the ten above.
-3. **Show** — lights that region's screens up on the grid. The button reads `○ show` or `◉ on map`,
-   so its state is legible without colour. The grid itself is a web and desktop panel only; the OBS
-   build carries the hint log but not the map, because 128 labelled cells can't be read at dock
-   size. See [OBS.md](OBS.md).
+3. **Show** — lights that region's screens up on the overworld. The button reads **Show** with an
+   empty circle, or **On map** with a filled one, so its state is legible without color. On OBS the
+   overworld is in the map dock, beside the hint log; see [OBS.md](OBS.md).
 4. **Heard at** and **note** — optional bookkeeping.
 
 Both halves are optional. You often note the subject before the region, or vice versa, and a
 half-recorded hint still narrows the map.
 
 Picking a region focuses it immediately, since that's almost always what you wanted next. Clicking
-`◉ on map` again clears the highlight.
+**On map** again clears the highlight.
 
 ## Mirrored overworld
 

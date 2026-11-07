@@ -271,6 +271,14 @@ Items in your inventory and the Triforce are not affected.
 
 The **Levels** panel is the room map for one level at a time.
 Pick the level with the numbers 1 to 9 in the panel title.
+Each number also shows how far along that level is:
+thin and dim until its entrance is marked on the overworld,
+bold once it is,
+and bold gold once the level is complete.
+Levels 1 to 8 are complete when their Triforce piece is held
+and every item spot in the level has an item recorded;
+Level 9 is complete once its rooms record both Ganon and Zelda.
+Hover a number to read its state.
 The title also counts the rooms you have recorded on that level.
 
 Click a room to select it and mark it visited.

@@ -282,7 +282,7 @@ export interface PoolEntry {
   readonly name: string;
   /** The `ItemDef` id this grants. */
   readonly itemId: string;
-  /** Value to set that item to. Counters increment instead. */
+  /** Value the item is raised to on pickup; it is never lowered. */
   readonly value: number;
   readonly sprite: string;
 }

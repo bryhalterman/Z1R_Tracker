@@ -3,8 +3,8 @@
  *
  * Vanilla Z1 has fixed overworld entrances and a fixed item per level. The
  * randomizer shuffles both, so the tracker records what you *found* rather
- * than asserting what should be there — `vanilla*` fields are hints only,
- * shown in the `z1` build and hidden in `z1r`.
+ * than asserting what should be there, and a definition carries no vanilla
+ * entrance, item or boss.
  */
 
 export interface DungeonDef {
