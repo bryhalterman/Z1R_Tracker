@@ -1,11 +1,14 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 const source = (path) => fileURLToPath(new URL(path, import.meta.url));
 
 const MANIFEST = source('./packages/core/src/sprites/manifest.json');
 const MAPS = source('./assets/maps');
+const LAUNCHER = source('./scripts/launcher/serve.mjs');
 
 /**
  * Publishes the sprite manifest next to each build's `index.html`.
@@ -106,3 +109,54 @@ export const workspaceAliases = [
   { find: '@z1r/ui', replacement: source('./packages/ui/src/index.ts') },
   { find: '@z1r/core', replacement: source('./packages/core/src/index.ts') },
 ];
+
+/**
+ * Ships `serve.mjs` beside a build's `index.html`.
+ *
+ * The desktop and OBS builds both carry the same launcher. It used to be two
+ * byte-identical copies in each app's `public`, which had already drifted from
+ * what one of them was for; emitting one source keeps them the same file.
+ */
+/** @returns {import('vite').Plugin} */
+export function launcher() {
+  return {
+    name: 'z1r-launcher',
+    buildStart() {
+      this.addWatchFile(LAUNCHER);
+    },
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'serve.mjs',
+        source: readFileSync(LAUNCHER, 'utf8'),
+      });
+    },
+  };
+}
+
+/**
+ * The config every app builds from: React, Tailwind, the shared sprite
+ * manifest and maps, the workspace aliases, and the build settings all three
+ * targets share.
+ *
+ * `plugins` are appended after the shared ones, and `build` is spread over the
+ * shared build settings, so an app adds what is particular to it and nothing
+ * else. Anything else in `options` is passed through as it is.
+ *
+ * @param {{ base: string; plugins?: import('vite').PluginOption[]; build?: import('vite').BuildOptions } & Omit<import('vite').UserConfig, 'base' | 'plugins' | 'build' | 'resolve'>} options
+ * @returns {import('vite').UserConfig}
+ */
+export function baseConfig({ base, plugins = [], build = {}, ...rest }) {
+  return {
+    base,
+    ...rest,
+    plugins: [react(), tailwindcss(), spriteManifest(), localMaps(), ...plugins],
+    resolve: { alias: workspaceAliases },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      target: 'es2022',
+      ...build,
+    },
+  };
+}

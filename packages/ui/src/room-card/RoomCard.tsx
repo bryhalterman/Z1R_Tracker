@@ -7,8 +7,8 @@
  * and level are showing, and re-renders the card on every store change. Nothing here keeps a copy of anything the store holds.
  */
 
-import { useRef, useState } from 'react';
-import { CheckIcon, ChevronDownIcon } from 'lucide-react';
+import { useState } from 'react';
+import { CheckIcon } from 'lucide-react';
 import {
   DOOR_STATES_BY_ID,
   DUNGEON_BOSSES,
@@ -39,22 +39,17 @@ import {
   type SpriteResolver,
   type TrackerState,
 } from '@z1r/core';
-import { Button, buttonVariants } from '#components/ui/button';
-import { Toggle } from '#components/ui/toggle';
+import { Button } from '#components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '#components/ui/toggle-group';
 import { Popover, PopoverContent, PopoverTrigger } from '#components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '#components/ui/command';
 import { cn } from '#lib/utils';
 import { LayoutArt } from './LayoutArt.js';
 import { Sprite } from '../shared/Sprite.js';
 import { dropTarget } from '../shared/drop-target.js';
+import { CheckToggle as CardCheckToggle, Row, Segmented } from '../shared/CardControls.js';
+import { onRightClick } from '../shared/input-handlers.js';
+import { SearchPicker, type PickerGroup } from '../shared/SearchPicker.js';
+import { SIDE_CLASS, SIDE_NAME, doorLabel } from '../room-grid/room-facts.js';
 import {
   bossTitle,
   collectedTitle,
@@ -85,8 +80,6 @@ export interface RoomCardProps {
   onDropItem: () => void;
 }
 
-const SIDE_CLASS: Record<RoomSide, string> = { north: 'n', east: 'e', south: 's', west: 'w' };
-const SIDE_NAME: Record<RoomSide, string> = { north: 'North', east: 'East', south: 'South', west: 'West' };
 const FROM_NAME: Record<RoomSlotKind, string> = { floor: 'Floor', stair: 'Stairs' };
 const STAIR_WORD: Record<RoomStairKind, string> = { none: 'None', item: 'To item', transport: 'Transport' };
 const PUSH_WORD: Record<RoomPushBlock, string> = { '': 'None', maybe: 'Maybe', checked: 'Checked' };
@@ -96,103 +89,14 @@ const PUSH_TITLE: Record<RoomPushBlock, string> = {
   checked: 'Tried the blocks here',
 };
 
-function doorLabel(state: DoorState): string {
-  const def = DOOR_STATES_BY_ID.get(state);
-  return def ? `${def.name} (${def.tag})` : state;
-}
-
-/** A labelled row: the key in a fixed column, the controls wrapping beside it. */
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-2">
-      <span className="pt-1.5 text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </span>
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">{children}</div>
-    </div>
-  );
-}
-
-/**
- * A two-state chip. The check in front of the label is its non-colour mark;
- * the pressed fill only repeats it.
- */
-function CheckToggle({
-  label,
-  pressed,
-  disabled,
-  title,
-  onPressedChange,
-}: {
-  label: string;
-  pressed: boolean;
-  disabled?: boolean;
-  title?: string;
-  onPressedChange: (pressed: boolean) => void;
-}) {
-  return (
-    <Toggle
-      variant="outline"
-      size="sm"
-      pressed={pressed}
-      disabled={disabled}
-      title={title}
-      onPressedChange={onPressedChange}
-      className="data-[pressed]:border-primary data-[pressed]:text-foreground"
-    >
-      {pressed ? <CheckIcon data-icon="inline-start" /> : null}
-      {label}
-    </Toggle>
-  );
+/** The card's chips also take the full text color when pressed. */
+function CheckToggle(props: Omit<Parameters<typeof CardCheckToggle>[0], 'className'>) {
+  return <CardCheckToggle {...props} className="data-[pressed]:text-foreground" />;
 }
 
 /** Why a row's options are greyed out, in words beside them. */
 function NotAvailable({ reason }: { reason: string }) {
   return <span className="text-xs text-muted-foreground italic">Not available for {reason}</span>;
-}
-
-/**
- * One answer out of a few. Clicking the pressed answer again empties the
- * group, which `onChange` receives as ''.
- */
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: T | null;
-  options: readonly { value: T; text: string; title?: string; hidden?: boolean; disabled?: boolean }[];
-  disabled?: boolean;
-  onChange: (value: T | '') => void;
-}) {
-  return (
-    <ToggleGroup
-      aria-label={label}
-      variant="outline"
-      size="sm"
-      spacing={0}
-      value={value === null ? [] : [value]}
-      disabled={disabled}
-      onValueChange={(next) => onChange((next[0] as T | undefined) ?? '')}
-    >
-      {options
-        .filter((option) => !option.hidden)
-        .map((option) => (
-          <ToggleGroupItem
-            key={option.value}
-            value={option.value}
-            title={option.title}
-            disabled={option.disabled}
-            className="data-[pressed]:border-primary data-[pressed]:underline data-[pressed]:underline-offset-4"
-          >
-            {option.text}
-          </ToggleGroupItem>
-        ))}
-    </ToggleGroup>
-  );
 }
 
 /** What every row of the card reads and writes through. */
@@ -661,10 +565,9 @@ function DoorWall({
         disabled={disabled}
         title={title}
         aria-label={title}
-        onContextMenu={(event) => {
-          event.preventDefault();
+        onContextMenu={onRightClick(() => {
           if (!disabled) onPick('unknown');
-        }}
+        })}
       >
         <span className="z1r-door-line" />
         <span className="z1r-door-tag">
@@ -719,9 +622,28 @@ function DoorWall({
 }
 
 /**
- * The layout picker: shadcn's combobox pattern, a popover holding a command
- * list that filters as you type. Each entry is the layout's picture and its
- * name, filed under what fills the room.
+ * Every layout, filed under what fills the room, after a "Not recorded" that
+ * takes the layout back off. Each entry is the layout's picture and its name.
+ */
+const LAYOUT_GROUPS: readonly PickerGroup[] = [
+  { options: [{ value: '', label: 'Not recorded' }] },
+  ...ROOM_LAYOUT_GROUPS.map((group) => ({
+    heading: group.name,
+    options: ROOM_LAYOUTS.filter((layout) => layout.group === group.id).map((layout) => ({
+      value: layout.id,
+      label: layout.name,
+      icon: (
+        <span className="inline-flex h-5 w-9 shrink-0 border border-border bg-background">
+          <LayoutArt def={layout} className="size-full" />
+        </span>
+      ),
+    })),
+  })),
+];
+
+/**
+ * The layout picker: the shared searchable dropdown, its trigger showing the
+ * recorded layout's picture beside its name.
  */
 function LayoutPicker({
   value,
@@ -732,67 +654,31 @@ function LayoutPicker({
   disabled: boolean;
   onPick: (id: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  // Closed for good when the control is disabled, not just hidden: masking it
-  // with `open && !disabled` left `open` true, and the popover came back on its
-  // own the moment the control was enabled again.
-  if (disabled && open) setOpen(false);
-  // Typing is the fastest way to a layout, so the filter takes focus on open.
-  const filter = useRef<HTMLInputElement>(null);
   const current = ROOM_LAYOUTS_BY_ID.get(value);
-  const pick = (id: string) => {
-    onPick(id);
-    setOpen(false);
-  };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        disabled={disabled}
-        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2')}
-        title={
-          current ? `${current.name} — pick a different layout` : 'Pick what stands on this room’s floor'
-        }
-      >
-        {current ? (
-          <span className="inline-flex h-4 w-7 border border-border">
-            <LayoutArt def={current} className="size-full" />
+    <SearchPicker
+      label="Layouts"
+      value={value}
+      groups={LAYOUT_GROUPS}
+      disabled={disabled}
+      namedByValue
+      title={current ? `${current.name} — pick a different layout` : 'Pick what stands on this room’s floor'}
+      triggerClassName="gap-2"
+      emptyText="No layout by that name."
+      listClassName="max-h-80"
+      renderValue={() => (
+        <>
+          {current ? (
+            <span className="inline-flex h-4 w-7 border border-border">
+              <LayoutArt def={current} className="size-full" />
+            </span>
+          ) : null}
+          <span className={cn(current ? '' : 'text-muted-foreground italic')}>
+            {current ? current.name : 'not recorded'}
           </span>
-        ) : null}
-        <span className={cn(current ? '' : 'text-muted-foreground italic')}>
-          {current ? current.name : 'not recorded'}
-        </span>
-        <ChevronDownIcon data-icon="inline-end" />
-      </PopoverTrigger>
-      <PopoverContent align="start" initialFocus={filter} className="z1r-ui w-72 p-0">
-        <Command>
-          <CommandInput ref={filter} placeholder="Filter layouts" />
-          <CommandList className="max-h-80">
-            <CommandEmpty>No layout by that name.</CommandEmpty>
-            <CommandGroup>
-              <CommandItem value="Not recorded" data-checked={value === ''} onSelect={() => pick('')}>
-                Not recorded
-              </CommandItem>
-            </CommandGroup>
-            {ROOM_LAYOUT_GROUPS.map((group) => (
-              <CommandGroup key={group.id} heading={group.name}>
-                {ROOM_LAYOUTS.filter((layout) => layout.group === group.id).map((layout) => (
-                  <CommandItem
-                    key={layout.id}
-                    value={layout.name}
-                    data-checked={layout.id === value}
-                    onSelect={() => pick(layout.id)}
-                  >
-                    <span className="inline-flex h-5 w-9 shrink-0 border border-border bg-background">
-                      <LayoutArt def={layout} className="size-full" />
-                    </span>
-                    {layout.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        </>
+      )}
+      onPick={onPick}
+    />
   );
 }

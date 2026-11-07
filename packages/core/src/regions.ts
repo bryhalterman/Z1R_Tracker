@@ -11,6 +11,8 @@
  * https://z1r.fandom.com/wiki/Maps → OW_Hint_Locations.png
  */
 
+import { byId, gridCellId } from './util.js';
+
 export interface RegionDef {
   readonly id: string;
   readonly name: string;
@@ -33,9 +35,7 @@ export const REGIONS: readonly RegionDef[] = [
   { id: 'desert', name: 'The Desert', code: 'DE', color: '#fff200' },
 ];
 
-export const REGIONS_BY_ID: ReadonlyMap<string, RegionDef> = new Map(
-  REGIONS.map((region) => [region.id, region]),
-);
+export const REGIONS_BY_ID: ReadonlyMap<string, RegionDef> = byId(REGIONS);
 
 const BY_CODE: ReadonlyMap<string, RegionDef> = new Map(REGIONS.map((r) => [r.code, r]));
 
@@ -51,14 +51,12 @@ const REGION_ROWS: readonly string[] = [
   'DW DW DW DW DW RV CS CS CS CS CS CO CO CO CO CO',
 ];
 
-const ROW_LABELS = 'ABCDEFGH';
-
 function buildScreenRegions(): Map<string, string> {
   const map = new Map<string, string>();
   REGION_ROWS.forEach((row, rowIndex) => {
     row.split(' ').forEach((code, colIndex) => {
       const region = BY_CODE.get(code);
-      if (region) map.set(`${ROW_LABELS[rowIndex]}${colIndex + 1}`, region.id);
+      if (region) map.set(gridCellId(colIndex + 1, rowIndex + 1), region.id);
     });
   });
   return map;

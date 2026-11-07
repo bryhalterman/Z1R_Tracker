@@ -31,6 +31,9 @@ import { cn } from '#lib/utils';
 import { Sprite } from '../shared/Sprite.js';
 import { previewHandlers } from '../map-preview.js';
 import { collectAction } from '../collect.js';
+import { onRightClick } from '../shared/input-handlers.js';
+import { spriteDim, tileVariants } from '../shared/tile-variants.js';
+import { slotCode, slotText } from './slot-words.js';
 
 export interface CompactLocationsProps {
   state: TrackerState;
@@ -43,19 +46,6 @@ export interface CompactLocationsProps {
    */
   rows?: boolean;
 }
-
-const KIND_TITLE: Record<string, string> = {
-  floor: 'Lying on the dungeon floor',
-  stair: 'Behind a staircase / item basement',
-  heart: 'Heart Container',
-  overworld: 'Named overworld location',
-};
-
-/** Single letter per slot kind — the whole label will not fit at this size. */
-const KIND_INITIAL: Record<string, string> = { floor: 'F', stair: 'S', heart: 'H', overworld: 'O' };
-
-/** The three overworld spots are not interchangeable, so they do not share a letter. */
-const SPOT_CODE: Record<string, string> = { 'ow.whiteSword': 'WS', 'ow.armos': 'AR', 'ow.coast': 'CO' };
 
 /**
  * A chip is redrawn only when what it shows changes. The placement objects are
@@ -72,25 +62,6 @@ function sameChip(a: ChipProps, b: ChipProps): boolean {
     a.dispatch === b.dispatch &&
     said(a.placement) === said(b.placement)
   );
-}
-
-/** The chip's words: where the slot is, what is in it, and whether it is collected. */
-function chipText(
-  kind: string,
-  location: LocationDef | null,
-  placement: ItemPlacement | null,
-  itemName: string | undefined,
-): string {
-  const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
-  return (
-    `${where} — ${itemName ?? 'unknown'}${placement?.collected ? ' (collected)' : ''}` +
-    (placement ? '' : ' — place it on a map to record it')
-  );
-}
-
-/** What an empty chip shows instead of a sprite: the spot's code, or the slot kind's letter. */
-function chipCode(kind: string, location: LocationDef | null): string {
-  return (location ? SPOT_CODE[location.id] : undefined) ?? KIND_INITIAL[kind] ?? '?';
 }
 
 type ChipProps = {
@@ -114,7 +85,7 @@ function ChipBody({
 } & Pick<CompactLocationsProps, 'resolver' | 'dispatch'>) {
   const entry = placement?.item ? SCREEN_ITEMS_BY_ID.get(placement.item) : undefined;
   const collected = !!placement?.collected;
-  const text = chipText(kind, location, placement, entry?.name);
+  const text = slotText(kind, location, placement, entry?.name);
   const toggle = () => {
     const action = collectAction(placement);
     if (action) dispatch(action);
@@ -130,20 +101,15 @@ function ChipBody({
         data-collected={collected}
         data-overflow={location ? undefined : 'true'}
         onClick={toggle}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          toggle();
-        }}
+        onContextMenu={onRightClick(toggle)}
         className={cn(
-          'relative grid size-6 cursor-pointer place-items-center rounded-md text-[10px] font-bold transition-colors outline-none',
-          'focus-visible:ring-2 focus-visible:ring-ring hover:bg-accent',
-          collected
-            ? 'bg-secondary text-foreground shadow-[inset_0_0_0_1.5px_var(--foreground)]'
-            : 'text-muted-foreground shadow-[inset_0_0_0_1px_var(--border)] [&_.z1r-sprite]:opacity-40 [&_.z1r-sprite]:grayscale',
+          tileVariants({ ring: collected ? 'on' : 'off', dim: collected ? undefined : 'dim' }),
+          'size-6 cursor-pointer rounded-md text-[10px] font-bold hover:bg-accent',
+          collected ? 'text-foreground' : 'text-muted-foreground',
           !location && 'outline-1 outline-offset-1 outline-dotted outline-destructive',
         )}
       >
-        {entry ? <Sprite resolver={resolver} spriteKey={entry.sprite} size={16} /> : chipCode(kind, location)}
+        {entry ? <Sprite resolver={resolver} spriteKey={entry.sprite} size={16} /> : slotCode(kind, location)}
       </TooltipTrigger>
       <TooltipContent className="z1r-ui max-w-64">{text}</TooltipContent>
     </Tooltip>
@@ -174,7 +140,7 @@ function PieceHead({ level, state, resolver, dispatch }: { level: string } & Com
         className={cn(
           'relative grid size-6 cursor-pointer place-items-center rounded-md outline-none',
           'focus-visible:ring-2 focus-visible:ring-ring',
-          !held && '[&_.z1r-sprite]:opacity-40 [&_.z1r-sprite]:grayscale',
+          !held && spriteDim('dim'),
         )}
       >
         <Sprite resolver={resolver} spriteKey="ui.triforce" size={20} />

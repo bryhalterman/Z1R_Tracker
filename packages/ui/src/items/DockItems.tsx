@@ -13,7 +13,7 @@
  * draws synchronously for its first-paint fit.
  */
 
-import type { MouseEvent, KeyboardEvent } from 'react';
+import type { MouseEvent } from 'react';
 import {
   ITEMS,
   labelFor,
@@ -26,6 +26,7 @@ import {
 import { Sprite } from '../shared/Sprite.js';
 import { placedSuffix } from '../placed.js';
 import { roomItemsForInventory } from '../rooms.js';
+import { onRightClick, onStepKeys, type StepKeys } from '../shared/input-handlers.js';
 
 export interface DockItemsProps {
   state: TrackerState;
@@ -40,6 +41,9 @@ const GROUPS = [
   ['passive', 'Always active'],
   ['bslot', 'B slot'],
 ] as const;
+
+/** Which way the arrow keys step an item: only down, since a click raises it. */
+const LOWER_KEYS: StepKeys = { ArrowLeft: -1, ArrowDown: -1 };
 
 /** Every room item a cell can stand for — a chain covers more than one. Fixed, so worked out once. */
 const COVERS = new Map(ITEMS.map((def) => [def.id, roomItemsForInventory(def)]));
@@ -95,16 +99,8 @@ function ItemCell({
   const badge = def.kind === 'progressive' && owned && maxValue(def) > 1 ? String(value) : null;
 
   const onClick = (event: MouseEvent) => step(def.id, event.shiftKey ? -1 : 1);
-  const onContextMenu = (event: MouseEvent) => {
-    event.preventDefault();
-    step(def.id, -1);
-  };
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-      event.preventDefault();
-      step(def.id, -1);
-    }
-  };
+  const onContextMenu = onRightClick(() => step(def.id, -1));
+  const onKeyDown = onStepKeys(LOWER_KEYS, (direction) => step(def.id, direction));
 
   return (
     <button

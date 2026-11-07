@@ -12,14 +12,7 @@
  * here shows up there and on the overlay at once.
  */
 
-import {
-  MAP_SECTIONS,
-  attachPersistence,
-  createInitialState,
-  createStore,
-  load,
-  loadResolver,
-} from './options.js';
+import { MAP_SECTIONS, bootTracker } from './options.js';
 import { mountTracker } from '@z1r/ui';
 import '@z1r/ui/styles.css';
 import './obs.css';
@@ -28,10 +21,9 @@ async function main(): Promise<void> {
   const root = document.querySelector<HTMLElement>('#tracker');
   if (!root) throw new Error('Map mount point is missing.');
 
-  const store = createStore(load() ?? createInitialState());
-  attachPersistence(store);
-
-  const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
+  const { store, resolver } = await bootTracker({
+    spritesUrl: new URL('sprites.json', document.baseURI).href,
+  });
 
   /*
    * No Export/Import/Reset bar here. They exist in the main dock, and a second

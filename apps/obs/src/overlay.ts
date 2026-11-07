@@ -6,15 +6,7 @@
  * All editing happens in the dock; this window only reflects it.
  */
 
-import {
-  OVERLAY_DEFAULT_SECTIONS,
-  allowedSections,
-  attachPersistence,
-  createInitialState,
-  createStore,
-  load,
-  loadResolver,
-} from './options.js';
+import { OVERLAY_DEFAULT_SECTIONS, allowedSections, bootTracker } from './options.js';
 import { mountTracker } from '@z1r/ui';
 import '@z1r/ui/styles.css';
 import './obs.css';
@@ -146,12 +138,12 @@ async function main(): Promise<void> {
     window.setTimeout(() => note.remove(), 8000);
   });
 
-  const store = createStore(load() ?? createInitialState());
   // `write: false` — the overlay must never be the source of truth. If the
   // dock and overlay both wrote, a stale overlay could clobber a live edit.
-  attachPersistence(store, { write: false });
-
-  const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
+  const { store, resolver } = await bootTracker({
+    spritesUrl: new URL('sprites.json', document.baseURI).href,
+    write: false,
+  });
 
   // Resize is applied directly: it is infrequent, and routing it through
   // requestAnimationFrame means it never lands while the source is hidden.

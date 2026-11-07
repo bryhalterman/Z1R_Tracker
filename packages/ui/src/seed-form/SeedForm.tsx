@@ -13,6 +13,7 @@
 
 import { useId } from 'react';
 import { useDraft } from '../shared/use-draft.js';
+import { Segmented, type SegmentedOption } from '../shared/CardControls.js';
 import {
   DUNGEON_QUESTS,
   ITEM_SHUFFLES,
@@ -26,7 +27,6 @@ import { Checkbox } from '#components/ui/checkbox';
 import { Input } from '#components/ui/input';
 import { Label } from '#components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '#components/ui/toggle-group';
 
 export interface SeedFormProps {
   seed: SeedSettings;
@@ -135,6 +135,11 @@ function SelectField<T extends string>({
   );
 }
 
+const QUEST_OPTIONS: readonly SegmentedOption<ConcreteQuest>[] = [
+  { value: '1st', text: '1Q' },
+  { value: '2nd', text: '2Q' },
+];
+
 /** L1-6 or L7-9: which quest that half of the game turned out to be. */
 function QuestHalf({
   caption,
@@ -148,30 +153,17 @@ function QuestHalf({
   return (
     <div className="flex items-center gap-2">
       <span className={`${LABEL} w-10`}>{caption}</span>
-      <ToggleGroup
-        aria-label={`Quest for ${caption}`}
-        variant="outline"
-        size="sm"
-        spacing={0}
-        value={[props.seed[name]]}
+      <Segmented<ConcreteQuest>
+        label={`Quest for ${caption}`}
+        value={props.seed[name]}
+        options={QUEST_OPTIONS}
         disabled={!props.interactive}
-        onValueChange={(next) => {
-          const quest = next[0] as ConcreteQuest | undefined;
+        onChange={(quest) => {
+          // Pressing the answer already chosen empties the group; a quest is
+          // always one of the two, so that click changes nothing.
           if (quest) props.set({ [name]: quest });
         }}
-      >
-        {(['1st', '2nd'] as const).map((quest) => (
-          <ToggleGroupItem
-            key={quest}
-            value={quest}
-            // Underlined as well as ringed, so the answer is not told by the
-            // ring's colour alone.
-            className="data-[pressed]:border-primary data-[pressed]:underline data-[pressed]:underline-offset-4"
-          >
-            {quest === '1st' ? '1Q' : '2Q'}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      />
     </div>
   );
 }

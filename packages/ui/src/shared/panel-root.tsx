@@ -1,7 +1,8 @@
 /**
  * The React root every panel renders into.
  *
- * Two jobs, so every mount helper gets them by calling one function:
+ * Two jobs, so every mount helper gets them by calling one function — or,
+ * through `panelHost`, by naming the component it draws:
  *
  * - An error boundary. A render error otherwise removes the root's whole
  *   tree — all 128 map cells for one bad screen — and `runPatches` cannot
@@ -13,7 +14,7 @@
  *   without each builder having to hand one back.
  */
 
-import { Component, type ReactNode } from 'react';
+import { Component, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { onDispose } from './disposers.js';
 
@@ -63,5 +64,20 @@ export function createPanelRoot(container: HTMLElement): PanelRoot {
       if (!unmounted) root.render(<PanelBoundary>{node}</PanelBoundary>);
     },
     unmount,
+  };
+}
+
+/** A panel's React root, drawing one component: render it again with new props, or tear it down. */
+export interface PanelHost<P> {
+  render(props: P): void;
+  /** Ahead of the tracker's teardown, which unmounts the root as well. */
+  unmount(): void;
+}
+
+/** The mount helper for `Panel`: give it a container, get back its host. */
+export function panelHost<P extends object>(Panel: ComponentType<P>) {
+  return (container: HTMLElement): PanelHost<P> => {
+    const root = createPanelRoot(container);
+    return { render: (props) => root.render(<Panel {...props} />), unmount: root.unmount };
   };
 }

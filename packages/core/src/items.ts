@@ -6,6 +6,8 @@
  * touching game data. See docs/SPRITES.md.
  */
 
+import { byId } from './util.js';
+
 /**
  * Mirrors the game's inventory screen: `passive` items are always in effect,
  * `bslot` items are the ones assigned to B. Rendered as two sections in that
@@ -194,7 +196,7 @@ export const ITEMS: readonly ItemDef[] = [
   },
 ];
 
-export const ITEMS_BY_ID: ReadonlyMap<string, ItemDef> = new Map(ITEMS.map((item) => [item.id, item]));
+export const ITEMS_BY_ID: ReadonlyMap<string, ItemDef> = byId(ITEMS);
 
 /** Highest value `id` can hold. Toggles cap at 1, progressives at their stage count. */
 export function maxValue(def: ItemDef): number {

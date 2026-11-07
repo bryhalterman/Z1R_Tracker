@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /*
- * Zero-dependency launcher for the downloadable build.
+ * Zero-dependency launcher, shipped next to the desktop and OBS builds.
  *
- * Double-clicking index.html works, but a real http origin is what unlocks the
- * service worker (offline sprite caching) and cross-window sync with an OBS
- * dock. This serves the folder it lives in and opens a browser at it.
+ * Both open from a folder, and both want a real http origin. The desktop
+ * build's service worker (offline sprite caching) needs one, and OBS's dock
+ * and overlay only sync when they share one: two `file://` pages do not. This
+ * serves the folder it lives in and opens a browser at it.
+ *
+ * One source, emitted into each build by `launcher()` in `vite.shared.mjs`,
+ * so it has to run on its own beside whichever build it lands in.
  *
  *   node serve.mjs [port]
  */
@@ -65,7 +69,8 @@ const server = createServer(async (req, res) => {
     const body = await readFile(target);
     res.writeHead(200, {
       'content-type': TYPES.get(extname(target).toLowerCase()) ?? 'application/octet-stream',
-      // The service worker owns caching; don't let the browser second-guess it.
+      // Revalidated on every load, so a rebuild shows up without clearing a
+      // cache by hand. On the desktop build the service worker owns caching.
       'cache-control': 'no-cache',
     });
     res.end(body);

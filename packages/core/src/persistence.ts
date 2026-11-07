@@ -20,21 +20,22 @@ import {
 } from './state.js';
 import { ITEMS_BY_ID, maxValue } from './items.js';
 import { isStorableLocationId } from './legacy-locations.js';
-import { clampWhole, fitNoteToMark, noteIsBare } from './notes.js';
+import { fitNoteToMark, noteIsBare } from './notes.js';
+import { byId, clampWhole, truncWhole } from './util.js';
 
 import {
-  bossAllowedOnLevel,
-  DOOR_STATES_BY_ID,
   emptyRoom,
+  isDoorState,
+  isRoomBoss,
   isRoomFrom,
+  isRoomItem,
   isRoomPushBlock,
   isRoomId,
   isRoomLevel,
+  isRoomStairKind,
+  isRoomTransport,
   roomIsBare,
-  ROOM_ITEMS_BY_ID,
   ROOM_SIDES,
-  ROOM_STAIRS_BY_ID,
-  ROOM_TRANSPORT_MAX,
   ROOM_TRANSPORT_PAIR_SIZE,
   type DoorState,
   type RoomDoors,
@@ -55,7 +56,15 @@ import {
   type MarkKind,
   type SecretSize,
 } from './overworld.js';
-import { OVERWORLD_LOCATIONS, POOL_BY_ID, SCREEN_ITEMS_BY_ID, type SeedSettings } from './seed.js';
+import {
+  DUNGEON_QUESTS,
+  ITEM_SHUFFLES,
+  OVERWORLD_LOCATIONS,
+  OVERWORLD_QUESTS,
+  POOL_BY_ID,
+  SCREEN_ITEMS_BY_ID,
+  type SeedSettings,
+} from './seed.js';
 
 export const STORAGE_KEY = 'z1r-tracker:state';
 export const CHANNEL_NAME = 'z1r-tracker';
@@ -102,7 +111,7 @@ function knownIdList(value: unknown, table: IdTable): string[] {
 }
 
 /** Named overworld spots by id, so a saved spot is checked like every other id. */
-const OVERWORLD_SPOTS_BY_ID: IdTable = new Map(OVERWORLD_LOCATIONS.map((l) => [l.id, l]));
+const OVERWORLD_SPOTS_BY_ID: IdTable = byId(OVERWORLD_LOCATIONS);
 
 /**
  * Items the model still has, each a whole number the item can actually hold.
@@ -120,7 +129,7 @@ function pruneItems(
   for (const [id, value] of Object.entries(items)) {
     const def = ITEMS_BY_ID.get(id);
     if (!def) continue;
-    items[id] = Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), 0), maxValue(def)) : 0;
+    items[id] = truncWhole(value, maxValue(def));
   }
   return items;
 }
@@ -136,13 +145,15 @@ function pruneDungeons(
   return result;
 }
 
-const QUESTS = new Set(['1st', '2nd', 'mixed', 'shapes', 'mixed-shapes', 'random-no-shapes', 'random']);
-const OVERWORLD_QUEST_VALUES = new Set(['1st', '2nd', 'mixed-1st', 'mixed-2nd', 'random']);
-const SHUFFLES = new Set(['none', 'dungeon', 'anywhere-hearts-in-dungeons', 'items-hearts', 'random']);
+// Read off the option lists the seed form offers, so a value added to
+// one of them is kept on load rather than reset to the default.
+const QUESTS: ReadonlySet<string> = new Set(DUNGEON_QUESTS.map((q) => q.value));
+const OVERWORLD_QUEST_VALUES: ReadonlySet<string> = new Set(OVERWORLD_QUESTS.map((q) => q.value));
+const SHUFFLES: ReadonlySet<string> = new Set(ITEM_SHUFFLES.map((s) => s.value));
 
 /** Highest id in use, so a new hint can never reuse one. */
 function hintSeqFrom(saved: unknown, hints: HintEntry[]): number {
-  const base = Number.isFinite(saved) ? Math.max(Math.trunc(saved as number), 0) : 0;
+  const base = truncWhole(saved);
   const used = hints.map((h) => Number(String(h.id).replace(/^h/, '')) || 0);
   return Math.max(base, ...used, 0);
 }
@@ -181,11 +192,10 @@ function conformShopPrices(saved: unknown, shop: readonly string[]): Record<stri
   const out: Record<string, number> = {};
   for (const [stock, value] of Object.entries(saved as Record<string, unknown>)) {
     if (!shop.includes(stock)) continue;
-    const price = Number(value);
-    if (!Number.isFinite(price)) continue;
-    // Truncated, not rejected, so this matches `setShopPrice` exactly and the
-    // two cannot drift. 0 and below is the empty value: no key.
-    const whole = Math.max(Math.trunc(price), 0);
+    // Truncated, not rejected, through the same helper as `setShopPrice`, so
+    // the two cannot drift. Not a finite number, or 0 and below, is the empty
+    // value: no key.
+    const whole = truncWhole(Number(value));
     if (whole === 0) continue;
     out[stock] = whole;
   }
@@ -270,8 +280,8 @@ function conformDoors(saved: unknown): RoomDoors {
       doors[side] = renamed;
       continue;
     }
-    if (!DOOR_STATES_BY_ID.has(value)) continue;
-    doors[side] = value as DoorState;
+    if (!isDoorState(value)) continue;
+    doors[side] = value;
   }
   return doors;
 }
@@ -353,8 +363,7 @@ function conformTransport(
   stairs: RoomStairKind,
 ): Pick<RoomNote, 'transport' | 'transportSeq'> {
   const pair = Number(note.transport);
-  const transport =
-    stairs === 'transport' && Number.isInteger(pair) && pair >= 1 && pair <= ROOM_TRANSPORT_MAX ? pair : 0;
+  const transport = stairs === 'transport' && isRoomTransport(pair) ? pair : 0;
   // The eviction stamp is meaningless without a number. A missing one
   // leaves 0, which simply makes that room the first candidate to evict.
   const seq = Number(note.transportSeq);
@@ -376,11 +385,13 @@ function conformRoom(raw: unknown, level: number): RoomNote | null {
 
   // Strictly true, so a truthy string or 1 does not read as visited.
   const visited = note.visited === true;
-  const item = knownId(note.item, ROOM_ITEMS_BY_ID);
+  // Checked by the same per-field validators the reducer refuses with; here
+  // a failure falls back to the empty value instead.
+  const item = isRoomItem(note.item) ? note.item : '';
   // Ganon and Zelda on any level but 9 are dropped rather than moved: the
   // room they were recorded in cannot exist, so neither can the boss.
-  const boss = typeof note.boss === 'string' && bossAllowedOnLevel(note.boss, level) ? note.boss : '';
-  const stairs = knownId<RoomStairKind>(note.stairs, ROOM_STAIRS_BY_ID, 'none');
+  const boss = isRoomBoss(note.boss, level) ? note.boss : '';
+  const stairs: RoomStairKind = isRoomStairKind(note.stairs) ? note.stairs : 'none';
   const { transport, transportSeq } = conformTransport(note, stairs);
   const doors = conformDoors(note.doors);
   // Both new in v12. An earlier room loads as uncollected and `auto`, which
@@ -549,7 +560,7 @@ export function migrate(raw: unknown): TrackerState | null {
     // but 1e400 overflows to one, and applyRemote gates on `rev <= current` —
     // so once both windows reach Infinity every later edit is silently dropped
     // by the OBS browser source, with no visible cause.
-    rev: Number.isFinite(candidate.rev) ? Math.max(Math.trunc(candidate.rev as number), 0) : 0,
+    rev: truncWhole(candidate.rev),
     // Prune, don't just merge. A plain spread would carry keys for items and
     // dungeon flags that have since been removed from the model — they'd
     // survive every future load and get written back into exported saves.

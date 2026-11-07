@@ -1,10 +1,11 @@
 /**
  * A searchable dropdown: shadcn's combobox pattern, a popover holding a
  * command list that filters as you type. For lists too long to scan in a
- * native select — the 41 hint subjects, the overworld regions.
+ * native select — the 41 hint subjects, the overworld regions, the room
+ * layouts.
  */
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { ChevronDownIcon } from 'lucide-react';
 import { buttonVariants } from '#components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '#components/ui/popover';
@@ -23,6 +24,8 @@ export interface PickerOption {
   readonly label: string;
   /** Extra words the filter matches on, beyond the label. */
   readonly keywords?: readonly string[];
+  /** A picture drawn before the label in the list. */
+  readonly icon?: ReactNode;
 }
 
 export interface PickerGroup {
@@ -37,15 +40,32 @@ export function SearchPicker({
   placeholder,
   disabled,
   className,
+  title,
+  namedByValue = false,
+  triggerClassName = 'min-w-0 justify-between gap-1.5',
+  renderValue,
+  emptyText = 'Nothing by that name.',
+  listClassName = 'max-h-72',
   onPick,
 }: {
   /** Names the control for assistive tech; the trigger shows the value. */
   label: string;
   value: string;
   groups: readonly PickerGroup[];
-  placeholder: string;
+  /** What the trigger shows with nothing picked; unused with `renderValue`. */
+  placeholder?: string;
   disabled?: boolean;
   className?: string;
+  title?: string;
+  /** Leave the trigger named by the value it shows rather than by `label`. */
+  namedByValue?: boolean;
+  /** The trigger's layout, in place of the default; `className` still follows it. */
+  triggerClassName?: string;
+  /** What the trigger shows, in place of the chosen option's label. */
+  renderValue?: () => ReactNode;
+  /** What the list says when the filter matches nothing. */
+  emptyText?: string;
+  listClassName?: string;
   onPick: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -61,23 +81,24 @@ export function SearchPicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         disabled={disabled}
-        aria-label={label}
-        className={cn(
-          buttonVariants({ variant: 'outline', size: 'sm' }),
-          'min-w-0 justify-between gap-1.5',
-          className,
-        )}
+        aria-label={namedByValue ? undefined : label}
+        title={title}
+        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), triggerClassName, className)}
       >
-        <span className={cn('truncate', current ? '' : 'text-muted-foreground italic')}>
-          {current ? current.label : placeholder}
-        </span>
+        {renderValue ? (
+          renderValue()
+        ) : (
+          <span className={cn('truncate', current ? '' : 'text-muted-foreground italic')}>
+            {current ? current.label : placeholder}
+          </span>
+        )}
         <ChevronDownIcon data-icon="inline-end" />
       </PopoverTrigger>
       <PopoverContent align="start" initialFocus={filter} className="z1r-ui w-72 p-0">
         <Command>
           <CommandInput ref={filter} placeholder={`Filter ${label.toLowerCase()}`} />
-          <CommandList className="max-h-72">
-            <CommandEmpty>Nothing by that name.</CommandEmpty>
+          <CommandList className={listClassName}>
+            <CommandEmpty>{emptyText}</CommandEmpty>
             {groups.map((group, index) => (
               <CommandGroup key={group.heading ?? index} heading={group.heading}>
                 {group.options.map((option) => (
@@ -91,6 +112,7 @@ export function SearchPicker({
                       setOpen(false);
                     }}
                   >
+                    {option.icon}
                     {option.label}
                   </CommandItem>
                 ))}

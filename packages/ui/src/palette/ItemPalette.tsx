@@ -32,6 +32,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#compo
 import { cn } from '#lib/utils';
 import { Sprite } from '../shared/Sprite.js';
 import { CellTip } from '../room-grid/CellTip.js';
+import { onRightClick, onStepKeys, type StepKeys } from '../shared/input-handlers.js';
+import { tileVariants } from '../shared/tile-variants.js';
 import { tileModel, type Held, type TileSpec } from './tile-model.js';
 
 /** An item's tiers, lowest first, drawn as one joined strip. */
@@ -110,8 +112,14 @@ export interface ItemPaletteProps {
   dragEnd: (dropped: boolean) => void;
 }
 
+/** Which way the arrow keys step an item's held stage. */
+const STAGE_KEYS: StepKeys = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 };
+
 // `targetFor` lives in tile-model.ts; re-exported for the palette's mount.
 export { targetFor } from './tile-model.js';
+
+/** The ring for each held state. */
+const HELD_RING = { held: 'on', unheld: 'off', none: 'quiet' } as const;
 
 /**
  * The tile's drawing, shared by every kind of tile.
@@ -135,19 +143,17 @@ function tileClass({
   inFamily: boolean;
 }): string {
   return cn(
-    'relative grid size-(--z1r-item-min) place-items-center p-0.5 outline-none transition-colors',
+    tileVariants({
+      ring: HELD_RING[held],
+      // Armed is the one the next map click spends: a thicker ring in the
+      // accent, and the sprite back at full strength whatever is held.
+      dim: armed ? 'lit' : held === 'unheld' ? 'faint' : undefined,
+      // Bought, not found: a dashed edge in place of the ring, held or not.
+      edge: bought ? 'dashed' : undefined,
+      armed,
+    }),
+    'size-(--z1r-item-min) p-0.5',
     inFamily ? 'rounded-sm' : 'rounded-lg',
-    'focus-visible:ring-2 focus-visible:ring-ring',
-    held === 'held' && 'bg-secondary shadow-[inset_0_0_0_1.5px_var(--foreground)]',
-    held === 'unheld' &&
-      'shadow-[inset_0_0_0_1px_var(--border)] [&_.z1r-sprite]:opacity-35 [&_.z1r-sprite]:grayscale',
-    held === 'none' && 'bg-secondary/50 shadow-[inset_0_0_0_1px_var(--border)]',
-    // Bought, not found: a dashed edge in place of the ring, held or not.
-    bought && 'shadow-none border border-dashed border-muted-foreground',
-    // Armed is the one the next map click spends: a thicker ring in the
-    // accent, and the sprite back at full strength whatever is held.
-    armed &&
-      'shadow-[inset_0_0_0_2.5px_var(--primary)] [&_.z1r-sprite]:opacity-100 [&_.z1r-sprite]:grayscale-0',
     placeable ? 'cursor-grab hover:bg-accent' : 'cursor-pointer hover:bg-accent',
   );
 }
@@ -239,20 +245,10 @@ const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
         // doing nothing. `detail` is the mouse's click count, and 0 for a
         // click the keyboard made.
         onClick={(event) => (event.detail === 0 && target ? toggleArmed() : toggleHeld())}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          toggleArmed();
-        }}
-        onKeyDown={(event) => {
-          if (!inventory) return;
-          if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            step(inventory.id, 1);
-          } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-            event.preventDefault();
-            step(inventory.id, -1);
-          }
-        }}
+        onContextMenu={onRightClick(toggleArmed)}
+        onKeyDown={
+          inventory ? onStepKeys(STAGE_KEYS, (direction) => step(inventory.id, direction)) : undefined
+        }
         draggable={!!target}
         onDragStart={
           target

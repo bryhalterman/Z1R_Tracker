@@ -1,11 +1,11 @@
 @echo off
-REM Runs Z1R Tracker on a local http origin so offline caching and OBS dock
-REM sync both work. Requires Node.js. If you don't have Node, just open
-REM index.html directly -- the tracker still works, minus offline caching.
+REM Serves the Z1R Tracker OBS pages on a local http origin. Requires Node.js:
+REM the pages are module scripts, which do not load from file://, and the
+REM docks and the overlay only sync when they share one http origin.
 setlocal
 cd /d "%~dp0"
 where node >nul 2>nul || (
-  echo Node.js was not found. Open index.html directly instead.
+  echo Node.js was not found. Install it from https://nodejs.org and run this again.
   pause
   exit /b 1
 )

@@ -11,11 +11,14 @@ export * from './state.js';
 export * from './logic.js';
 export * from './placements.js';
 export * from './persistence.js';
+export * from './util.js';
 export * from './sprites/loader.js';
 export * from './sprites/vectors.js';
 
 import manifest from './sprites/manifest.json';
 import { SpriteResolver, type SpriteManifest } from './sprites/loader.js';
+import { attachPersistence, load } from './persistence.js';
+import { createInitialState, createStore, type Store } from './state.js';
 
 /** The manifest bundled with the build. Override at runtime via `SpriteResolver.fromUrl`. */
 export const bundledManifest = manifest as unknown as SpriteManifest;
@@ -51,4 +54,34 @@ export async function loadResolver(url = 'sprites.json'): Promise<SpriteResolver
   } catch {
     return createDefaultResolver();
   }
+}
+
+export interface BootOptions {
+  /**
+   * Where the served sprite manifest is, resolved by the caller: core has no
+   * document to resolve a relative path against. A URL that cannot be fetched
+   * falls back to the bundled manifest, as `loadResolver` does.
+   */
+  readonly spritesUrl: string;
+  /** False for a read-only display, which must never write back. See `SyncOptions`. */
+  readonly write?: boolean;
+}
+
+export interface Booted {
+  readonly store: Store;
+  readonly resolver: SpriteResolver;
+}
+
+/**
+ * The start every app entry shares: restore the saved run, keep it saved and in
+ * sync with the other windows, and load the sprite manifest.
+ *
+ * The store is restored before the resolver is awaited, so a run in progress
+ * is in place before the first paint whatever the network does.
+ */
+export async function bootTracker(options: BootOptions): Promise<Booted> {
+  const store = createStore(load() ?? createInitialState());
+  attachPersistence(store, { write: options.write ?? true });
+  const resolver = await loadResolver(options.spritesUrl);
+  return { store, resolver };
 }

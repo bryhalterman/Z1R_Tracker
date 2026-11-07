@@ -28,13 +28,7 @@ import {
 import { createSprite } from './sprite.js';
 import { memoise, runPatches, type Patch } from './patch.js';
 import { mountCompactLocations } from './locations/mount.js';
-
-const KIND_TITLE: Record<string, string> = {
-  floor: 'Lying on the dungeon floor',
-  stair: 'Behind a staircase / item basement',
-  heart: 'Heart Container',
-  overworld: 'Named overworld location',
-};
+import { slotCode, slotText } from './locations/slot-words.js';
 
 /**
  * Which slots and overflow chips the panel draws, as one string.
@@ -90,33 +84,6 @@ export function buildLocations(
   rows = false,
 ): HTMLElement {
   return buildCompactLocations(store, resolver, patches, interactive, rows);
-}
-
-/** Single letter per slot kind — the whole label will not fit at this size. */
-const KIND_INITIAL: Record<string, string> = {
-  floor: 'F',
-  stair: 'S',
-  heart: 'H',
-  overworld: 'O',
-};
-
-/**
- * The three overworld spots are not interchangeable, so they do not share a
- * letter.
- *
- * They rendered as three identical `O` chips, which told you there were three
- * of them and nothing else — you had to hover each one to find out which was
- * the Coast. Dungeon slots genuinely are interchangeable within a level, so
- * those keep their kind initial.
- */
-const SPOT_CODE: Record<string, string> = {
-  'ow.whiteSword': 'WS',
-  'ow.armos': 'AR',
-  'ow.coast': 'CO',
-};
-
-function slotCode(kind: string, location: LocationDef | null): string {
-  return (location ? SPOT_CODE[location.id] : undefined) ?? KIND_INITIAL[kind] ?? '?';
 }
 
 /**
@@ -255,11 +222,7 @@ function buildCompactLocations(
       slot.dataset.collected = String(collected);
       slot.dataset.known = String(!!item);
       const entry = item ? SCREEN_ITEMS_BY_ID.get(item) : undefined;
-      const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
-      slot.title =
-        `${where} — ${entry?.name ?? 'unknown'}` +
-        `${collected ? ' (collected)' : ''}` +
-        (placement ? '' : ' — place it on a map to record it');
+      slot.title = slotText(kind, location, placement, entry?.name);
       renderedItem = memoise(renderedItem, item, () => {
         if (entry) face.replaceChildren(createSprite(resolver, entry.sprite, { size: 16 }));
         else face.replaceChildren(slotCode(kind, location));

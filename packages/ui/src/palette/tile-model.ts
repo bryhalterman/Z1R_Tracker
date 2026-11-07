@@ -13,6 +13,7 @@ import {
   type ItemDef,
   type TrackerState,
 } from '@z1r/core';
+import { factLine } from '../shared/fact-line.js';
 
 /**
  * One tile: a placeable item by its pool or room id, or — for the two tiers
@@ -148,5 +149,5 @@ export function tileModel(
   const held = heldState(base);
   const facts = tileFacts(base, held, isArmed, where);
   const hints = tileHints(base.target, held, isArmed);
-  return { ...base, held, facts, hints, text: [base.name, ...facts, ...hints].join(' — ') };
+  return { ...base, held, facts, hints, text: factLine([base.name, ...facts, ...hints]) };
 }

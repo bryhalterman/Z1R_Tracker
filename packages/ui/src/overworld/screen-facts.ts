@@ -18,6 +18,7 @@ import {
   type RegionDef,
   type ScreenNote,
 } from '@z1r/core';
+import { factLine } from '../shared/fact-line.js';
 
 /**
  * How many stock icons a shop tile draws.
@@ -221,5 +222,5 @@ export function screenHeading(id: string, region: RegionDef | undefined): string
 
 /** The cell's accessible name: screen, region and facts on one line. */
 export function screenLabel(id: string, region: RegionDef | undefined, facts: readonly string[]): string {
-  return [id, ...(region ? [region.name] : []), ...facts].join(' — ');
+  return factLine([id, ...(region ? [region.name] : []), ...facts]);
 }

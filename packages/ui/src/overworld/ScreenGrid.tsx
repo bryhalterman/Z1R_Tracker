@@ -39,6 +39,7 @@ import { SpriteArt } from '../shared/Sprite.js';
 import { CellTip } from '../room-grid/CellTip.js';
 import { previewHandlers } from '../map-preview.js';
 import { dropTarget } from '../shared/drop-target.js';
+import { onRightClick, onStepKeys, type StepKeys } from '../shared/input-handlers.js';
 import {
   centredSprite,
   insideEntries,
@@ -152,6 +153,9 @@ export function ScreenGrid(props: ScreenGridProps) {
 }
 
 const EXIT_NAME = { left: 'Left', middle: 'Middle', right: 'Right' } as const;
+
+/** Which way the arrow keys step a screen through the marks. */
+const MARK_KEYS: StepKeys = { ArrowRight: 1, ArrowLeft: -1 };
 
 /** The height a guide's letter plate needs above its cell, gap included. */
 const TAG_ROOM = 22;
@@ -458,17 +462,10 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
         onClick={() => onTouch(id)}
         // Right-click clears outright — the common correction, and faster than
         // picking "Unmarked".
-        onContextMenu={(event) => {
-          event.preventDefault();
-          onClear(id);
-        }}
+        onContextMenu={onRightClick(() => onClear(id))}
         // Arrow keys step through the marks without opening anything, which is
         // quicker than the brushes when tagging a run of screens.
-        onKeyDown={(event) => {
-          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-          event.preventDefault();
-          onCycle(id, event.key === 'ArrowRight' ? 1 : -1);
-        }}
+        onKeyDown={onStepKeys(MARK_KEYS, (direction) => onCycle(id, direction))}
         {...dropTarget(canDrop, () => onTouch(id))}
       >
         <ScreenTerrain mapUrl={mapUrl} col={col} row={row} />

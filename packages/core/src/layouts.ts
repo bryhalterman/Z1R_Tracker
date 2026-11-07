@@ -27,6 +27,8 @@
  * | `x`  | black floor                           |
  */
 
+import { byId } from './util.js';
+
 /** Width and height of a layout, in squares. */
 export const ROOM_LAYOUT_COLUMNS = 12;
 export const ROOM_LAYOUT_ROWS = 7;
@@ -687,9 +689,7 @@ export const ROOM_LAYOUTS: readonly RoomLayoutDef[] = [
   },
 ];
 
-export const ROOM_LAYOUTS_BY_ID: ReadonlyMap<string, RoomLayoutDef> = new Map(
-  ROOM_LAYOUTS.map((layout) => [layout.id, layout]),
-);
+export const ROOM_LAYOUTS_BY_ID: ReadonlyMap<string, RoomLayoutDef> = byId(ROOM_LAYOUTS);
 
 /** A known layout id, or '' for a room whose layout has not been recorded. */
 export function isRoomLayout(value: unknown): value is string {

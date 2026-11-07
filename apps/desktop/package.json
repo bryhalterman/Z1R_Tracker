@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node serve.mjs"
+    "start": "node dist/serve.mjs"
   },
   "dependencies": {
     "@z1r/core": "0.1.0",

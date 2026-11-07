@@ -20,18 +20,18 @@ import {
 } from './overworld.js';
 import { SCREEN_ITEMS_BY_ID, createSeedSettings, questsMustDiffer, type SeedSettings } from './seed.js';
 import {
-  bossAllowedOnLevel,
-  DOOR_STATES_BY_ID,
   emptyRoom,
+  isDoorState,
+  isRoomBoss,
   isRoomFrom,
+  isRoomItem,
   isRoomPushBlock,
   isRoomId,
   isRoomLevel,
   isRoomSide,
+  isRoomStairKind,
+  isRoomTransport,
   roomIsBare,
-  ROOM_ITEMS_BY_ID,
-  ROOM_STAIRS_BY_ID,
-  ROOM_TRANSPORT_MAX,
   ROOM_TRANSPORT_PAIR_SIZE,
   type DoorState,
   type RoomFrom,
@@ -40,7 +40,8 @@ import {
   type RoomSide,
 } from './rooms.js';
 import { isRoomLayout } from './layouts.js';
-import { clampWhole, emptyNote, fitNoteToMark, noteIsBare, sameNote } from './notes.js';
+import { emptyNote, fitNoteToMark, noteIsBare, sameNote } from './notes.js';
+import { clampWhole, truncClamp, truncWhole } from './util.js';
 
 export const STATE_VERSION = 13;
 
@@ -607,7 +608,7 @@ const MARK_HANDLERS: Pick<
   },
 
   placeDungeon(state, action, bump) {
-    const level = Math.min(Math.max(Math.trunc(action.level) || 0, 1), 9);
+    const level = truncClamp(action.level, 1, 9);
     const marks = { ...state.marks };
     const screenNotes = { ...state.screenNotes };
 
@@ -642,7 +643,7 @@ const MARK_HANDLERS: Pick<
   },
 
   placeStairway(state, action, bump) {
-    const number = Math.min(Math.max(Math.trunc(action.number) || 0, 1), OVERWORLD_STAIRWAY_COUNT);
+    const number = truncClamp(action.number, 1, OVERWORLD_STAIRWAY_COUNT);
     const marks = { ...state.marks };
     const screenNotes = { ...state.screenNotes };
 
@@ -757,7 +758,7 @@ const SCREEN_NOTE_HANDLERS: Pick<
     const current = state.screenNotes[action.screen] ?? emptyNote();
     // Rupees are whole and never negative, and anything unparseable reads as
     // "no price" rather than as a number nobody can act on.
-    const price = Number.isFinite(action.price) ? Math.max(Math.trunc(action.price), 0) : 0;
+    const price = truncWhole(action.price);
     // A price belongs to stock the shop carries; one for anything else would
     // render nowhere. Clearing one is always allowed.
     if (price !== 0 && !current.shop.includes(action.stock)) return state;
@@ -824,14 +825,12 @@ type RoomPatchCheck<K extends keyof RoomNotePatch> = (
 const ROOM_PATCH_CHECKS: { readonly [K in keyof RoomNotePatch]-?: RoomPatchCheck<K> | null } = {
   visited: isBoolean,
   known: isBoolean,
-  item: (item) => item === '' || ROOM_ITEMS_BY_ID.has(item),
-  boss: (boss, level) => boss === '' || bossAllowedOnLevel(boss, level),
-  stairs: (stairs) => ROOM_STAIRS_BY_ID.has(stairs),
-  doors: (doors) =>
-    Object.entries(doors).every(
-      ([side, door]) => isRoomSide(side) && typeof door === 'string' && DOOR_STATES_BY_ID.has(door),
-    ),
-  transport: (transport) => Number.isInteger(transport) && transport >= 0 && transport <= ROOM_TRANSPORT_MAX,
+  item: isRoomItem,
+  boss: isRoomBoss,
+  stairs: isRoomStairKind,
+  doors: (doors) => Object.entries(doors).every(([side, door]) => isRoomSide(side) && isDoorState(door)),
+  // 0 is unpaired, which a patch may set; a pair number has to be real.
+  transport: (transport) => transport === 0 || isRoomTransport(transport),
   // Never taken from a caller — `mergeRoomPatch` keeps the stored stamp — so
   // there is nothing to refuse.
   transportSeq: null,
@@ -913,7 +912,7 @@ const ROOM_HANDLERS: Pick<
       // Checked against the tables rather than trusted from the type: this same
       // action arrives from a BroadcastChannel and from a save file, where
       // nothing has been through the compiler.
-      if (!isRoomSide(action.side) || !DOOR_STATES_BY_ID.has(action.state)) return null;
+      if (!isRoomSide(action.side) || !isDoorState(action.state)) return null;
       if (current.doors[action.side] === action.state) return null;
       return { ...current, doors: { ...current.doors, [action.side]: action.state } };
     });
@@ -924,7 +923,7 @@ const ROOM_HANDLERS: Pick<
       // '' is the empty value — "no item here" — so it clears rather than being
       // refused. Anything else has to be a real id, or the room would carry a
       // reference that renders as nothing and never goes away.
-      if (action.item !== '' && !ROOM_ITEMS_BY_ID.has(action.item)) return null;
+      if (!isRoomItem(action.item)) return null;
       if (current.item === action.item) return null;
       /*
        * Where the item is, not that you have it. Granting it here would make a
@@ -968,7 +967,7 @@ const ROOM_HANDLERS: Pick<
       // Ganon and Zelda exist in Level 9 and nowhere else, so this refuses
       // rather than clamps: there is no nearby value to fall back to, and
       // storing one would draw a room that cannot exist.
-      if (action.boss !== '' && !bossAllowedOnLevel(action.boss, action.level)) return null;
+      if (!isRoomBoss(action.boss, action.level)) return null;
       if (current.boss === action.boss) return null;
       return { ...current, boss: action.boss };
     });
@@ -979,8 +978,7 @@ const ROOM_HANDLERS: Pick<
     if (!target) return state;
     // Refused, not clamped: a 7 or a 2.5 is a caller bug, and quietly turning
     // it into a 4 would pair two rooms the player never paired.
-    if (!Number.isInteger(action.number)) return state;
-    if (action.number < 1 || action.number > ROOM_TRANSPORT_MAX) return state;
+    if (!isRoomTransport(action.number)) return state;
     // Re-placing the number a room already holds would restamp it as the
     // newest of the pair, which would change which room an eviction picks.
     if (target.current.transport === action.number) return state;

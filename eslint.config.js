@@ -23,9 +23,10 @@ export default tseslint.config(
     rules: reactHooks.configs.recommended.rules,
   },
   {
-    // Node: build tooling, the launchers shipped next to the desktop and OBS
-    // builds, and the tests, which run under Node's own test runner.
-    files: ['*.{js,mjs}', 'scripts/**/*.mjs', 'apps/*/public/**/*.mjs', 'apps/*/*.config.ts', '**/*.test.ts'],
+    // Node: build tooling (the launcher shipped next to the desktop and OBS
+    // builds is in scripts/launcher), and the tests, which run under Node's
+    // own test runner.
+    files: ['*.{js,mjs}', 'scripts/**/*.mjs', 'apps/*/*.config.ts', '**/*.test.ts'],
     languageOptions: { globals: globals.node },
   },
   {

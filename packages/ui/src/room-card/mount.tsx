@@ -3,19 +3,10 @@
  * again whenever the panel redraws.
  */
 
-import { createPanelRoot } from '../shared/panel-root.js';
+import { panelHost, type PanelHost } from '../shared/panel-root.js';
 import { RoomCard, type RoomCardProps } from './RoomCard.js';
 import '../shadcn.css';
 
-export interface RoomCardHost {
-  render(props: RoomCardProps): void;
-}
+export type RoomCardHost = PanelHost<RoomCardProps>;
 
-export function mountRoomCard(container: HTMLElement): RoomCardHost {
-  const root = createPanelRoot(container);
-  return {
-    render(props) {
-      root.render(<RoomCard {...props} />);
-    },
-  };
-}
+export const mountRoomCard = panelHost(RoomCard);

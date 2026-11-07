@@ -16,7 +16,16 @@ import {
   type RoomSide,
 } from '@z1r/core';
 
-const SIDE_NAME: Record<RoomSide, string> = {
+/** Edge class suffixes, matching the `.n .e .s .w` hooks OBS CSS is written against. */
+export const SIDE_CLASS: Record<RoomSide, string> = {
+  north: 'n',
+  east: 'e',
+  south: 's',
+  west: 'w',
+};
+
+/** A side as words: the room card's door titles and the sheet's cell facts. */
+export const SIDE_NAME: Record<RoomSide, string> = {
   north: 'North',
   east: 'East',
   south: 'South',

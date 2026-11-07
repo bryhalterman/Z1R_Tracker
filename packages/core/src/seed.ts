@@ -12,6 +12,7 @@
  */
 
 import { DUNGEONS } from './dungeons.js';
+import { byId } from './util.js';
 
 /** https://z1r.wiki/wiki/Dungeon_Quest */
 export type DungeonQuest =
@@ -332,9 +333,7 @@ export const SHUFFLE_POOL: readonly PoolEntry[] = [
   { id: 'whiteSword', name: 'White Sword', itemId: 'sword', value: 2, sprite: 'item.sword.white' },
 ];
 
-export const POOL_BY_ID: ReadonlyMap<string, PoolEntry> = new Map(
-  SHUFFLE_POOL.map((entry) => [entry.id, entry]),
-);
+export const POOL_BY_ID: ReadonlyMap<string, PoolEntry> = byId(SHUFFLE_POOL);
 
 /**
  * Items found on the overworld that are not in the shuffle pool.
@@ -372,6 +371,4 @@ export const MINOR_DROPS: readonly PoolEntry[] = [
 /** Everything an overworld screen can hold: the pool, the minor drops, the extras. */
 export const SCREEN_ITEMS: readonly PoolEntry[] = [...SHUFFLE_POOL, ...MINOR_DROPS, ...OVERWORLD_EXTRAS];
 
-export const SCREEN_ITEMS_BY_ID: ReadonlyMap<string, PoolEntry> = new Map(
-  SCREEN_ITEMS.map((entry) => [entry.id, entry]),
-);
+export const SCREEN_ITEMS_BY_ID: ReadonlyMap<string, PoolEntry> = byId(SCREEN_ITEMS);

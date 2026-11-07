@@ -1,7 +1,5 @@
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type Plugin } from 'vite';
-import { localMaps, spriteManifest, workspaceAliases } from '../../vite.shared.mjs';
+import { baseConfig, launcher } from '../../vite.shared.mjs';
 
 /**
  * Vite tags the entry script `type="module" crossorigin` because that is right
@@ -27,25 +25,23 @@ function classicScriptTag(): Plugin {
  * -clicking `index.html` has to work. `serve.mjs` ships alongside for anyone
  * who'd rather run it over http and pick up the offline service worker.
  */
-export default defineConfig({
-  base: './',
-  plugins: [react(), tailwindcss(), spriteManifest(), localMaps(), classicScriptTag()],
-  resolve: { alias: workspaceAliases },
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-    target: 'es2022',
-    modulePreload: false,
-    cssCodeSplit: false,
-    rollupOptions: {
-      output: {
-        format: 'iife',
-        // Content-hashed, like the other two targets. Fixed names meant a
-        // browser that had seen assets/index.js once would keep serving the old
-        // one after an update — which is exactly what happened during review.
-        entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash][extname]',
+export default defineConfig(
+  baseConfig({
+    base: './',
+    plugins: [classicScriptTag(), launcher()],
+    build: {
+      modulePreload: false,
+      cssCodeSplit: false,
+      rollupOptions: {
+        output: {
+          format: 'iife',
+          // Content-hashed, like the other two targets. Fixed names meant a
+          // browser that had seen assets/index.js once would keep serving the old
+          // one after an update — which is exactly what happened during review.
+          entryFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]',
+        },
       },
     },
-  },
-});
+  }),
+);

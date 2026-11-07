@@ -2151,12 +2151,27 @@
 .z1r-room-door.n[data-door='open']::after,
 .z1r-room-door.s[data-door='open']::after {
   block-size: 3px;
-  background: linear-gradient(to right, var(--z1r-good) 0 32%, transparent 32% 68%, var(--z1r-good) 68% 100%);
 }
 
 .z1r-room-door.e[data-door='open']::after,
 .z1r-room-door.w[data-door='open']::after {
   inline-size: 3px;
+}
+
+/*
+ * The two stubs, for the sheet's edges and the room card's door lines alike:
+ * across on a north or south side, upright on an east or west one.
+ */
+.z1r-room-door.n[data-door='open']::after,
+.z1r-room-door.s[data-door='open']::after,
+[data-door='open'] > .z1r-door-line {
+  background: linear-gradient(to right, var(--z1r-good) 0 32%, transparent 32% 68%, var(--z1r-good) 68% 100%);
+}
+
+.z1r-room-door.e[data-door='open']::after,
+.z1r-room-door.w[data-door='open']::after,
+.z1r-door-wall[data-side='w'][data-door='open'] > .z1r-door-line,
+.z1r-door-wall[data-side='e'][data-door='open'] > .z1r-door-line {
   background: linear-gradient(
     to bottom,
     var(--z1r-good) 0 32%,
@@ -2565,12 +2580,6 @@
   border-radius: var(--z1r-radius-cell);
 }
 
-.z1r-door-wall[data-side='w'] .z1r-door-line,
-.z1r-door-wall[data-side='e'] .z1r-door-line {
-  inline-size: 7px;
-  block-size: 18px;
-}
-
 .z1r-door-wall[data-side='n'] .z1r-door-line,
 .z1r-door-wall[data-side='s'] .z1r-door-line {
   inline-size: 28px;
@@ -2578,6 +2587,7 @@
 
 .z1r-door-wall[data-side='w'] .z1r-door-line,
 .z1r-door-wall[data-side='e'] .z1r-door-line {
+  inline-size: 7px;
   block-size: 28px;
 }
 
@@ -2586,20 +2596,9 @@
   border: var(--z1r-border-width) dashed var(--z1r-muted);
 }
 
-/* Open: two stubs with a gap — a doorway, drawn the way paper draws one. */
-[data-door='open'] > .z1r-door-line {
-  background: linear-gradient(to right, var(--z1r-good) 0 32%, transparent 32% 68%, var(--z1r-good) 68% 100%);
-}
-
-.z1r-door-wall[data-side='w'][data-door='open'] > .z1r-door-line,
-.z1r-door-wall[data-side='e'][data-door='open'] > .z1r-door-line {
-  background: linear-gradient(
-    to bottom,
-    var(--z1r-good) 0 32%,
-    transparent 32% 68%,
-    var(--z1r-good) 68% 100%
-  );
-}
+/* Open: two stubs with a gap — a doorway, drawn the way paper draws one. No
+   rule here: the room card's open door shares the sheet's open-edge rule,
+   earlier in this file. */
 
 /* Wall: solid. */
 [data-door='wall'] > .z1r-door-line {

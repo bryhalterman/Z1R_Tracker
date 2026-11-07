@@ -6,14 +6,7 @@
  * the *same origin* — see docs/OBS.md.
  */
 
-import {
-  DOCK_SECTIONS,
-  attachPersistence,
-  createInitialState,
-  createStore,
-  load,
-  loadResolver,
-} from './options.js';
+import { DOCK_SECTIONS, bootTracker } from './options.js';
 import { mountControls, mountTracker } from '@z1r/ui';
 import '@z1r/ui/styles.css';
 import './obs.css';
@@ -72,10 +65,9 @@ async function main(): Promise<void> {
   const controls = document.querySelector<HTMLElement>('#controls');
   if (!root || !controls) throw new Error('Dock mount points are missing.');
 
-  const store = createStore(load() ?? createInitialState());
-  attachPersistence(store);
-
-  const resolver = await loadResolver(new URL('sprites.json', document.baseURI).href);
+  const { store, resolver } = await bootTracker({
+    spritesUrl: new URL('sprites.json', document.baseURI).href,
+  });
 
   /*
    * Stamp the build into the footnote.

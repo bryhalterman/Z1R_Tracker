@@ -9,16 +9,14 @@
  */
 
 import { mirrorScreen } from './regions.js';
+import { byId, gridCellId } from './util.js';
 
 export const OVERWORLD_COLUMNS = 16;
 export const OVERWORLD_ROWS = 8;
 
-const ROW_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
-
 /** `col` is 1-based (1-16), `row` is 1-based (1-8). */
 export function screenId(col: number, row: number): string {
-  const label = ROW_LABELS[row - 1] ?? '?';
-  return `${label}${col}`;
+  return gridCellId(col, row);
 }
 
 const SCREEN_ID_SET: ReadonlySet<string> = new Set(allScreenIds());
@@ -132,9 +130,7 @@ export const SECRET_SIZES: readonly SecretSizeDef[] = [
   { id: 'large', name: 'Large', code: 'L', range: '50–150' },
 ];
 
-export const SECRET_SIZES_BY_ID: ReadonlyMap<string, SecretSizeDef> = new Map(
-  SECRET_SIZES.map((entry) => [entry.id, entry]),
-);
+export const SECRET_SIZES_BY_ID: ReadonlyMap<string, SecretSizeDef> = byId(SECRET_SIZES);
 
 /**
  * Shop stock worth remembering.
@@ -166,9 +162,7 @@ export const SHOP_STOCK: readonly ShopStockDef[] = [
   { id: 'blueCandle', name: 'Blue Candle', sprite: 'item.candle.blue', code: 'BC' },
 ];
 
-export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = new Map(
-  SHOP_STOCK.map((entry) => [entry.id, entry]),
-);
+export const SHOP_STOCK_BY_ID: ReadonlyMap<string, ShopStockDef> = byId(SHOP_STOCK);
 
 /**
  * What is stopping you getting further into a dungeon you have already found.
@@ -197,9 +191,7 @@ export const DUNGEON_BLOCKS: readonly DungeonBlockDef[] = [
   { id: 'recorder', name: 'Needs the Recorder', sprite: 'item.recorder', code: 'RC' },
 ];
 
-export const DUNGEON_BLOCKS_BY_ID: ReadonlyMap<string, DungeonBlockDef> = new Map(
-  DUNGEON_BLOCKS.map((entry) => [entry.id, entry]),
-);
+export const DUNGEON_BLOCKS_BY_ID: ReadonlyMap<string, DungeonBlockDef> = byId(DUNGEON_BLOCKS);
 
 /** The named overworld spot whose item needs the Ladder. */
 export const COAST_SPOT_ID = 'ow.coast';

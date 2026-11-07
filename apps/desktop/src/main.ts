@@ -1,4 +1,4 @@
-import { attachPersistence, createInitialState, createStore, load, loadResolver } from '@z1r/core';
+import { bootTracker } from '@z1r/core';
 import { mountControls, mountTracker } from '@z1r/ui';
 import '@z1r/ui/styles.css';
 import './app.css';
@@ -11,13 +11,10 @@ async function main(): Promise<void> {
   const controlsRoot = document.querySelector<HTMLElement>('#controls');
   if (!trackerRoot || !controlsRoot) throw new Error('Tracker mount points are missing.');
 
-  const store = createStore(load() ?? createInitialState());
-  attachPersistence(store);
-
   // Over file:// the fetch always fails, so skip it and use the bundled manifest.
-  const resolver = isFileProtocol
-    ? await loadResolver('')
-    : await loadResolver(new URL('sprites.json', document.baseURI).href);
+  const { store, resolver } = await bootTracker({
+    spritesUrl: isFileProtocol ? '' : new URL('sprites.json', document.baseURI).href,
+  });
 
   mountControls(controlsRoot, { store });
   mountTracker(trackerRoot, { store, resolver });

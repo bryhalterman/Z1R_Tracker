@@ -19,16 +19,14 @@
 
 import { DUNGEONS_BY_LEVEL } from './dungeons.js';
 import { MINOR_DROPS, SHUFFLE_POOL } from './seed.js';
+import { byId, gridCellId } from './util.js';
 
 export const ROOM_COLUMNS = 8;
 export const ROOM_ROWS = 8;
 
-const ROW_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
-
 /** `col` is 1-based (1-8), `row` is 1-based (1-8). */
 export function roomId(col: number, row: number): string {
-  const label = ROW_LABELS[row - 1] ?? '?';
-  return `${label}${col}`;
+  return gridCellId(col, row);
 }
 
 export function allRoomIds(): string[] {
@@ -128,9 +126,19 @@ export const DOOR_STATES: readonly DoorStateDef[] = [
   { id: 'shutter', name: 'Shutter', tag: 'SH' },
 ];
 
-export const DOOR_STATES_BY_ID: ReadonlyMap<string, DoorStateDef> = new Map(
-  DOOR_STATES.map((entry) => [entry.id, entry]),
-);
+export const DOOR_STATES_BY_ID: ReadonlyMap<string, DoorStateDef> = byId(DOOR_STATES);
+
+/**
+ * A door state the table defines.
+ *
+ * One of the per-field checks every room value passes through: the reducer's
+ * single-field actions, `setRoomNote`'s patch check and `migrate` all call it,
+ * so the three cannot drift. What each does with a failure is its own — the
+ * reducer refuses, `migrate` falls back to the empty value.
+ */
+export function isDoorState(value: unknown): value is DoorState {
+  return typeof value === 'string' && DOOR_STATES_BY_ID.has(value);
+}
 
 /** Where a staircase in a room goes. */
 export type RoomStairKind = 'none' | 'item' | 'transport';
@@ -152,9 +160,12 @@ export const ROOM_STAIRS: readonly RoomStairDef[] = [
   { id: 'transport', name: 'Transport stairs', tag: 'TP' },
 ];
 
-export const ROOM_STAIRS_BY_ID: ReadonlyMap<string, RoomStairDef> = new Map(
-  ROOM_STAIRS.map((entry) => [entry.id, entry]),
-);
+export const ROOM_STAIRS_BY_ID: ReadonlyMap<string, RoomStairDef> = byId(ROOM_STAIRS);
+
+/** A staircase kind the table defines. Shared like `isDoorState`. */
+export function isRoomStairKind(value: unknown): value is RoomStairKind {
+  return typeof value === 'string' && ROOM_STAIRS_BY_ID.has(value);
+}
 
 /** A transport number names a pair, so two rooms hold it and no more. */
 export const ROOM_TRANSPORT_PAIR_SIZE = 2;
@@ -169,6 +180,14 @@ export const ROOM_TRANSPORT_PAIR_SIZE = 2;
  * draw a button for every number up to it.
  */
 export const ROOM_TRANSPORT_MAX = (ROOM_ROWS * ROOM_COLUMNS) / ROOM_TRANSPORT_PAIR_SIZE;
+
+/**
+ * A pair number a room can carry: whole, from 1 to `ROOM_TRANSPORT_MAX`. 0,
+ * unpaired, is not one. Shared like `isDoorState`.
+ */
+export function isRoomTransport(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= ROOM_TRANSPORT_MAX;
+}
 
 export interface BossDef {
   readonly id: string;
@@ -198,9 +217,7 @@ export const DUNGEON_BOSSES: readonly BossDef[] = [
   { id: 'zelda', name: 'Princess Zelda', sprite: 'npc.zelda', level9Only: true },
 ];
 
-export const DUNGEON_BOSSES_BY_ID: ReadonlyMap<string, BossDef> = new Map(
-  DUNGEON_BOSSES.map((entry) => [entry.id, entry]),
-);
+export const DUNGEON_BOSSES_BY_ID: ReadonlyMap<string, BossDef> = byId(DUNGEON_BOSSES);
 
 /** Which level the two Level 9 entries are allowed on. */
 export const LEVEL_NINE = 9;
@@ -210,6 +227,11 @@ export function bossAllowedOnLevel(boss: string, level: number): boolean {
   const def = DUNGEON_BOSSES_BY_ID.get(boss);
   if (!def) return false;
   return !def.level9Only || level === LEVEL_NINE;
+}
+
+/** '' for no boss, or a boss allowed on `level`. Shared like `isDoorState`. */
+export function isRoomBoss(value: unknown, level: number): value is string {
+  return value === '' || (typeof value === 'string' && bossAllowedOnLevel(value, level));
 }
 
 export interface RoomItemDef {
@@ -246,9 +268,12 @@ export const ROOM_ITEMS: readonly RoomItemDef[] = [
   ...DUNGEON_ONLY_ITEMS,
 ];
 
-export const ROOM_ITEMS_BY_ID: ReadonlyMap<string, RoomItemDef> = new Map(
-  ROOM_ITEMS.map((entry) => [entry.id, entry]),
-);
+export const ROOM_ITEMS_BY_ID: ReadonlyMap<string, RoomItemDef> = byId(ROOM_ITEMS);
+
+/** '' for no item, or an item a room can hold. Shared like `isDoorState`. */
+export function isRoomItem(value: unknown): value is string {
+  return value === '' || (typeof value === 'string' && ROOM_ITEMS_BY_ID.has(value));
+}
 
 /**
  * How a room's item was found, which decides the location slot it fills.

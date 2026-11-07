@@ -39,18 +39,6 @@ export function noteIsBare(note: ScreenNote): boolean {
   );
 }
 
-/**
- * A whole number from 0 to `max`, and 0 for anything that is not whole.
- *
- * How a screen note's level and stairway numbers are read, by the reducer and
- * by `migrate` alike, so the two cannot drift. 0 is a real value for both — a
- * dungeon found but not identified, a stairway not yet numbered — which is why
- * a bad value lands there rather than being refused.
- */
-export function clampWhole(value: number, max: number): number {
-  return Number.isInteger(value) ? Math.min(Math.max(value, 0), max) : 0;
-}
-
 /** Fields `sameNote` compares by value; the lists and prices need their own comparison. */
 const SCALAR_NOTE_FIELDS = ['dungeon', 'stairway', 'spot', 'item', 'collected', 'secret'] as const;
 

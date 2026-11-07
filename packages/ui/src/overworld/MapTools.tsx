@@ -15,7 +15,6 @@
  * click is about to change anything.
  */
 
-import { CheckIcon } from 'lucide-react';
 import {
   coastScreen,
   COAST_SPOT_ID,
@@ -35,12 +34,12 @@ import {
 import { Input } from '#components/ui/input';
 import { useDraft } from '../shared/use-draft.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#components/ui/select';
-import { Toggle } from '#components/ui/toggle';
-import { ToggleGroup, ToggleGroupItem } from '#components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { cn } from '#lib/utils';
 import { ClearButton } from '../panel/PanelHeading.js';
 import { SearchPicker } from '../shared/SearchPicker.js';
+import { CheckToggle, Row as CardRow, Segmented } from '../shared/CardControls.js';
+import { spriteDim, tileVariants } from '../shared/tile-variants.js';
 import { previewHandlers, type MapPreview } from '../map-preview.js';
 import { Sprite } from '../shared/Sprite.js';
 import { cardSubject, cardTitle, showingName, statusLine, type Showing } from './map-status.js';
@@ -70,18 +69,11 @@ export interface MapActions {
   toggleCollected: () => void;
 }
 
-const LABEL = 'text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase';
-
 /** A brush or stock tile: armed is a thick accent ring, current a solid ring. */
 function iconTile({ armed, current }: { armed?: boolean; current?: boolean }): string {
   return cn(
-    'relative grid size-7 cursor-pointer place-items-center rounded-md transition-colors outline-none',
-    'focus-visible:ring-2 focus-visible:ring-ring hover:bg-accent',
-    armed
-      ? 'shadow-[inset_0_0_0_2.5px_var(--primary)]'
-      : current
-        ? 'bg-secondary shadow-[inset_0_0_0_1.5px_var(--foreground)]'
-        : 'shadow-[inset_0_0_0_1px_var(--border)]',
+    tileVariants({ ring: armed ? undefined : current ? 'on' : 'off', armed }),
+    'size-7 cursor-pointer rounded-md hover:bg-accent',
   );
 }
 
@@ -181,16 +173,20 @@ export interface ScreenCardProps {
   actions: MapActions;
 }
 
+/** The screen card's rows take a wider key column than the room card's. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-start gap-2">
-      <span className={cn(LABEL, 'pt-1.5')}>{label}</span>
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">{children}</div>
-    </div>
+    <CardRow label={label} keys="wide">
+      {children}
+    </CardRow>
   );
 }
 
-/** One choice of a few, the chosen one underlined as well as ringed. */
+/**
+ * One choice of a few, the chosen one underlined as well as ringed. Separate
+ * tiles that wrap, not one joined strip: nine of them are wider than the card
+ * beside the map.
+ */
 function Numbers({
   label,
   value,
@@ -206,29 +202,14 @@ function Numbers({
   preview?: (value: string) => Exclude<MapPreview, null>;
 }) {
   return (
-    <ToggleGroup
-      aria-label={label}
-      variant="outline"
-      size="sm"
-      // Separate tiles that wrap, not one joined strip: nine of them are wider
-      // than the card beside the map, and a joined strip cannot break a line.
-      spacing={1}
-      className="flex-wrap"
-      value={value ? [value] : []}
-      onValueChange={(next) => onChange(next[0] ?? '')}
-    >
-      {options.map((option) => (
-        <ToggleGroupItem
-          key={option.value}
-          value={option.value}
-          title={option.title}
-          className="min-w-7 data-[pressed]:border-primary data-[pressed]:underline data-[pressed]:underline-offset-4"
-          {...(preview ? previewHandlers(preview(option.value)) : {})}
-        >
-          {option.text}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <Segmented
+      label={label}
+      value={value}
+      options={options}
+      tiles
+      optionProps={preview ? (option) => previewHandlers(preview(option)) : undefined}
+      onChange={onChange}
+    />
   );
 }
 
@@ -373,12 +354,7 @@ function IconToggle({
         className={iconTile({ current: on })}
         onClick={onToggle}
       >
-        <span
-          className={cn(
-            'grid place-items-center',
-            !on && '[&_.z1r-sprite]:opacity-40 [&_.z1r-sprite]:grayscale',
-          )}
-        >
+        <span className={cn('grid place-items-center', !on && spriteDim('dim'))}>
           <Sprite resolver={resolver} spriteKey={sprite} size={18} />
         </span>
       </TooltipTrigger>
@@ -541,9 +517,8 @@ function PickedUpRow({ note, actions }: { note: ScreenNote | undefined; actions:
   const got = !!placed && !!note?.collected;
   return (
     <Row label="Picked up">
-      <Toggle
-        variant="outline"
-        size="sm"
+      <CheckToggle
+        label="Collected"
         pressed={got}
         disabled={!placed}
         title={
@@ -554,11 +529,7 @@ function PickedUpRow({ note, actions }: { note: ScreenNote | undefined; actions:
             : 'Nothing on this screen to collect'
         }
         onPressedChange={actions.toggleCollected}
-        className="data-[pressed]:border-primary"
-      >
-        {got ? <CheckIcon data-icon="inline-start" /> : null}
-        Collected
-      </Toggle>
+      />
     </Row>
   );
 }
@@ -591,17 +562,12 @@ export interface MapHeadingProps {
 export function MapHeading({ regions, onRegions, warpsFound, warpsTotal, focus, onClear }: MapHeadingProps) {
   return (
     <span className="z1r-ui ml-2 inline-flex min-w-0 flex-1 items-center gap-2 text-xs font-normal tracking-normal normal-case">
-      <Toggle
-        variant="outline"
-        size="sm"
+      <CheckToggle
+        label="Regions"
         pressed={regions}
-        onPressedChange={onRegions}
         title="Label every screen with its hint region code"
-        className="data-[pressed]:border-primary"
-      >
-        {regions ? <CheckIcon data-icon="inline-start" /> : null}
-        Regions
-      </Toggle>
+        onPressedChange={onRegions}
+      />
       <span
         className="text-muted-foreground tabular-nums"
         title="Warp staircases marked, out of the four a seed has"

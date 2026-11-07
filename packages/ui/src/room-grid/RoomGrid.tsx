@@ -20,7 +20,6 @@ import {
   ROOM_SIDES,
   roomId,
   type RoomNote,
-  type RoomSide,
   type SpriteResolver,
   type TrackerState,
 } from '@z1r/core';
@@ -29,15 +28,8 @@ import { SpriteArt } from '../shared/Sprite.js';
 import { LayoutArt } from '../room-card/LayoutArt.js';
 import { CellTip } from './CellTip.js';
 import { dropTarget } from '../shared/drop-target.js';
-import { ladderState, roomFacts } from './room-facts.js';
-
-/** Edge class suffixes, matching the `.n .e .s .w` hooks OBS CSS is written against. */
-const SIDE_CLASS: Record<RoomSide, string> = {
-  north: 'n',
-  east: 'e',
-  south: 's',
-  west: 'w',
-};
+import { factLine } from '../shared/fact-line.js';
+import { SIDE_CLASS, ladderState, roomFacts } from './room-facts.js';
 
 /** Rendered edge length of the item sprite riding above it. */
 const MARK_ART_SIZE = 15;
@@ -137,7 +129,7 @@ const RoomCell = memo(function RoomCell({
   const layoutDef = note?.layout ? ROOM_LAYOUTS_BY_ID.get(note.layout) : undefined;
   const collected = !!note?.item && note.collected;
   const facts = roomFacts(note, isEntrance, ladder, layoutDef);
-  const label = [id, ...facts].join(' — ');
+  const label = factLine([id, ...facts]);
 
   return (
     <Tooltip>

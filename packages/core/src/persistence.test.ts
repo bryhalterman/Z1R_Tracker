@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { importState, migrate } from './persistence.js';
 import { createInitialState, reduce, type TrackerState } from './state.js';
 import { ITEMS_BY_ID, maxValue } from './items.js';
-import { overworldMap } from './seed.js';
+import { DUNGEON_QUESTS, ITEM_SHUFFLES, OVERWORLD_QUESTS, overworldMap } from './seed.js';
 
 /** A save written before hearts/keys/rupees and boss/map/compass were dropped. */
 function legacySave(): Record<string, unknown> {
@@ -331,4 +331,22 @@ test('collectLocation refuses an empty entry and ignores a repeat', () => {
   const collected = reduce(stored, { type: 'collectLocation', id: 'd1.floor.0', collected: true });
   assert.equal(collected.locations['d1.floor.0']?.collected, true);
   assert.equal(reduce(collected, { type: 'collectLocation', id: 'd1.floor.0', collected: true }), collected);
+});
+
+test('every seed option the form offers survives a load', () => {
+  for (const { value } of DUNGEON_QUESTS) {
+    const state = createInitialState();
+    state.seed.dungeonQuest = value;
+    assert.equal(migrate(JSON.parse(JSON.stringify(state)))?.seed.dungeonQuest, value);
+  }
+  for (const { value } of OVERWORLD_QUESTS) {
+    const state = createInitialState();
+    state.seed.overworldQuest = value;
+    assert.equal(migrate(JSON.parse(JSON.stringify(state)))?.seed.overworldQuest, value);
+  }
+  for (const { value } of ITEM_SHUFFLES) {
+    const state = createInitialState();
+    state.seed.itemShuffle = value;
+    assert.equal(migrate(JSON.parse(JSON.stringify(state)))?.seed.itemShuffle, value);
+  }
 });
