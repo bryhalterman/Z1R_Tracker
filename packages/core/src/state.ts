@@ -300,6 +300,29 @@ function emptyDungeon(): DungeonState {
  * Returns `notes` itself when the stored entry would not change, so a caller
  * can tell a no-op from a write.
  */
+/**
+ * Takes a once-only marker off every screen but `keep`: there is one Level 3
+ * and one stairway 2, so marking one anew means the old spot was wrong, and
+ * the marker moves rather than duplicating. Edits `marks` and `notes` in
+ * place and returns the notes it took the marker from.
+ */
+function moveUniqueMarker(
+  notes: Record<string, ScreenNote>,
+  marks: Record<string, MarkKind>,
+  keep: string,
+  field: 'dungeon' | 'stairway',
+  value: number,
+): ScreenNote[] {
+  const moved: ScreenNote[] = [];
+  for (const [screen, note] of Object.entries(notes)) {
+    if (screen === keep || note[field] !== value) continue;
+    moved.push(note);
+    delete notes[screen];
+    delete marks[screen];
+  }
+  return moved;
+}
+
 function pruneNote(
   notes: Record<string, ScreenNote>,
   marks: Record<string, MarkKind>,
@@ -613,10 +636,8 @@ const MARK_HANDLERS: Pick<
     const screenNotes = { ...state.screenNotes };
 
     /*
-     * A level exists once. Marking it somewhere new means the old spot was
-     * wrong, so the marker moves rather than duplicating — two screens both
-     * claiming Level 3 is worse than no marker at all, because you cannot
-     * tell which one to walk to.
+     * A level exists once — two screens both claiming Level 3 is worse than
+     * no marker at all, because you cannot tell which one to walk to.
      *
      * The blockers travel with it: they belong to the dungeon, not to the
      * square of grass it was mistakenly pinned on. Nothing else does — a
@@ -624,13 +645,8 @@ const MARK_HANDLERS: Pick<
      * on — and they join any the new screen already lists rather than
      * being hidden under them.
      */
-    const carried: string[] = [];
-    for (const [screen, note] of Object.entries(screenNotes)) {
-      if (screen === action.screen || note.dungeon !== level) continue;
-      carried.push(...note.blocks);
-      delete screenNotes[screen];
-      delete marks[screen];
-    }
+    const moved = moveUniqueMarker(screenNotes, marks, action.screen, 'dungeon', level);
+    const carried = moved.flatMap((note) => note.blocks);
 
     marks[action.screen] = 'dungeon';
     const target = { ...emptyNote(), ...screenNotes[action.screen] };
@@ -647,17 +663,9 @@ const MARK_HANDLERS: Pick<
     const marks = { ...state.marks };
     const screenNotes = { ...state.screenNotes };
 
-    /*
-     * Same rule as a level: there is one stairway 2, so marking a new one
-     * means the old one was wrong and the marker moves rather than
-     * duplicating. Nothing is carried across — a stairway note holds only
-     * its number, unlike a dungeon, whose blockers belong to the dungeon.
-     */
-    for (const [screen, note] of Object.entries(screenNotes)) {
-      if (screen === action.screen || note.stairway !== number) continue;
-      delete screenNotes[screen];
-      delete marks[screen];
-    }
+    // Same rule as a level. Nothing is carried across — a stairway note
+    // holds only its number, unlike a dungeon, whose blockers belong to it.
+    moveUniqueMarker(screenNotes, marks, action.screen, 'stairway', number);
 
     marks[action.screen] = 'stairway';
     const placed: ScreenNote = {

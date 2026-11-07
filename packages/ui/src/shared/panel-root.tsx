@@ -22,7 +22,7 @@ interface BoundaryState {
   failed: boolean;
 }
 
-class PanelBoundary extends Component<{ children: ReactNode }, BoundaryState> {
+export class PanelBoundary extends Component<{ children: ReactNode }, BoundaryState> {
   override state: BoundaryState = { failed: false };
 
   static getDerivedStateFromError(): BoundaryState {

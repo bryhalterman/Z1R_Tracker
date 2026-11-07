@@ -9,6 +9,7 @@
 
 import { createRoot, type Root } from 'react-dom/client';
 import { ConfirmLoss, type ConfirmLossText } from './ConfirmLoss.js';
+import { PanelBoundary } from '../shared/panel-root.js';
 import '../shadcn.css';
 
 let root: Root | null = null;
@@ -27,12 +28,20 @@ export function askToConfirm(text: ConfirmLossText): Promise<boolean> {
       if (settlePending !== settle) return;
       settlePending = null;
       // Rendered closed rather than unmounted, so the dialog plays its exit.
-      shown.render(<ConfirmLoss open={false} {...text} onConfirm={() => {}} onCancel={() => {}} />);
+      shown.render(
+        <PanelBoundary>
+          <ConfirmLoss open={false} {...text} onConfirm={() => {}} onCancel={() => {}} />
+        </PanelBoundary>,
+      );
       resolve(ok);
     };
     settlePending = settle;
+    // Behind the panels' error boundary, so a render error shows a notice
+    // instead of taking the root down.
     shown.render(
-      <ConfirmLoss open {...text} onConfirm={() => settle(true)} onCancel={() => settle(false)} />,
+      <PanelBoundary>
+        <ConfirmLoss open {...text} onConfirm={() => settle(true)} onCancel={() => settle(false)} />
+      </PanelBoundary>,
     );
   });
 }
