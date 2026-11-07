@@ -13,16 +13,12 @@
 
 import { memo } from 'react';
 import {
-  DOOR_STATES_BY_ID,
-  DUNGEON_BOSSES_BY_ID,
   ROOM_COLUMNS,
   ROOM_ITEMS_BY_ID,
   ROOM_LAYOUTS_BY_ID,
   ROOM_ROWS,
   ROOM_SIDES,
-  ROOM_STAIRS_BY_ID,
   roomId,
-  type DoorState,
   type RoomNote,
   type RoomSide,
   type SpriteResolver,
@@ -33,6 +29,7 @@ import { SpriteArt } from '../shared/Sprite.js';
 import { LayoutArt } from '../room-card/LayoutArt.js';
 import { CellTip } from './CellTip.js';
 import { dropTarget } from '../shared/drop-target.js';
+import { ladderState, roomFacts } from './room-facts.js';
 
 /** Edge class suffixes, matching the `.n .e .s .w` hooks OBS CSS is written against. */
 const SIDE_CLASS: Record<RoomSide, string> = {
@@ -42,21 +39,8 @@ const SIDE_CLASS: Record<RoomSide, string> = {
   west: 'w',
 };
 
-const SIDE_NAME: Record<RoomSide, string> = {
-  north: 'North',
-  east: 'East',
-  south: 'South',
-  west: 'West',
-};
-
 /** Rendered edge length of the item sprite riding above it. */
 const MARK_ART_SIZE = 15;
-
-/** A door's name with its tag, so the state reads as words and not as a hue. */
-function doorLabel(state: DoorState): string {
-  const def = DOOR_STATES_BY_ID.get(state);
-  return def ? `${def.name} (${def.tag})` : state;
-}
 
 type FlagIcon = 'boss' | 'push-maybe' | 'push-checked';
 
@@ -149,43 +133,10 @@ const RoomCell = memo(function RoomCell({
   onTouch,
   canDrop,
 }: RoomCellProps) {
-  /*
-   * Water in the way: the Ladder's sprite in the top-right corner. Once the
-   * Ladder is held it stays, dimmed and checked, so the room still reads as one
-   * that needed it — and now does not.
-   */
-  const ladderState = note?.ladder ? (ladderHeld ? 'clear' : 'blocked') : '';
+  const ladder = ladderState(note, ladderHeld);
   const layoutDef = note?.layout ? ROOM_LAYOUTS_BY_ID.get(note.layout) : undefined;
   const collected = !!note?.item && note.collected;
-  const boss = note?.boss ?? '';
-  const push = note?.pushBlock ?? '';
-  const stairs = note?.stairs ?? 'none';
-  const transport = note?.transport ?? 0;
-  const itemDef = note?.item ? ROOM_ITEMS_BY_ID.get(note.item) : undefined;
-
-  // Every fact about the room, in words: the tooltip's lines, and joined into
-  // one line, the cell's accessible name.
-  const facts: string[] = [];
-  if (isEntrance) facts.push('entrance');
-  if (ladderState === 'blocked') facts.push('needs the Ladder');
-  if (ladderState === 'clear') facts.push('needed the Ladder — held, passable now');
-  if (layoutDef) facts.push(`${layoutDef.name} layout`);
-  if (note) {
-    facts.push(note.visited ? 'visited' : note.known ? 'known from the map, not visited' : 'not visited');
-    if (note.item) {
-      const name = itemDef?.name ?? note.item;
-      facts.push(`holds ${name}${note.collected ? ', collected' : ''}`);
-    }
-    const bossDef = boss ? DUNGEON_BOSSES_BY_ID.get(boss) : undefined;
-    if (bossDef) facts.push(bossDef.name);
-    const stairDef = stairs === 'none' ? undefined : ROOM_STAIRS_BY_ID.get(stairs);
-    if (stairDef) facts.push(`${stairDef.name} (${stairDef.tag})`);
-    if (transport) facts.push(`transport pair ${transport}`);
-    const walls = ROOM_SIDES.filter((side) => note.doors[side] !== 'unknown').map(
-      (side) => `${SIDE_NAME[side]} ${doorLabel(note.doors[side])}`,
-    );
-    if (walls.length) facts.push(walls.join(', '));
-  }
+  const facts = roomFacts(note, isEntrance, ladder, layoutDef);
   const label = [id, ...facts].join(' — ');
 
   return (
@@ -197,41 +148,15 @@ const RoomCell = memo(function RoomCell({
         data-visited={String(!!note?.visited)}
         data-known={String(!!note?.known)}
         data-start={String(isEntrance)}
-        data-ladder={ladderState}
+        data-ladder={ladder}
         data-collected={String(collected)}
         aria-current={isSelected ? 'true' : 'false'}
         aria-label={label}
         onClick={() => onTouch(id)}
         {...dropTarget(canDrop, () => onTouch(id))}
       >
-        {/*
-         * The doorways, drawn and nothing more. The compass on the room card is
-         * the one way to set a door, so these take no clicks and are hidden
-         * from assistive tech: the cell's own label names every known side.
-         */}
-        {ROOM_SIDES.map((side) => (
-          <span
-            key={side}
-            className={`z1r-room-door ${SIDE_CLASS[side]}`}
-            data-side={SIDE_CLASS[side]}
-            data-door={note?.doors[side] ?? 'unknown'}
-            aria-hidden="true"
-          />
-        ))}
-        <span className="z1r-room-mark">
-          {/* Drawn shapes, not tints, so the two kinds of staircase read apart
-              without colour. */}
-          {stairs === 'item' && (
-            <SpriteArt
-              resolver={resolver}
-              spriteKey="ui.stairs"
-              size={MARK_ART_SIZE}
-              className="z1r-room-stairs"
-            />
-          )}
-          {transport ? <span className="z1r-room-transport">{transport}</span> : null}
-          {itemDef && <SpriteArt resolver={resolver} spriteKey={itemDef.sprite} size={MARK_ART_SIZE} />}
-        </span>
+        <RoomDoors note={note} />
+        <RoomMarks note={note} resolver={resolver} />
         {/* A collected item's corner check: a shape, so it does not rest on colour. */}
         <span className="z1r-room-got" aria-hidden="true" hidden={!collected}>
           ✓
@@ -241,17 +166,14 @@ const RoomCell = memo(function RoomCell({
           {isEntrance && <SpriteArt resolver={resolver} spriteKey="mark.start" size={14} />}
         </span>
         <span className="z1r-room-ladder">
-          {ladderState && <SpriteArt resolver={resolver} spriteKey="item.ladder" size={14} />}
-          {ladderState === 'clear' && <span className="z1r-room-ladder-ok">✓</span>}
+          {ladder && <SpriteArt resolver={resolver} spriteKey="item.ladder" size={14} />}
+          {ladder === 'clear' && <span className="z1r-room-ladder-ok">✓</span>}
         </span>
         {/* The room's layout, faint across the floor under everything else. */}
         <span className="z1r-room-layout">
           {layoutDef && <LayoutArt def={layoutDef} className="z1r-room-layout-art" />}
         </span>
-        <span className="z1r-room-flags" aria-hidden="true">
-          {boss && <Flag kind="boss" />}
-          {push && <Flag kind={push === 'maybe' ? 'push-maybe' : 'push-checked'} />}
-        </span>
+        <RoomFlags note={note} />
       </TooltipTrigger>
       <TooltipContent className="z1r-ui max-w-64">
         <CellTip heading={`Level ${level} · ${id}`} lines={facts} />
@@ -259,3 +181,55 @@ const RoomCell = memo(function RoomCell({
     </Tooltip>
   );
 });
+
+/*
+ * The doorways, drawn and nothing more. The compass on the room card is the
+ * one way to set a door, so these take no clicks and are hidden from
+ * assistive tech: the cell's own label names every known side.
+ */
+function RoomDoors({ note }: { note: RoomNote | undefined }) {
+  return ROOM_SIDES.map((side) => (
+    <span
+      key={side}
+      className={`z1r-room-door ${SIDE_CLASS[side]}`}
+      data-side={SIDE_CLASS[side]}
+      data-door={note?.doors[side] ?? 'unknown'}
+      aria-hidden="true"
+    />
+  ));
+}
+
+/** The middle of the cell: the staircase, the transport pair and the item. */
+function RoomMarks({ note, resolver }: { note: RoomNote | undefined; resolver: SpriteResolver }) {
+  const stairs = note?.stairs ?? 'none';
+  const transport = note?.transport ?? 0;
+  const itemDef = note?.item ? ROOM_ITEMS_BY_ID.get(note.item) : undefined;
+  return (
+    <span className="z1r-room-mark">
+      {/* Drawn shapes, not tints, so the two kinds of staircase read apart
+          without colour. */}
+      {stairs === 'item' && (
+        <SpriteArt
+          resolver={resolver}
+          spriteKey="ui.stairs"
+          size={MARK_ART_SIZE}
+          className="z1r-room-stairs"
+        />
+      )}
+      {transport ? <span className="z1r-room-transport">{transport}</span> : null}
+      {itemDef && <SpriteArt resolver={resolver} spriteKey={itemDef.sprite} size={MARK_ART_SIZE} />}
+    </span>
+  );
+}
+
+/** The corner marks: a boss, and a push block suspected or tried. */
+function RoomFlags({ note }: { note: RoomNote | undefined }) {
+  const boss = note?.boss ?? '';
+  const push = note?.pushBlock ?? '';
+  return (
+    <span className="z1r-room-flags" aria-hidden="true">
+      {boss && <Flag kind="boss" />}
+      {push && <Flag kind={push === 'maybe' ? 'push-maybe' : 'push-checked'} />}
+    </span>
+  );
+}

@@ -37,6 +37,7 @@ import { askToConfirm } from './confirm/ask.js';
 import { mountRoomCard } from './room-card/mount.js';
 import { mountRoomGrid } from './room-grid/mount.js';
 import { mountClearButton, mountLevelStrip } from './panel/mount.js';
+import { el } from './dom.js';
 
 /* ---------------------------------------------------------------- placement */
 
@@ -124,17 +125,6 @@ export function roomItemsForInventory(def: ItemDef): readonly string[] {
 /* -------------------------------------------------------------------- panel */
 
 const LEVELS: readonly number[] = DUNGEONS.map((dungeon) => dungeon.level);
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
 
 export function buildRooms(
   store: Store,

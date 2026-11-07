@@ -39,24 +39,37 @@ export function noteIsBare(note: ScreenNote): boolean {
   );
 }
 
+/**
+ * A whole number from 0 to `max`, and 0 for anything that is not whole.
+ *
+ * How a screen note's level and stairway numbers are read, by the reducer and
+ * by `migrate` alike, so the two cannot drift. 0 is a real value for both — a
+ * dungeon found but not identified, a stairway not yet numbered — which is why
+ * a bad value lands there rather than being refused.
+ */
+export function clampWhole(value: number, max: number): number {
+  return Number.isInteger(value) ? Math.min(Math.max(value, 0), max) : 0;
+}
+
+/** Fields `sameNote` compares by value; the lists and prices need their own comparison. */
+const SCALAR_NOTE_FIELDS = ['dungeon', 'stairway', 'spot', 'item', 'collected', 'secret'] as const;
+
+/** A note's prices as one string, in key order, so two can be compared whatever order they were written in. */
+function pricesKey(note: ScreenNote): string {
+  return Object.entries(note.shopPrices)
+    .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
+    .join(';');
+}
+
 /** Whether two notes record the same thing, field by field. */
 export function sameNote(a: ScreenNote | undefined, b: ScreenNote | undefined): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  const prices = (note: ScreenNote) =>
-    Object.entries(note.shopPrices)
-      .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
-      .join(';');
   return (
-    a.dungeon === b.dungeon &&
-    a.stairway === b.stairway &&
-    a.spot === b.spot &&
-    a.item === b.item &&
-    a.collected === b.collected &&
-    a.secret === b.secret &&
+    SCALAR_NOTE_FIELDS.every((field) => a[field] === b[field]) &&
     a.shop.join() === b.shop.join() &&
     a.blocks.join() === b.blocks.join() &&
-    prices(a) === prices(b)
+    pricesKey(a) === pricesKey(b)
   );
 }
 

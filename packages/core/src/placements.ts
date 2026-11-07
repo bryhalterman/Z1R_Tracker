@@ -135,10 +135,8 @@ export function deriveItemLocations(state: TrackerState): ItemLocations {
 
 const DERIVED = new WeakMap<TrackerState, ItemLocations>();
 
-function derive(state: TrackerState): ItemLocations {
-  const locations = deriveLocations(state.seed);
-
-  // Free slots per level and kind, in listed order, consumed from the front.
+/** Free slots per level and kind, in listed order, consumed from the front. */
+function freeSlots(locations: readonly LocationDef[]): Map<string, LocationDef[]> {
   const free = new Map<string, LocationDef[]>();
   for (const location of locations) {
     if (location.level === undefined) continue;
@@ -147,56 +145,91 @@ function derive(state: TrackerState): ItemLocations {
     queue.push(location);
     free.set(key, queue);
   }
+  return free;
+}
 
-  const byId = new Map<string, ItemPlacement>();
-  const overflow = new Map<number, OverflowPlacement[]>();
+/** Append one entry to a level's overflow list. */
+function pushOverflow(
+  overflow: Map<number, OverflowPlacement[]>,
+  level: number,
+  entry: OverflowPlacement,
+): void {
+  const spilled = overflow.get(level) ?? [];
+  spilled.push(entry);
+  overflow.set(level, spilled);
+}
 
-  for (const { level } of DUNGEONS) {
-    const levelRooms = state.rooms[String(level)];
-    if (!levelRooms) continue;
-    const take = (kind: LocationDef['kind']) => free.get(slotKey(level, kind))?.shift();
-    const place = (slot: LocationDef, note: RoomNote, room: string) =>
+/** The three moves filling one level makes: take a free slot, fill it, or overflow. */
+interface LevelFiller {
+  take(kind: LocationDef['kind']): LocationDef | undefined;
+  place(slot: LocationDef, note: RoomNote, room: string): void;
+  spill(note: RoomNote, room: string, kind: RoomSlotKind): void;
+}
+
+function levelFiller(
+  level: number,
+  free: Map<string, LocationDef[]>,
+  byId: Map<string, ItemPlacement>,
+  overflow: Map<number, OverflowPlacement[]>,
+): LevelFiller {
+  return {
+    take: (kind) => free.get(slotKey(level, kind))?.shift(),
+    place: (slot, note, room) => {
       byId.set(slot.id, {
         item: note.item,
         collected: note.collected,
         source: { kind: 'room', level, room },
       });
-    const spill = (note: RoomNote, room: string, kind: RoomSlotKind) => {
-      const spilled = overflow.get(level) ?? [];
-      spilled.push({
+    },
+    spill: (note, room, kind) =>
+      pushOverflow(overflow, level, {
         item: note.item,
         collected: note.collected,
         source: { kind: 'room', level, room },
         kind,
-      });
-      overflow.set(level, spilled);
-    };
+      }),
+  };
+}
 
-    const deferred: { note: RoomNote; room: string }[] = [];
-    for (const room of allRoomIds()) {
-      const note = levelRooms[room];
-      // Pool entries only. This is what leaves the Map, Compass and Triforce
-      // out: they have no pool entry because they never move.
-      if (!note || !POOL_BY_ID.has(note.item)) continue;
-      if (resolveRoomFrom(note) === 'stair') {
-        const slot = take('stair');
-        if (slot) place(slot, note, room);
-        else spill(note, room, 'stair');
-        continue;
-      }
-      const slot = take(note.item === 'heart' ? 'heart' : 'floor');
-      if (slot) place(slot, note, room);
-      else deferred.push({ note, room });
-    }
+/**
+ * First pass for one room: the slot it most likely is. A stair item is settled
+ * here either way — a stair slot or overflow. False when a floor item found its
+ * first choice taken, so the second pass can try the rest.
+ */
+function placeFirstChoice(fill: LevelFiller, note: RoomNote, room: string): boolean {
+  if (resolveRoomFrom(note) === 'stair') {
+    const slot = fill.take('stair');
+    if (slot) fill.place(slot, note, room);
+    else fill.spill(note, room, 'stair');
+    return true;
+  }
+  const slot = fill.take(note.item === 'heart' ? 'heart' : 'floor');
+  if (!slot) return false;
+  fill.place(slot, note, room);
+  return true;
+}
 
-    // Second pass: any floor spot still free, plain or heart.
-    for (const { note, room } of deferred) {
-      const slot = take('floor') ?? take('heart');
-      if (slot) place(slot, note, room);
-      else spill(note, room, 'floor');
-    }
+/** One level's rooms, in grid order, into its free slots or its overflow. */
+function fillLevel(levelRooms: Record<string, RoomNote>, fill: LevelFiller): void {
+  const deferred: { note: RoomNote; room: string }[] = [];
+  for (const room of allRoomIds()) {
+    const note = levelRooms[room];
+    // Pool entries only. This is what leaves the Map, Compass and Triforce
+    // out: they have no pool entry because they never move.
+    if (!note || !POOL_BY_ID.has(note.item)) continue;
+    if (!placeFirstChoice(fill, note, room)) deferred.push({ note, room });
   }
 
+  // Second pass: any floor spot still free, plain or heart.
+  for (const { note, room } of deferred) {
+    const slot = fill.take('floor') ?? fill.take('heart');
+    if (slot) fill.place(slot, note, room);
+    else fill.spill(note, room, 'floor');
+  }
+}
+
+/** Screens into the named overworld spots, in grid order. Returns the second claims on a spot. */
+function fillScreens(state: TrackerState, byId: Map<string, ItemPlacement>): ItemPlacement[] {
   const overworldOverflow: ItemPlacement[] = [];
   for (const screen of allScreenIds()) {
     const note = state.screenNotes[screen];
@@ -211,17 +244,30 @@ function derive(state: TrackerState): ItemLocations {
     if (byId.has(note.spot)) overworldOverflow.push(placement);
     else byId.set(note.spot, placement);
   }
+  return overworldOverflow;
+}
 
-  // The fallback runs last and only into slots still empty, so a placement on
-  // the maps always wins over what an older save stored for the same slot.
+/**
+ * The fallback runs last and only into slots still empty, so a placement on
+ * the maps always wins over what an older save stored for the same slot.
+ */
+function fillStored(
+  state: TrackerState,
+  locations: readonly LocationDef[],
+  byId: Map<string, ItemPlacement>,
+): void {
   for (const location of locations) {
     if (byId.has(location.id)) continue;
     const stored = storedPlacement(state, location.id);
     if (stored) byId.set(location.id, stored);
   }
+}
 
-  // Extra floor slots an older save added by hand no longer exist, so what it
-  // recorded in one joins its level's overflow instead of vanishing.
+/**
+ * Extra floor slots an older save added by hand no longer exist, so what it
+ * recorded in one joins its level's overflow instead of vanishing.
+ */
+function spillFormerExtras(state: TrackerState, overflow: Map<number, OverflowPlacement[]>): void {
   // Filtered before sorting: most saves hold none, and this runs per render.
   const extras: [string, number][] = [];
   for (const id of Object.keys(state.locations)) {
@@ -232,10 +278,25 @@ function derive(state: TrackerState): ItemLocations {
   for (const [id, level] of extras) {
     const stored = storedPlacement(state, id);
     if (!stored) continue;
-    const spilled = overflow.get(level) ?? [];
-    spilled.push({ ...stored, source: { kind: 'stored', id }, kind: 'floor' });
-    overflow.set(level, spilled);
+    pushOverflow(overflow, level, { ...stored, source: { kind: 'stored', id }, kind: 'floor' });
   }
+}
+
+function derive(state: TrackerState): ItemLocations {
+  const locations = deriveLocations(state.seed);
+  const free = freeSlots(locations);
+  const byId = new Map<string, ItemPlacement>();
+  const overflow = new Map<number, OverflowPlacement[]>();
+
+  for (const { level } of DUNGEONS) {
+    const levelRooms = state.rooms[String(level)];
+    if (!levelRooms) continue;
+    fillLevel(levelRooms, levelFiller(level, free, byId, overflow));
+  }
+
+  const overworldOverflow = fillScreens(state, byId);
+  fillStored(state, locations, byId);
+  spillFormerExtras(state, overflow);
 
   return {
     slots: locations.map((location) => ({ location, placement: byId.get(location.id) ?? null })),

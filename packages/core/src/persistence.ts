@@ -20,7 +20,7 @@ import {
 } from './state.js';
 import { ITEMS_BY_ID, maxValue } from './items.js';
 import { isStorableLocationId } from './legacy-locations.js';
-import { fitNoteToMark, noteIsBare } from './notes.js';
+import { clampWhole, fitNoteToMark, noteIsBare } from './notes.js';
 
 import {
   bossAllowedOnLevel,
@@ -38,6 +38,7 @@ import {
   ROOM_TRANSPORT_PAIR_SIZE,
   type DoorState,
   type RoomDoors,
+  type RoomFrom,
   type RoomNote,
   type RoomStairKind,
 } from './rooms.js';
@@ -64,7 +65,7 @@ export const CHANNEL_NAME = 'z1r-tracker';
  * has added and lose ones it has dropped.
  */
 function conform<T extends object>(template: T, saved: unknown): T {
-  if (!saved || typeof saved !== 'object') return { ...template };
+  if (!isRecord(saved)) return { ...template };
   const source = saved as Record<string, unknown>;
   const result = { ...template } as Record<string, unknown>;
   for (const key of Object.keys(template)) {
@@ -72,6 +73,36 @@ function conform<T extends object>(template: T, saved: unknown): T {
   }
   return result as T;
 }
+
+/** Anything `Object.entries` can walk: what every conformer below checks first. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
+/** A definition table, looked up by id. */
+type IdTable = ReadonlyMap<string, unknown>;
+
+/**
+ * `value` if it is an id `table` defines, else `fallback`.
+ *
+ * Ids are looked up in a table to render, so an unknown one draws nothing and
+ * would sit in the save forever as an invisible entry.
+ */
+function knownId<T extends string = string>(value: unknown, table: IdTable, fallback = '' as T): T {
+  return typeof value === 'string' && table.has(value) ? (value as T) : fallback;
+}
+
+/** The distinct ids of `value` that `table` defines, sorted; [] when it is not a list. */
+function knownIdList(value: unknown, table: IdTable): string[] {
+  return Array.isArray(value)
+    ? [...new Set(value.filter((id): id is string => typeof id === 'string'))]
+        .filter((id) => table.has(id))
+        .sort()
+    : [];
+}
+
+/** Named overworld spots by id, so a saved spot is checked like every other id. */
+const OVERWORLD_SPOTS_BY_ID: IdTable = new Map(OVERWORLD_LOCATIONS.map((l) => [l.id, l]));
 
 /**
  * Items the model still has, each a whole number the item can actually hold.
@@ -116,7 +147,6 @@ function hintSeqFrom(saved: unknown, hints: HintEntry[]): number {
   return Math.max(base, ...used, 0);
 }
 
-/** Drops anything that isn't a well-formed hint object. */
 /**
  * Drop marks whose kind no longer exists.
  *
@@ -127,7 +157,7 @@ function hintSeqFrom(saved: unknown, hints: HintEntry[]): number {
  * them straight back out again.
  */
 function conformMarks(saved: unknown): Record<string, MarkKind> {
-  if (!saved || typeof saved !== 'object') return {};
+  if (!isRecord(saved)) return {};
   const out: Record<string, MarkKind> = {};
   for (const [screen, kind] of Object.entries(saved as Record<string, unknown>)) {
     if (typeof kind !== 'string' || kind === 'none') continue;
@@ -147,7 +177,7 @@ function conformMarks(saved: unknown): Record<string, MarkKind> {
  * orphan renders nowhere and would sit in the save forever.
  */
 function conformShopPrices(saved: unknown, shop: readonly string[]): Record<string, number> {
-  if (!saved || typeof saved !== 'object') return {};
+  if (!isRecord(saved)) return {};
   const out: Record<string, number> = {};
   for (const [stock, value] of Object.entries(saved as Record<string, unknown>)) {
     if (!shop.includes(stock)) continue;
@@ -170,60 +200,45 @@ function conformShopPrices(saved: unknown, shop: readonly string[]): Record<stri
  * string where an array belongs would iterate character by character.
  */
 function conformScreenNotes(saved: unknown, mirrored: boolean): Record<string, ScreenNote> {
-  if (!saved || typeof saved !== 'object') return {};
+  if (!isRecord(saved)) return {};
   const out: Record<string, ScreenNote> = {};
-  for (const [screen, value] of Object.entries(saved as Record<string, unknown>)) {
-    if (!value || typeof value !== 'object') continue;
-    const note = value as Partial<ScreenNote>;
-
-    const level = Number(note.dungeon);
-    const dungeon = Number.isInteger(level) ? Math.min(Math.max(level, 0), 9) : 0;
-    // Same treatment as the level: coerced, then clamped to the numbers that
-    // exist. 0 is "unnumbered", which a stairway written by an older save is.
-    const stairNumber = Number(note.stairway);
-    const stairway = Number.isInteger(stairNumber)
-      ? Math.min(Math.max(stairNumber, 0), OVERWORLD_STAIRWAY_COUNT)
-      : 0;
-    // Ids are looked up in a table to render, so an unknown one draws nothing
-    // and would sit in the save forever as an invisible entry.
-    const shop = Array.isArray(note.shop)
-      ? [...new Set(note.shop.filter((id): id is string => typeof id === 'string'))]
-          .filter((id) => SHOP_STOCK_BY_ID.has(id))
-          .sort()
-      : [];
-    // Absent in every save written before v10, which is simply no prices.
-    const shopPrices = conformShopPrices(note.shopPrices, shop);
-    const blocks = Array.isArray(note.blocks)
-      ? [...new Set(note.blocks.filter((id): id is string => typeof id === 'string'))]
-          .filter((id) => DUNGEON_BLOCKS_BY_ID.has(id))
-          .sort()
-      : [];
-    const item = typeof note.item === 'string' && SCREEN_ITEMS_BY_ID.has(note.item) ? note.item : '';
-    // Checked against the real list: an unknown spot id renders as nothing and
-    // would sit in the save forever as an invisible entry.
-    // The coast is a fixed screen, so a coast tag on any other screen — from
-    // when it was a tag — is dropped, and the coast screen's item fills it.
-    const spot = conformSpot(
-      screen,
-      typeof note.spot === 'string' && OVERWORLD_LOCATIONS.some((l) => l.id === note.spot) ? note.spot : '',
-      item,
-      mirrored,
-    );
-    // New in v12, so absent from every earlier save, which reads as not
-    // collected. Strictly true, and never without an item: a flag with nothing
-    // to be about would attach itself to whatever item is placed next.
-    const collected = note.collected === true && item !== '';
-    // New in v13; absent reads as unknown.
-    const secret =
-      typeof note.secret === 'string' && SECRET_SIZES_BY_ID.has(note.secret)
-        ? (note.secret as SecretSize)
-        : '';
-
-    const conformed = { dungeon, stairway, shop, shopPrices, blocks, spot, item, collected, secret };
-    if (noteIsBare(conformed)) continue;
-    out[screen] = conformed;
+  for (const [screen, value] of Object.entries(saved)) {
+    const conformed = conformScreenNote(screen, value, mirrored);
+    if (conformed) out[screen] = conformed;
   }
   return out;
+}
+
+/** One screen's note, checked field by field. Null when nothing worth keeping is left. */
+function conformScreenNote(screen: string, value: unknown, mirrored: boolean): ScreenNote | null {
+  if (!isRecord(value)) return null;
+  const note = value as Partial<ScreenNote>;
+
+  const dungeon = clampWhole(Number(note.dungeon), 9);
+  // Same treatment as the level: coerced, then clamped to the numbers that
+  // exist. 0 is "unnumbered", which a stairway written by an older save is.
+  const stairway = clampWhole(Number(note.stairway), OVERWORLD_STAIRWAY_COUNT);
+  // Ids are looked up in a table to render, so an unknown one draws nothing
+  // and would sit in the save forever as an invisible entry.
+  const shop = knownIdList(note.shop, SHOP_STOCK_BY_ID);
+  // Absent in every save written before v10, which is simply no prices.
+  const shopPrices = conformShopPrices(note.shopPrices, shop);
+  const blocks = knownIdList(note.blocks, DUNGEON_BLOCKS_BY_ID);
+  const item = knownId(note.item, SCREEN_ITEMS_BY_ID);
+  // Checked against the real list: an unknown spot id renders as nothing and
+  // would sit in the save forever as an invisible entry.
+  // The coast is a fixed screen, so a coast tag on any other screen — from
+  // when it was a tag — is dropped, and the coast screen's item fills it.
+  const spot = conformSpot(screen, knownId(note.spot, OVERWORLD_SPOTS_BY_ID), item, mirrored);
+  // New in v12, so absent from every earlier save, which reads as not
+  // collected. Strictly true, and never without an item: a flag with nothing
+  // to be about would attach itself to whatever item is placed next.
+  const collected = note.collected === true && item !== '';
+  // New in v13; absent reads as unknown.
+  const secret = knownId<SecretSize>(note.secret, SECRET_SIZES_BY_ID, '');
+
+  const conformed = { dungeon, stairway, shop, shopPrices, blocks, spot, item, collected, secret };
+  return noteIsBare(conformed) ? null : conformed;
 }
 
 /**
@@ -245,7 +260,7 @@ const DOOR_STATE_RENAMES: ReadonlyMap<string, DoorState> = new Map([['bomb', 'bo
  */
 function conformDoors(saved: unknown): RoomDoors {
   const doors = emptyRoom().doors;
-  if (!saved || typeof saved !== 'object') return doors;
+  if (!isRecord(saved)) return doors;
   const source = saved as Record<string, unknown>;
   for (const side of ROOM_SIDES) {
     const value = source[side];
@@ -302,90 +317,109 @@ function conformPairs(rooms: Record<string, RoomNote>): Record<string, RoomNote>
  * at all.
  */
 function conformRooms(saved: unknown): Record<string, Record<string, RoomNote>> {
-  if (!saved || typeof saved !== 'object') return {};
+  if (!isRecord(saved)) return {};
   const out: Record<string, Record<string, RoomNote>> = {};
-
-  for (const [level, value] of Object.entries(saved as Record<string, unknown>)) {
+  for (const [level, value] of Object.entries(saved)) {
     const number = Number(level);
     if (!isRoomLevel(number)) continue;
-    if (!value || typeof value !== 'object') continue;
-
-    const kept: Record<string, RoomNote> = {};
-    for (const [room, raw] of Object.entries(value as Record<string, unknown>)) {
-      if (!isRoomId(room)) continue;
-      if (!raw || typeof raw !== 'object') continue;
-      const note = raw as Partial<RoomNote>;
-
-      // Strictly true, so a truthy string or 1 does not read as visited.
-      const visited = note.visited === true;
-      const item = typeof note.item === 'string' && ROOM_ITEMS_BY_ID.has(note.item) ? note.item : '';
-      // Ganon and Zelda on any level but 9 are dropped rather than moved: the
-      // room they were recorded in cannot exist, so neither can the boss.
-      const boss = typeof note.boss === 'string' && bossAllowedOnLevel(note.boss, number) ? note.boss : '';
-      const stairs: RoomStairKind =
-        typeof note.stairs === 'string' && ROOM_STAIRS_BY_ID.has(note.stairs)
-          ? (note.stairs as RoomStairKind)
-          : 'none';
-      // Only transport stairs carry a pair number, same rule the reducer holds.
-      // Coerced then checked whole: a 2.5, a -1 and a NaN all read as unpaired
-      // rather than being rounded into a pair nobody placed.
-      const pair = Number(note.transport);
-      const transport =
-        stairs === 'transport' && Number.isInteger(pair) && pair >= 1 && pair <= ROOM_TRANSPORT_MAX
-          ? pair
-          : 0;
-      // The eviction stamp is meaningless without a number. A missing one
-      // leaves 0, which simply makes that room the first candidate to evict.
-      const seq = Number(note.transportSeq);
-      const transportSeq = transport !== 0 && Number.isInteger(seq) && seq > 0 ? seq : 0;
-      const doors = conformDoors(note.doors);
-      // Both new in v12. An earlier room loads as uncollected and `auto`, which
-      // is what a room recorded before either existed meant. Collected follows
-      // the reducer's rule that an empty room cannot be.
-      const collected = note.collected === true && item !== '';
-      // `heart` was a third value until it folded into `floor`: the heart spot
-      // is one of a level's floor spots.
-      const from = isRoomFrom(note.from) ? note.from : note.from === 'heart' ? 'floor' : 'auto';
-
-      const conformed: RoomNote = {
-        visited,
-        // Absent before it existed, which is nothing premarked. Strictly true,
-        // the same as visited, and never alongside it: a save holding both
-        // keeps the stronger fact, that the room was walked.
-        known: note.known === true && !visited,
-        item,
-        boss,
-        stairs,
-        transport,
-        transportSeq,
-        doors,
-        collected,
-        from,
-        // Absent in every save before it existed, which is no water recorded.
-        ladder: note.ladder === true,
-        // Absent before it existed, which is no layout recorded. A save from
-        // when chutes were marked by direction keeps them as the two chute
-        // layouts; an id no longer known reads as unrecorded.
-        layout: isRoomLayout(note.layout) ? note.layout : layoutFromChute((raw as { chute?: unknown }).chute),
-        // Both absent before they existed: nothing tried, nothing cleared.
-        pushBlock: isRoomPushBlock(note.pushBlock) ? note.pushBlock : '',
-        cleared: note.cleared === true,
-      };
-      // Absence is the empty state, so a room that conformed down to nothing
-      // must not be written back out as sixty-four unknown doors.
-      if (roomIsBare(conformed)) continue;
-      kept[room] = conformed;
-    }
-
-    if (Object.keys(kept).length === 0) continue;
+    const kept = conformLevelRooms(value, number);
     // Keyed the way the reducer reads it: "03" is Level 3, stored as "3".
-    out[String(number)] = conformPairs(kept);
+    if (kept) out[String(number)] = kept;
   }
   return out;
 }
 
+/** One level's rooms, each checked. Null when none is left worth keeping. */
+function conformLevelRooms(value: unknown, level: number): Record<string, RoomNote> | null {
+  if (!isRecord(value)) return null;
+  const kept: Record<string, RoomNote> = {};
+  for (const [room, raw] of Object.entries(value)) {
+    if (!isRoomId(room)) continue;
+    const conformed = conformRoom(raw, level);
+    if (conformed) kept[room] = conformed;
+  }
+  return Object.keys(kept).length === 0 ? null : conformPairs(kept);
+}
+
+/**
+ * A room's pair number and its eviction stamp.
+ *
+ * Only transport stairs carry a pair number, same rule the reducer holds.
+ * Coerced then checked whole: a 2.5, a -1 and a NaN all read as unpaired
+ * rather than being rounded into a pair nobody placed.
+ */
+function conformTransport(
+  note: Partial<RoomNote>,
+  stairs: RoomStairKind,
+): Pick<RoomNote, 'transport' | 'transportSeq'> {
+  const pair = Number(note.transport);
+  const transport =
+    stairs === 'transport' && Number.isInteger(pair) && pair >= 1 && pair <= ROOM_TRANSPORT_MAX ? pair : 0;
+  // The eviction stamp is meaningless without a number. A missing one
+  // leaves 0, which simply makes that room the first candidate to evict.
+  const seq = Number(note.transportSeq);
+  const transportSeq = transport !== 0 && Number.isInteger(seq) && seq > 0 ? seq : 0;
+  return { transport, transportSeq };
+}
+
+/** How a room's item was found. */
+function conformFrom(from: unknown): RoomFrom {
+  // `heart` was a third value until it folded into `floor`: the heart spot
+  // is one of a level's floor spots.
+  return isRoomFrom(from) ? from : from === 'heart' ? 'floor' : 'auto';
+}
+
+/** One room, checked field by field. Null when nothing worth keeping is left. */
+function conformRoom(raw: unknown, level: number): RoomNote | null {
+  if (!isRecord(raw)) return null;
+  const note = raw as Partial<RoomNote>;
+
+  // Strictly true, so a truthy string or 1 does not read as visited.
+  const visited = note.visited === true;
+  const item = knownId(note.item, ROOM_ITEMS_BY_ID);
+  // Ganon and Zelda on any level but 9 are dropped rather than moved: the
+  // room they were recorded in cannot exist, so neither can the boss.
+  const boss = typeof note.boss === 'string' && bossAllowedOnLevel(note.boss, level) ? note.boss : '';
+  const stairs = knownId<RoomStairKind>(note.stairs, ROOM_STAIRS_BY_ID, 'none');
+  const { transport, transportSeq } = conformTransport(note, stairs);
+  const doors = conformDoors(note.doors);
+  // Both new in v12. An earlier room loads as uncollected and `auto`, which
+  // is what a room recorded before either existed meant. Collected follows
+  // the reducer's rule that an empty room cannot be.
+  const collected = note.collected === true && item !== '';
+  const from = conformFrom(note.from);
+
+  const conformed: RoomNote = {
+    visited,
+    // Absent before it existed, which is nothing premarked. Strictly true,
+    // the same as visited, and never alongside it: a save holding both
+    // keeps the stronger fact, that the room was walked.
+    known: note.known === true && !visited,
+    item,
+    boss,
+    stairs,
+    transport,
+    transportSeq,
+    doors,
+    collected,
+    from,
+    // Absent in every save before it existed, which is no water recorded.
+    ladder: note.ladder === true,
+    // Absent before it existed, which is no layout recorded. A save from
+    // when chutes were marked by direction keeps them as the two chute
+    // layouts; an id no longer known reads as unrecorded.
+    layout: isRoomLayout(note.layout) ? note.layout : layoutFromChute((raw as { chute?: unknown }).chute),
+    // Both absent before they existed: nothing tried, nothing cleared.
+    pushBlock: isRoomPushBlock(note.pushBlock) ? note.pushBlock : '',
+    cleared: note.cleared === true,
+  };
+  // Absence is the empty state, so a room that conformed down to nothing
+  // must not be written back out as sixty-four unknown doors.
+  return roomIsBare(conformed) ? null : conformed;
+}
+
 function conformLevelStarts(saved: unknown): Record<string, string> {
-  if (!saved || typeof saved !== 'object') return {};
+  if (!isRecord(saved)) return {};
   const out: Record<string, string> = {};
   for (const [level, room] of Object.entries(saved as Record<string, unknown>)) {
     if (!isRoomLevel(Number(level)) || typeof room !== 'string' || !isRoomId(room)) continue;
@@ -394,6 +428,7 @@ function conformLevelStarts(saved: unknown): Record<string, string> {
   return out;
 }
 
+/** Drops anything that isn't a well-formed hint object. */
 function conformHints(saved: unknown): HintEntry[] {
   if (!Array.isArray(saved)) return [];
   const blank: HintEntry = { id: '', subject: '', region: '', screen: '', note: '' };
@@ -424,20 +459,25 @@ function conformSeed(base: SeedSettings, saved: unknown): SeedSettings {
  * every save and export forever.
  */
 function conformLocations(saved: unknown): Record<string, LocationState> {
-  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+  if (!isRecord(saved) || Array.isArray(saved)) return {};
   const out: Record<string, LocationState> = {};
-  for (const [id, value] of Object.entries(saved as Record<string, unknown>)) {
+  for (const [id, value] of Object.entries(saved)) {
     if (!isStorableLocationId(id)) continue;
-    if (!value || typeof value !== 'object') continue;
-    const { item, collected } = value as { item?: unknown; collected?: unknown };
-    const entry: LocationState = {
-      item: typeof item === 'string' && POOL_BY_ID.has(item) ? item : '',
-      collected: collected === true,
-    };
-    if (entry.item === '' && !entry.collected) continue;
-    out[id] = entry;
+    const entry = conformLocation(value);
+    if (entry) out[id] = entry;
   }
   return out;
+}
+
+/** One stored slot entry. Null when it is malformed or says nothing. */
+function conformLocation(value: unknown): LocationState | null {
+  if (!isRecord(value)) return null;
+  const { item, collected } = value as { item?: unknown; collected?: unknown };
+  const entry: LocationState = {
+    item: knownId(item, POOL_BY_ID),
+    collected: collected === true,
+  };
+  return entry.item === '' && !entry.collected ? null : entry;
 }
 
 /**
@@ -466,6 +506,19 @@ function timestamp(saved: unknown, fallback: number): number {
 }
 
 /**
+ * A versioned object no newer than this build, carrying the two maps every
+ * save has. `migrate` conforms everything else; this only decides whether
+ * there is a save to conform at all.
+ */
+function isSaveShaped(raw: unknown): raw is Partial<TrackerState> {
+  if (!isRecord(raw)) return false;
+  const candidate = raw as Partial<TrackerState>;
+  if (typeof candidate.version !== 'number' || candidate.version > STATE_VERSION) return false;
+  // Require evidence this is actually a tracker save, not merely versioned JSON.
+  return isRecord(candidate.items) && isRecord(candidate.dungeons);
+}
+
+/**
  * Accepts anything shaped like a tracker state; repairs older versions.
  *
  * Validation is structural, not just a version check. `{"version":1}` used to
@@ -475,13 +528,8 @@ function timestamp(saved: unknown, fallback: number): number {
  * unknown top-level keys living forever in exports and broadcasts.
  */
 export function migrate(raw: unknown): TrackerState | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const candidate = raw as Partial<TrackerState>;
-  if (typeof candidate.version !== 'number') return null;
-  if (candidate.version > STATE_VERSION) return null;
-  // Require evidence this is actually a tracker save, not merely versioned JSON.
-  if (!candidate.items || typeof candidate.items !== 'object') return null;
-  if (!candidate.dungeons || typeof candidate.dungeons !== 'object') return null;
+  if (!isSaveShaped(raw)) return null;
+  const candidate = raw;
 
   const base = createInitialState();
   const seed = conformSeed(base.seed, candidate.seed);

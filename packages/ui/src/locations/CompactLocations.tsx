@@ -74,6 +74,25 @@ function sameChip(a: ChipProps, b: ChipProps): boolean {
   );
 }
 
+/** The chip's words: where the slot is, what is in it, and whether it is collected. */
+function chipText(
+  kind: string,
+  location: LocationDef | null,
+  placement: ItemPlacement | null,
+  itemName: string | undefined,
+): string {
+  const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
+  return (
+    `${where} — ${itemName ?? 'unknown'}${placement?.collected ? ' (collected)' : ''}` +
+    (placement ? '' : ' — place it on a map to record it')
+  );
+}
+
+/** What an empty chip shows instead of a sprite: the spot's code, or the slot kind's letter. */
+function chipCode(kind: string, location: LocationDef | null): string {
+  return (location ? SPOT_CODE[location.id] : undefined) ?? KIND_INITIAL[kind] ?? '?';
+}
+
 type ChipProps = {
   kind: string;
   location: LocationDef | null;
@@ -95,10 +114,7 @@ function ChipBody({
 } & Pick<CompactLocationsProps, 'resolver' | 'dispatch'>) {
   const entry = placement?.item ? SCREEN_ITEMS_BY_ID.get(placement.item) : undefined;
   const collected = !!placement?.collected;
-  const where = location ? location.label : `Extra ${KIND_TITLE[kind]?.toLowerCase() ?? kind}`;
-  const text =
-    `${where} — ${entry?.name ?? 'unknown'}${collected ? ' (collected)' : ''}` +
-    (placement ? '' : ' — place it on a map to record it');
+  const text = chipText(kind, location, placement, entry?.name);
   const toggle = () => {
     const action = collectAction(placement);
     if (action) dispatch(action);
@@ -127,11 +143,7 @@ function ChipBody({
           !location && 'outline-1 outline-offset-1 outline-dotted outline-destructive',
         )}
       >
-        {entry ? (
-          <Sprite resolver={resolver} spriteKey={entry.sprite} size={16} />
-        ) : (
-          ((location ? SPOT_CODE[location.id] : undefined) ?? KIND_INITIAL[kind] ?? '?')
-        )}
+        {entry ? <Sprite resolver={resolver} spriteKey={entry.sprite} size={16} /> : chipCode(kind, location)}
       </TooltipTrigger>
       <TooltipContent className="z1r-ui max-w-64">{text}</TooltipContent>
     </Tooltip>

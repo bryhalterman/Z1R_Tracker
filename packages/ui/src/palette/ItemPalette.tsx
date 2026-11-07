@@ -26,29 +26,13 @@
  * armed.
  */
 
-import {
-  ITEMS,
-  ITEMS_BY_ID,
-  ROOM_ITEMS_BY_ID,
-  SCREEN_ITEMS,
-  SCREEN_ITEMS_BY_ID,
-  labelFor,
-  spriteFor,
-  type ItemDef,
-  type SpriteResolver,
-  type TrackerState,
-} from '@z1r/core';
+import { ITEMS, SCREEN_ITEMS, type ItemDef, type SpriteResolver, type TrackerState } from '@z1r/core';
 import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { cn } from '#lib/utils';
 import { Sprite } from '../shared/Sprite.js';
 import { CellTip } from '../room-grid/CellTip.js';
-
-/**
- * One tile: a placeable item by its pool or room id, or — for the two tiers
- * that are bought, never found — an inventory item at a stage.
- */
-type TileSpec = string | { readonly inventory: string; readonly stage: number };
+import { tileModel, type Held, type TileSpec } from './tile-model.js';
 
 /** An item's tiers, lowest first, drawn as one joined strip. */
 interface Family {
@@ -126,19 +110,8 @@ export interface ItemPaletteProps {
   dragEnd: (dropped: boolean) => void;
 }
 
-/** Where an item can be dropped in this mount, in words, or '' for nowhere. */
-export function targetFor(id: string, placeInto: ItemPaletteProps['placeInto']): string {
-  // Rooms hold the pool and the dungeon pickups; the overworld holds the pool
-  // and the overworld-only items.
-  const rooms = placeInto.rooms && ROOM_ITEMS_BY_ID.has(id);
-  const map = placeInto.map && SCREEN_ITEMS_BY_ID.has(id);
-  if (rooms && map) return 'a room or an overworld screen';
-  if (rooms) return 'a room';
-  if (map) return 'an overworld screen';
-  return '';
-}
-
-type Held = 'held' | 'unheld' | 'none';
+// `targetFor` lives in tile-model.ts; re-exported for the palette's mount.
+export { targetFor } from './tile-model.js';
 
 /**
  * The tile's drawing, shared by every kind of tile.
@@ -230,27 +203,9 @@ const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
     dragStart,
     dragEnd,
   } = props;
-  const bought = typeof spec !== 'string';
-  const pool = bought ? undefined : SCREEN_ITEMS_BY_ID.get(spec);
-  const def = bought ? undefined : (ROOM_ITEMS_BY_ID.get(spec) ?? pool);
-  if (!bought && !def) return null;
-
-  // The inventory item this tile reports, and the stage it stands for. The
-  // Heart Container's inventory id is empty, and the Map, the Compass and a
-  // Triforce piece have no pool entry: those four have no held state.
-  const inventory = bought
-    ? ITEMS_BY_ID.get(spec.inventory)
-    : pool?.itemId
-      ? ITEMS_BY_ID.get(pool.itemId)
-      : undefined;
-  const stage = bought ? spec.stage : (pool?.value ?? 0);
-  const value = inventory ? (items[inventory.id] ?? 0) : 0;
-  const name = bought ? (inventory ? labelFor(inventory, stage) : '') : def!.name;
-  const sprite = bought ? (inventory ? spriteFor(inventory, stage) : '') : def!.sprite;
-  const id = bought ? `${spec.inventory}.${spec.stage}` : spec;
-
-  const target = bought ? '' : targetFor(spec, placeInto);
-  const held: Held = inventory && stage > 0 ? (value >= stage ? 'held' : 'unheld') : 'none';
+  const model = tileModel(spec, items, isArmed, where, placeInto);
+  if (!model) return null;
+  const { inventory, stage, value, name, sprite, id, target, bought, held, facts, text } = model;
 
   /*
    * A left click says whether you hold this tier. Not held: the item goes up
@@ -263,21 +218,6 @@ const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
   const toggleArmed = () => {
     if (target) arm(isArmed ? '' : (spec as string));
   };
-
-  // What the tile is, a fact per line. How to use the palette is behind the
-  // ? in the heading; the accessible name keeps it, since a screen reader
-  // reaches the tile without passing the ?.
-  const facts: string[] = [];
-  if (held !== 'none') facts.push(held === 'held' ? 'held' : 'not held');
-  if (where) facts.push(`placed at ${where}`);
-  if (isArmed) facts.push('armed');
-  if (bought) facts.push('bought in a shop, never placed');
-  else if (!target) facts.push('nowhere in this window to place it');
-  const hints: string[] = [];
-  if (target)
-    hints.push(isArmed ? 'right-click to put it down' : `right-click to arm, or drag onto ${target}`);
-  if (held !== 'none') hints.push(held === 'held' ? 'click to mark it not held' : 'click to mark it held');
-  const text = [name, ...facts, ...hints].join(' — ');
 
   return (
     <Tooltip>

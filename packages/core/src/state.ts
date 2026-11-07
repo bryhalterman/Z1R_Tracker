@@ -40,7 +40,7 @@ import {
   type RoomSide,
 } from './rooms.js';
 import { isRoomLayout } from './layouts.js';
-import { emptyNote, fitNoteToMark, noteIsBare, sameNote } from './notes.js';
+import { clampWhole, emptyNote, fitNoteToMark, noteIsBare, sameNote } from './notes.js';
 
 export const STATE_VERSION = 13;
 
@@ -335,12 +335,14 @@ function writeRooms(
   return next;
 }
 
+/** A room action's address: the level key, and the room as it stands. */
+interface RoomTarget {
+  level: string;
+  current: RoomNote;
+}
+
 /** The level/room pair every room action is addressed by, or null if either is not real. */
-function roomTarget(
-  state: TrackerState,
-  level: number,
-  room: string,
-): { level: string; current: RoomNote } | null {
+function roomTarget(state: TrackerState, level: number, room: string): RoomTarget | null {
   if (!isRoomLevel(level) || !isRoomId(room)) return null;
   const key = String(level);
   return { level: key, current: state.rooms[key]?.[room] ?? emptyRoom() };
@@ -429,14 +431,12 @@ function editScreenNote(
   const next = { ...current, ...patch };
   if (typeof next.dungeon === 'number') {
     // 0 means "found but not yet identified", which is a real state.
-    next.dungeon = Number.isInteger(next.dungeon) ? Math.min(Math.max(next.dungeon, 0), 9) : 0;
+    next.dungeon = clampWhole(next.dungeon, 9);
   }
   if (typeof next.stairway === 'number') {
     // 0 is "no number yet"; the UI places stairways through placeStairway,
     // which is what keeps the numbers unique.
-    next.stairway = Number.isInteger(next.stairway)
-      ? Math.min(Math.max(next.stairway, 0), OVERWORLD_STAIRWAY_COUNT)
-      : 0;
+    next.stairway = clampWhole(next.stairway, OVERWORLD_STAIRWAY_COUNT);
   }
   // An unknown size reads as unknown rather than refusing the whole patch.
   if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
@@ -532,259 +532,400 @@ function settleCollected(
   return { collected, picked: collected && !(sameItem && before.collected) };
 }
 
-export function reduce(state: TrackerState, action: Action, now = Date.now()): TrackerState {
-  /** Applies a change and advances the sync counter. Every local edit goes through here. */
-  const bump = (patch: Partial<TrackerState>): TrackerState => ({
-    ...state,
-    ...patch,
-    rev: state.rev + 1,
-    updatedAt: now,
+/** Applies a change and advances the sync counter. Every local edit goes through here. */
+type Bump = (patch: Partial<TrackerState>) => TrackerState;
+
+/**
+ * The reducer for one action type. `now` is only read by the actions that
+ * replace the state outright; every other edit stamps it through `bump`.
+ */
+type Handler<K extends Action['type']> = (
+  state: TrackerState,
+  action: Extract<Action, { type: K }>,
+  bump: Bump,
+  now: number,
+) => TrackerState;
+
+/**
+ * One handler per action type. A mapped type rather than a switch, so an action
+ * added to `Action` without a handler is a compile error instead of a reducer
+ * that falls off the end and hands the store `undefined`.
+ */
+type Handlers = { readonly [K in Action['type']]: Handler<K> };
+
+const ITEM_HANDLERS: Pick<Handlers, 'cycleItem' | 'setItem' | 'setDungeon'> = {
+  cycleItem(state, action, bump) {
+    const def = ITEMS_BY_ID.get(action.id);
+    if (!def) return state;
+    const current = state.items[action.id] ?? 0;
+    const limit = maxValue(def);
+    // Both kinds wrap back round to 0, so a click past the top clears.
+    const next = (current + action.direction + (limit + 1)) % (limit + 1);
+    if (next === current) return state;
+    return bump({ items: { ...state.items, [action.id]: next } });
+  },
+
+  setItem(state, action, bump) {
+    const value = clampItem(action.id, action.value);
+    if ((state.items[action.id] ?? 0) === value) return state;
+    return bump({ items: { ...state.items, [action.id]: value } });
+  },
+
+  setDungeon(state, action, bump) {
+    const key = String(action.level);
+    const current = state.dungeons[key] ?? emptyDungeon();
+    const next = { ...current, ...action.patch };
+    if (next.triforce === current.triforce) return state;
+    return bump({ dungeons: { ...state.dungeons, [key]: next } });
+  },
+};
+
+const MARK_HANDLERS: Pick<
+  Handlers,
+  'cycleMark' | 'setMark' | 'markScreen' | 'placeDungeon' | 'placeStairway' | 'clearMap' | 'setStartScreen'
+> = {
+  cycleMark(state, action, bump) {
+    const current = state.marks[action.screen] ?? 'none';
+    const next = cycleMark(current, action.direction);
+    return bump(writeMark(state, action.screen, next));
+  },
+
+  setMark(state, action, bump) {
+    const written = writeMark(state, action.screen, action.mark);
+    const unchanged =
+      (state.marks[action.screen] ?? 'none') === action.mark &&
+      (written.screenNotes ?? state.screenNotes) === state.screenNotes;
+    return unchanged ? state : bump(written);
+  },
+
+  markScreen(state, action, bump) {
+    const marked = { ...state, ...writeMark(state, action.screen, action.mark) };
+    const edited = editScreenNote(marked, action.screen, action.patch);
+    const markChanged = (state.marks[action.screen] ?? 'none') !== action.mark;
+    if (!edited && !markChanged && marked.screenNotes === state.screenNotes) return state;
+    return bump({ marks: marked.marks, screenNotes: marked.screenNotes, ...edited });
+  },
+
+  placeDungeon(state, action, bump) {
+    const level = Math.min(Math.max(Math.trunc(action.level) || 0, 1), 9);
+    const marks = { ...state.marks };
+    const screenNotes = { ...state.screenNotes };
+
+    /*
+     * A level exists once. Marking it somewhere new means the old spot was
+     * wrong, so the marker moves rather than duplicating — two screens both
+     * claiming Level 3 is worse than no marker at all, because you cannot
+     * tell which one to walk to.
+     *
+     * The blockers travel with it: they belong to the dungeon, not to the
+     * square of grass it was mistakenly pinned on. Nothing else does — a
+     * shop's stock or a coast spot belongs to the screen it was recorded
+     * on — and they join any the new screen already lists rather than
+     * being hidden under them.
+     */
+    const carried: string[] = [];
+    for (const [screen, note] of Object.entries(screenNotes)) {
+      if (screen === action.screen || note.dungeon !== level) continue;
+      carried.push(...note.blocks);
+      delete screenNotes[screen];
+      delete marks[screen];
+    }
+
+    marks[action.screen] = 'dungeon';
+    const target = { ...emptyNote(), ...screenNotes[action.screen] };
+    const placed: ScreenNote = {
+      ...target,
+      blocks: [...new Set([...target.blocks, ...carried])].sort(),
+      dungeon: level,
+    };
+    return bump({ marks, screenNotes: pruneNote(screenNotes, marks, action.screen, placed) });
+  },
+
+  placeStairway(state, action, bump) {
+    const number = Math.min(Math.max(Math.trunc(action.number) || 0, 1), OVERWORLD_STAIRWAY_COUNT);
+    const marks = { ...state.marks };
+    const screenNotes = { ...state.screenNotes };
+
+    /*
+     * Same rule as a level: there is one stairway 2, so marking a new one
+     * means the old one was wrong and the marker moves rather than
+     * duplicating. Nothing is carried across — a stairway note holds only
+     * its number, unlike a dungeon, whose blockers belong to the dungeon.
+     */
+    for (const [screen, note] of Object.entries(screenNotes)) {
+      if (screen === action.screen || note.stairway !== number) continue;
+      delete screenNotes[screen];
+      delete marks[screen];
+    }
+
+    marks[action.screen] = 'stairway';
+    const placed: ScreenNote = {
+      ...emptyNote(),
+      ...screenNotes[action.screen],
+      stairway: number,
+    };
+    return bump({ marks, screenNotes: pruneNote(screenNotes, marks, action.screen, placed) });
+  },
+
+  clearMap(state, _action, bump) {
+    /*
+     * Deliberately only the map. A run ends with most of 128 screens marked
+     * and none of it is worth carrying into the next seed, but the items and
+     * Triforce have their own controls — wiping those here would make this a
+     * second Reset wearing a friendlier label.
+     */
+    if (
+      Object.keys(state.marks).length === 0 &&
+      Object.keys(state.screenNotes).length === 0 &&
+      state.startScreen === ''
+    ) {
+      return state;
+    }
+    // The start pennant is on the map, so it goes with it.
+    return bump({ marks: {}, screenNotes: {}, startScreen: '' });
+  },
+
+  setStartScreen(state, action, bump) {
+    if (action.screen !== '' && !isScreenId(action.screen)) return state;
+    const startScreen = action.screen === state.startScreen ? '' : action.screen;
+    if (startScreen === state.startScreen) return state;
+    return bump({ startScreen });
+  },
+};
+
+const SCREEN_NOTE_HANDLERS: Pick<
+  Handlers,
+  'setScreenNote' | 'toggleDungeonBlock' | 'collectScreen' | 'toggleShopStock' | 'setShopPrice'
+> = {
+  setScreenNote(state, action, bump) {
+    const edited = editScreenNote(state, action.screen, action.patch);
+    return edited ? bump(edited) : state;
+  },
+
+  toggleDungeonBlock(state, action, bump) {
+    // Blockers belong to a dungeon. With the dungeon brush armed the card
+    // offers them for whatever screen is selected, so this is reachable on a
+    // shop; refusing keeps an invisible blocker off it.
+    if (state.marks[action.screen] !== 'dungeon') return state;
+    const current = state.screenNotes[action.screen] ?? emptyNote();
+    const held = current.blocks.includes(action.block);
+    const next: ScreenNote = {
+      ...current,
+      blocks: held
+        ? current.blocks.filter((id) => id !== action.block)
+        : [...current.blocks, action.block].sort(),
+    };
+    return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
+  },
+
+  collectScreen(state, action, bump) {
+    const current = state.screenNotes[action.screen];
+    // Checked rather than trusted from the type: this arrives over a
+    // BroadcastChannel too, where nothing has been through the compiler.
+    if (typeof action.collected !== 'boolean') return state;
+    // Nothing on the screen means nothing to have picked up. Storing the
+    // flag anyway would outlive the item it was about the moment one is set.
+    if (!current || current.item === '') return state;
+    if (current.collected === action.collected) return state;
+    const next: ScreenNote = { ...current, collected: action.collected };
+    const screenNotes = pruneNote(state.screenNotes, state.marks, action.screen, next);
+    if (!action.collected) return bump({ screenNotes });
+    return bump({ screenNotes, items: grantPoolEntry(state.items, current.item) });
+  },
+
+  toggleShopStock(state, action, bump) {
+    const current = state.screenNotes[action.screen] ?? emptyNote();
+    const held = current.shop.includes(action.stock);
+    // The price belongs to the stock entry. Leaving it behind would put the
+    // old number back the next time the same item was ticked, which reads as
+    // the tracker inventing a price nobody saw.
+    const shopPrices = { ...current.shopPrices };
+    if (held) delete shopPrices[action.stock];
+    const next: ScreenNote = {
+      ...current,
+      shop: held
+        ? current.shop.filter((id) => id !== action.stock)
+        : // Sorted so two screens with the same stock serialise identically,
+          // and the icons never reorder as you tick them.
+          [...current.shop, action.stock].sort(),
+      shopPrices,
+    };
+    return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
+  },
+
+  setShopPrice(state, action, bump) {
+    const current = state.screenNotes[action.screen] ?? emptyNote();
+    // Rupees are whole and never negative, and anything unparseable reads as
+    // "no price" rather than as a number nobody can act on.
+    const price = Number.isFinite(action.price) ? Math.max(Math.trunc(action.price), 0) : 0;
+    // A price belongs to stock the shop carries; one for anything else would
+    // render nowhere. Clearing one is always allowed.
+    if (price !== 0 && !current.shop.includes(action.stock)) return state;
+    if ((current.shopPrices[action.stock] ?? 0) === price) return state;
+    const shopPrices = { ...current.shopPrices };
+    // 0 is the empty value, so it removes the key rather than being stored —
+    // same rule as a bare note, and it keeps exports free of `{"bomb":0}`.
+    if (price === 0) delete shopPrices[action.stock];
+    else shopPrices[action.stock] = price;
+    const next: ScreenNote = { ...current, shopPrices };
+    return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
+  },
+};
+
+/** One room, edited, stored back into its level. */
+function roomsWith(
+  state: TrackerState,
+  target: RoomTarget,
+  room: string,
+  next: RoomNote,
+): Record<string, Record<string, RoomNote>> {
+  const levelRooms = { ...state.rooms[target.level], [room]: next };
+  return writeRooms(state.rooms, target.level, levelRooms);
+}
+
+/**
+ * The shared shape of the single-field room actions: address the room, let
+ * `edit` produce its new note, store it.
+ *
+ * `edit` returns null to refuse — a value that is not real, or one the room
+ * already holds — and the state comes back untouched, so a no-op never bumps
+ * `rev`.
+ */
+function editRoom(
+  state: TrackerState,
+  bump: Bump,
+  level: number,
+  room: string,
+  edit: (current: RoomNote) => RoomNote | null,
+): TrackerState {
+  const target = roomTarget(state, level, room);
+  if (!target) return state;
+  const next = edit(target.current);
+  return next ? bump({ rooms: roomsWith(state, target, room, next) }) : state;
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean';
+}
+
+/** A check on one field of a room patch, given the level the room is on. */
+type RoomPatchCheck<K extends keyof RoomNotePatch> = (
+  value: NonNullable<RoomNotePatch[K]>,
+  level: number,
+) => boolean;
+
+/**
+ * What each field of a `setRoomNote` patch has to be, checked against the
+ * tables rather than trusted from the type.
+ *
+ * Every field is listed, so one added to `RoomNote` has to be given a check —
+ * or `null`, deliberately — before this compiles. Checked in this order.
+ */
+const ROOM_PATCH_CHECKS: { readonly [K in keyof RoomNotePatch]-?: RoomPatchCheck<K> | null } = {
+  visited: isBoolean,
+  known: isBoolean,
+  item: (item) => item === '' || ROOM_ITEMS_BY_ID.has(item),
+  boss: (boss, level) => boss === '' || bossAllowedOnLevel(boss, level),
+  stairs: (stairs) => ROOM_STAIRS_BY_ID.has(stairs),
+  doors: (doors) =>
+    Object.entries(doors).every(
+      ([side, door]) => isRoomSide(side) && typeof door === 'string' && DOOR_STATES_BY_ID.has(door),
+    ),
+  transport: (transport) => Number.isInteger(transport) && transport >= 0 && transport <= ROOM_TRANSPORT_MAX,
+  // Never taken from a caller — `mergeRoomPatch` keeps the stored stamp — so
+  // there is nothing to refuse.
+  transportSeq: null,
+  from: isRoomFrom,
+  collected: isBoolean,
+  ladder: isBoolean,
+  layout: isRoomLayout,
+  pushBlock: isRoomPushBlock,
+  cleared: isBoolean,
+};
+
+const ROOM_PATCH_FIELDS = Object.keys(ROOM_PATCH_CHECKS) as (keyof RoomNotePatch)[];
+
+/** Whether every field a patch carries passes its check. An absent field is not checked. */
+function roomPatchIsValid(patch: RoomNotePatch, level: number): boolean {
+  // Known and visited are one three-way state — clear, known, visited — so
+  // a patch claiming both is a gesture that cannot happen.
+  if (patch.known === true && patch.visited === true) return false;
+  return ROOM_PATCH_FIELDS.every((field) => {
+    const value = patch[field];
+    const check = ROOM_PATCH_CHECKS[field] as ((value: unknown, level: number) => boolean) | null;
+    return value === undefined || check === null || check(value, level);
   });
+}
 
-  switch (action.type) {
-    case 'cycleItem': {
-      const def = ITEMS_BY_ID.get(action.id);
-      if (!def) return state;
-      const current = state.items[action.id] ?? 0;
-      const limit = maxValue(def);
-      // Both kinds wrap back round to 0, so a click past the top clears.
-      const next = (current + action.direction + (limit + 1)) % (limit + 1);
-      if (next === current) return state;
-      return bump({ items: { ...state.items, [action.id]: next } });
-    }
+/** The room a valid patch describes, held to the rules the single-field actions keep. */
+function mergeRoomPatch(current: RoomNote, patch: RoomNotePatch, collected: boolean): RoomNote {
+  const merged: RoomNote = {
+    ...current,
+    ...patch,
+    doors: { ...current.doors, ...patch.doors },
+    // Bookkeeping for the eviction order, not a fact about the room, so it
+    // is never taken from a caller — `pairTransport` is what stamps it.
+    transportSeq: current.transportSeq,
+    collected,
+  };
+  // Setting one side of the known / visited pair clears the other. Every
+  // gesture that records a room as walked — a sheet click, a boss, a
+  // staircase — arrives here as `visited: true`, and takes the premark off.
+  if (patch.visited === true) merged.known = false;
+  if (patch.known === true) merged.visited = false;
+  // Same two rules the single-field actions enforce, so a patch cannot
+  // reach a state a sequence of clicks could not.
+  if (merged.stairs !== 'transport') {
+    merged.transport = 0;
+    merged.transportSeq = 0;
+  }
+  return merged;
+}
 
-    case 'setItem': {
-      const value = clampItem(action.id, action.value);
-      if ((state.items[action.id] ?? 0) === value) return state;
-      return bump({ items: { ...state.items, [action.id]: value } });
-    }
+const ROOM_HANDLERS: Pick<
+  Handlers,
+  | 'setLevelStart'
+  | 'setRoomDoor'
+  | 'setRoomItem'
+  | 'collectRoom'
+  | 'setRoomFrom'
+  | 'setRoomBoss'
+  | 'placeRoomTransport'
+  | 'clearRoomTransport'
+  | 'setRoomNote'
+  | 'clearRooms'
+> = {
+  setLevelStart(state, action, bump) {
+    if (!isRoomLevel(action.level)) return state;
+    if (action.room !== '' && !isRoomId(action.room)) return state;
+    const key = String(action.level);
+    const current = state.levelStarts[key] ?? '';
+    const room = action.room === current ? '' : action.room;
+    if (room === current) return state;
+    const levelStarts = { ...state.levelStarts };
+    if (room) levelStarts[key] = room;
+    else delete levelStarts[key];
+    return bump({ levelStarts });
+  },
 
-    case 'setDungeon': {
-      const key = String(action.level);
-      const current = state.dungeons[key] ?? emptyDungeon();
-      const next = { ...current, ...action.patch };
-      if (next.triforce === current.triforce) return state;
-      return bump({ dungeons: { ...state.dungeons, [key]: next } });
-    }
-
-    case 'cycleMark': {
-      const current = state.marks[action.screen] ?? 'none';
-      const next = cycleMark(current, action.direction);
-      return bump(writeMark(state, action.screen, next));
-    }
-
-    case 'setMark': {
-      const written = writeMark(state, action.screen, action.mark);
-      const unchanged =
-        (state.marks[action.screen] ?? 'none') === action.mark &&
-        (written.screenNotes ?? state.screenNotes) === state.screenNotes;
-      return unchanged ? state : bump(written);
-    }
-
-    case 'setScreenNote': {
-      const edited = editScreenNote(state, action.screen, action.patch);
-      return edited ? bump(edited) : state;
-    }
-
-    case 'markScreen': {
-      const marked = { ...state, ...writeMark(state, action.screen, action.mark) };
-      const edited = editScreenNote(marked, action.screen, action.patch);
-      const markChanged = (state.marks[action.screen] ?? 'none') !== action.mark;
-      if (!edited && !markChanged && marked.screenNotes === state.screenNotes) return state;
-      return bump({ marks: marked.marks, screenNotes: marked.screenNotes, ...edited });
-    }
-
-    case 'placeDungeon': {
-      const level = Math.min(Math.max(Math.trunc(action.level) || 0, 1), 9);
-      const marks = { ...state.marks };
-      const screenNotes = { ...state.screenNotes };
-
-      /*
-       * A level exists once. Marking it somewhere new means the old spot was
-       * wrong, so the marker moves rather than duplicating — two screens both
-       * claiming Level 3 is worse than no marker at all, because you cannot
-       * tell which one to walk to.
-       *
-       * The blockers travel with it: they belong to the dungeon, not to the
-       * square of grass it was mistakenly pinned on. Nothing else does — a
-       * shop's stock or a coast spot belongs to the screen it was recorded
-       * on — and they join any the new screen already lists rather than
-       * being hidden under them.
-       */
-      const carried: string[] = [];
-      for (const [screen, note] of Object.entries(screenNotes)) {
-        if (screen === action.screen || note.dungeon !== level) continue;
-        carried.push(...note.blocks);
-        delete screenNotes[screen];
-        delete marks[screen];
-      }
-
-      marks[action.screen] = 'dungeon';
-      const target = { ...emptyNote(), ...screenNotes[action.screen] };
-      const placed: ScreenNote = {
-        ...target,
-        blocks: [...new Set([...target.blocks, ...carried])].sort(),
-        dungeon: level,
-      };
-      return bump({ marks, screenNotes: pruneNote(screenNotes, marks, action.screen, placed) });
-    }
-
-    case 'placeStairway': {
-      const number = Math.min(Math.max(Math.trunc(action.number) || 0, 1), OVERWORLD_STAIRWAY_COUNT);
-      const marks = { ...state.marks };
-      const screenNotes = { ...state.screenNotes };
-
-      /*
-       * Same rule as a level: there is one stairway 2, so marking a new one
-       * means the old one was wrong and the marker moves rather than
-       * duplicating. Nothing is carried across — a stairway note holds only
-       * its number, unlike a dungeon, whose blockers belong to the dungeon.
-       */
-      for (const [screen, note] of Object.entries(screenNotes)) {
-        if (screen === action.screen || note.stairway !== number) continue;
-        delete screenNotes[screen];
-        delete marks[screen];
-      }
-
-      marks[action.screen] = 'stairway';
-      const placed: ScreenNote = {
-        ...emptyNote(),
-        ...screenNotes[action.screen],
-        stairway: number,
-      };
-      return bump({ marks, screenNotes: pruneNote(screenNotes, marks, action.screen, placed) });
-    }
-
-    case 'toggleDungeonBlock': {
-      // Blockers belong to a dungeon. With the dungeon brush armed the card
-      // offers them for whatever screen is selected, so this is reachable on a
-      // shop; refusing keeps an invisible blocker off it.
-      if (state.marks[action.screen] !== 'dungeon') return state;
-      const current = state.screenNotes[action.screen] ?? emptyNote();
-      const held = current.blocks.includes(action.block);
-      const next: ScreenNote = {
-        ...current,
-        blocks: held
-          ? current.blocks.filter((id) => id !== action.block)
-          : [...current.blocks, action.block].sort(),
-      };
-      return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
-    }
-
-    case 'clearMap':
-      /*
-       * Deliberately only the map. A run ends with most of 128 screens marked
-       * and none of it is worth carrying into the next seed, but the items and
-       * Triforce have their own controls — wiping those here would make this a
-       * second Reset wearing a friendlier label.
-       */
-      if (
-        Object.keys(state.marks).length === 0 &&
-        Object.keys(state.screenNotes).length === 0 &&
-        state.startScreen === ''
-      ) {
-        return state;
-      }
-      // The start pennant is on the map, so it goes with it.
-      return bump({ marks: {}, screenNotes: {}, startScreen: '' });
-
-    case 'setStartScreen': {
-      if (action.screen !== '' && !isScreenId(action.screen)) return state;
-      const startScreen = action.screen === state.startScreen ? '' : action.screen;
-      if (startScreen === state.startScreen) return state;
-      return bump({ startScreen });
-    }
-
-    case 'setLevelStart': {
-      if (!isRoomLevel(action.level)) return state;
-      if (action.room !== '' && !isRoomId(action.room)) return state;
-      const key = String(action.level);
-      const current = state.levelStarts[key] ?? '';
-      const room = action.room === current ? '' : action.room;
-      if (room === current) return state;
-      const levelStarts = { ...state.levelStarts };
-      if (room) levelStarts[key] = room;
-      else delete levelStarts[key];
-      return bump({ levelStarts });
-    }
-
-    case 'collectScreen': {
-      const current = state.screenNotes[action.screen];
-      // Checked rather than trusted from the type: this arrives over a
-      // BroadcastChannel too, where nothing has been through the compiler.
-      if (typeof action.collected !== 'boolean') return state;
-      // Nothing on the screen means nothing to have picked up. Storing the
-      // flag anyway would outlive the item it was about the moment one is set.
-      if (!current || current.item === '') return state;
-      if (current.collected === action.collected) return state;
-      const next: ScreenNote = { ...current, collected: action.collected };
-      const screenNotes = pruneNote(state.screenNotes, state.marks, action.screen, next);
-      if (!action.collected) return bump({ screenNotes });
-      return bump({ screenNotes, items: grantPoolEntry(state.items, current.item) });
-    }
-
-    case 'toggleShopStock': {
-      const current = state.screenNotes[action.screen] ?? emptyNote();
-      const held = current.shop.includes(action.stock);
-      // The price belongs to the stock entry. Leaving it behind would put the
-      // old number back the next time the same item was ticked, which reads as
-      // the tracker inventing a price nobody saw.
-      const shopPrices = { ...current.shopPrices };
-      if (held) delete shopPrices[action.stock];
-      const next: ScreenNote = {
-        ...current,
-        shop: held
-          ? current.shop.filter((id) => id !== action.stock)
-          : // Sorted so two screens with the same stock serialise identically,
-            // and the icons never reorder as you tick them.
-            [...current.shop, action.stock].sort(),
-        shopPrices,
-      };
-      return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
-    }
-
-    case 'setShopPrice': {
-      const current = state.screenNotes[action.screen] ?? emptyNote();
-      // Rupees are whole and never negative, and anything unparseable reads as
-      // "no price" rather than as a number nobody can act on.
-      const price = Number.isFinite(action.price) ? Math.max(Math.trunc(action.price), 0) : 0;
-      // A price belongs to stock the shop carries; one for anything else would
-      // render nowhere. Clearing one is always allowed.
-      if (price !== 0 && !current.shop.includes(action.stock)) return state;
-      if ((current.shopPrices[action.stock] ?? 0) === price) return state;
-      const shopPrices = { ...current.shopPrices };
-      // 0 is the empty value, so it removes the key rather than being stored —
-      // same rule as a bare note, and it keeps exports free of `{"bomb":0}`.
-      if (price === 0) delete shopPrices[action.stock];
-      else shopPrices[action.stock] = price;
-      const next: ScreenNote = { ...current, shopPrices };
-      return bump({ screenNotes: pruneNote(state.screenNotes, state.marks, action.screen, next) });
-    }
-
-    case 'setRoomDoor': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
+  setRoomDoor(state, action, bump) {
+    return editRoom(state, bump, action.level, action.room, (current) => {
       // Checked against the tables rather than trusted from the type: this same
       // action arrives from a BroadcastChannel and from a save file, where
       // nothing has been through the compiler.
-      if (!isRoomSide(action.side) || !DOOR_STATES_BY_ID.has(action.state)) return state;
-      if (target.current.doors[action.side] === action.state) return state;
-      const next: RoomNote = {
-        ...target.current,
-        doors: { ...target.current.doors, [action.side]: action.state },
-      };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
-    }
+      if (!isRoomSide(action.side) || !DOOR_STATES_BY_ID.has(action.state)) return null;
+      if (current.doors[action.side] === action.state) return null;
+      return { ...current, doors: { ...current.doors, [action.side]: action.state } };
+    });
+  },
 
-    case 'setRoomItem': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
+  setRoomItem(state, action, bump) {
+    return editRoom(state, bump, action.level, action.room, (current) => {
       // '' is the empty value — "no item here" — so it clears rather than being
       // refused. Anything else has to be a real id, or the room would carry a
       // reference that renders as nothing and never goes away.
-      if (action.item !== '' && !ROOM_ITEMS_BY_ID.has(action.item)) return state;
-      if (target.current.item === action.item) return state;
+      if (action.item !== '' && !ROOM_ITEMS_BY_ID.has(action.item)) return null;
+      if (current.item === action.item) return null;
       /*
        * Where the item is, not that you have it. Granting it here would make a
        * map note silently fill in the inventory, and un-noting it could not
@@ -792,268 +933,262 @@ export function reduce(state: TrackerState, action: Action, now = Date.now()): T
        * there. The collected flag goes with the old item: it was about that
        * item, and a pickup of one says nothing about the next.
        */
-      const next: RoomNote = { ...target.current, item: action.item, collected: false };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
-    }
+      return { ...current, item: action.item, collected: false };
+    });
+  },
 
-    case 'collectRoom': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
-      if (typeof action.collected !== 'boolean') return state;
-      // An empty room has nothing to have picked up, and a flag stored on one
-      // would be about whichever item was placed there next.
-      if (target.current.item === '') return state;
-      if (target.current.collected === action.collected) return state;
-      const next: RoomNote = { ...target.current, collected: action.collected };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      const rooms = writeRooms(state.rooms, target.level, levelRooms);
-      // Un-collecting never revokes, the same promise `collectLocation` makes:
-      // the inventory may have been raised by other means since.
-      if (!action.collected) return bump({ rooms });
-      return bump({ rooms, items: grantPoolEntry(state.items, target.current.item) });
-    }
+  collectRoom(state, action, bump) {
+    const target = roomTarget(state, action.level, action.room);
+    if (!target) return state;
+    if (typeof action.collected !== 'boolean') return state;
+    // An empty room has nothing to have picked up, and a flag stored on one
+    // would be about whichever item was placed there next.
+    if (target.current.item === '') return state;
+    if (target.current.collected === action.collected) return state;
+    const next: RoomNote = { ...target.current, collected: action.collected };
+    const rooms = roomsWith(state, target, action.room, next);
+    // Un-collecting never revokes, the same promise `collectLocation` makes:
+    // the inventory may have been raised by other means since.
+    if (!action.collected) return bump({ rooms });
+    return bump({ rooms, items: grantPoolEntry(state.items, target.current.item) });
+  },
 
-    case 'setRoomFrom': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
+  setRoomFrom(state, action, bump) {
+    return editRoom(state, bump, action.level, action.room, (current) => {
       // Refused, not defaulted: an unknown value is a caller bug, and reading
       // it as `auto` would move the item to a slot nobody chose.
-      if (!isRoomFrom(action.from)) return state;
-      if (target.current.from === action.from) return state;
-      const next: RoomNote = { ...target.current, from: action.from };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
-    }
+      if (!isRoomFrom(action.from)) return null;
+      if (current.from === action.from) return null;
+      return { ...current, from: action.from };
+    });
+  },
 
-    case 'setRoomBoss': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
+  setRoomBoss(state, action, bump) {
+    return editRoom(state, bump, action.level, action.room, (current) => {
       // Ganon and Zelda exist in Level 9 and nowhere else, so this refuses
       // rather than clamps: there is no nearby value to fall back to, and
       // storing one would draw a room that cannot exist.
-      if (action.boss !== '' && !bossAllowedOnLevel(action.boss, action.level)) return state;
-      if (target.current.boss === action.boss) return state;
-      const next: RoomNote = { ...target.current, boss: action.boss };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
-    }
+      if (action.boss !== '' && !bossAllowedOnLevel(action.boss, action.level)) return null;
+      if (current.boss === action.boss) return null;
+      return { ...current, boss: action.boss };
+    });
+  },
 
-    case 'placeRoomTransport': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
-      // Refused, not clamped: a 7 or a 2.5 is a caller bug, and quietly turning
-      // it into a 4 would pair two rooms the player never paired.
-      if (!Number.isInteger(action.number)) return state;
-      if (action.number < 1 || action.number > ROOM_TRANSPORT_MAX) return state;
-      // Re-placing the number a room already holds would restamp it as the
-      // newest of the pair, which would change which room an eviction picks.
-      if (target.current.transport === action.number) return state;
-      const levelRooms = pairTransport(
-        state.rooms[target.level] ?? {},
-        action.room,
-        target.current,
-        action.number,
-      );
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
-    }
+  placeRoomTransport(state, action, bump) {
+    const target = roomTarget(state, action.level, action.room);
+    if (!target) return state;
+    // Refused, not clamped: a 7 or a 2.5 is a caller bug, and quietly turning
+    // it into a 4 would pair two rooms the player never paired.
+    if (!Number.isInteger(action.number)) return state;
+    if (action.number < 1 || action.number > ROOM_TRANSPORT_MAX) return state;
+    // Re-placing the number a room already holds would restamp it as the
+    // newest of the pair, which would change which room an eviction picks.
+    if (target.current.transport === action.number) return state;
+    const levelRooms = pairTransport(
+      state.rooms[target.level] ?? {},
+      action.room,
+      target.current,
+      action.number,
+    );
+    return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
+  },
 
-    case 'clearRoomTransport': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
-      if (target.current.transport === 0) return state;
+  clearRoomTransport(state, action, bump) {
+    return editRoom(state, bump, action.level, action.room, (current) => {
+      if (current.transport === 0) return null;
       // The staircase stays; only the number goes.
-      const next: RoomNote = { ...target.current, transport: 0, transportSeq: 0 };
-      const levelRooms = { ...state.rooms[target.level], [action.room]: next };
-      return bump({ rooms: writeRooms(state.rooms, target.level, levelRooms) });
-    }
+      return { ...current, transport: 0, transportSeq: 0 };
+    });
+  },
 
-    case 'setRoomNote': {
-      const target = roomTarget(state, action.level, action.room);
-      if (!target) return state;
-      const patch = action.patch;
+  setRoomNote(state, action, bump) {
+    const target = roomTarget(state, action.level, action.room);
+    if (!target) return state;
+    const patch = action.patch;
 
-      /*
-       * One bad field refuses the whole patch rather than being dropped from
-       * it. A patch is one user gesture — a detail strip committing several
-       * fields together — so applying the half that parsed would record a room
-       * the player never described.
-       */
-      if (patch.visited !== undefined && typeof patch.visited !== 'boolean') return state;
-      if (patch.known !== undefined && typeof patch.known !== 'boolean') return state;
-      // Known and visited are one three-way state — clear, known, visited — so
-      // a patch claiming both is a gesture that cannot happen.
-      if (patch.known === true && patch.visited === true) return state;
-      if (patch.item !== undefined && patch.item !== '' && !ROOM_ITEMS_BY_ID.has(patch.item)) {
-        return state;
-      }
-      if (patch.boss !== undefined && patch.boss !== '') {
-        if (!bossAllowedOnLevel(patch.boss, action.level)) return state;
-      }
-      if (patch.stairs !== undefined && !ROOM_STAIRS_BY_ID.has(patch.stairs)) return state;
-      if (patch.doors !== undefined) {
-        for (const [side, door] of Object.entries(patch.doors)) {
-          if (!isRoomSide(side)) return state;
-          if (typeof door !== 'string' || !DOOR_STATES_BY_ID.has(door)) return state;
-        }
-      }
-      if (patch.transport !== undefined) {
-        if (!Number.isInteger(patch.transport)) return state;
-        if (patch.transport < 0 || patch.transport > ROOM_TRANSPORT_MAX) return state;
-      }
-      if (patch.from !== undefined && !isRoomFrom(patch.from)) return state;
-      if (patch.collected !== undefined && typeof patch.collected !== 'boolean') return state;
-      if (patch.ladder !== undefined && typeof patch.ladder !== 'boolean') return state;
-      if (patch.layout !== undefined && !isRoomLayout(patch.layout)) return state;
-      if (patch.pushBlock !== undefined && !isRoomPushBlock(patch.pushBlock)) return state;
-      if (patch.cleared !== undefined && typeof patch.cleared !== 'boolean') return state;
-      // Same refusal as `collectRoom`: collecting an empty room is not a fact.
-      const item = patch.item ?? target.current.item;
-      if (patch.collected === true && item === '') return state;
-      const settled = settleCollected(target.current, item, patch.collected);
+    /*
+     * One bad field refuses the whole patch rather than being dropped from
+     * it. A patch is one user gesture — a detail strip committing several
+     * fields together — so applying the half that parsed would record a room
+     * the player never described.
+     */
+    if (!roomPatchIsValid(patch, action.level)) return state;
+    // Same refusal as `collectRoom`: collecting an empty room is not a fact.
+    const item = patch.item ?? target.current.item;
+    if (patch.collected === true && item === '') return state;
+    const settled = settleCollected(target.current, item, patch.collected);
+    const merged = mergeRoomPatch(target.current, patch, settled.collected);
 
-      const merged: RoomNote = {
-        ...target.current,
-        ...patch,
-        doors: { ...target.current.doors, ...patch.doors },
-        // Bookkeeping for the eviction order, not a fact about the room, so it
-        // is never taken from a caller — `pairTransport` is what stamps it.
-        transportSeq: target.current.transportSeq,
-        collected: settled.collected,
-      };
-      // Setting one side of the known / visited pair clears the other. Every
-      // gesture that records a room as walked — a sheet click, a boss, a
-      // staircase — arrives here as `visited: true`, and takes the premark off.
-      if (patch.visited === true) merged.known = false;
-      if (patch.known === true) merged.visited = false;
-      // Same two rules the single-field actions enforce, so a patch cannot
-      // reach a state a sequence of clicks could not.
-      if (merged.stairs !== 'transport') {
-        merged.transport = 0;
-        merged.transportSeq = 0;
-      }
+    const existing = state.rooms[target.level] ?? {};
+    const levelRooms =
+      merged.transport !== 0 && merged.transport !== target.current.transport
+        ? pairTransport(existing, action.room, merged, merged.transport)
+        : { ...existing, [action.room]: merged };
+    const rooms = writeRooms(state.rooms, target.level, levelRooms);
+    if (!settled.picked) return bump({ rooms });
+    return bump({ rooms, items: grantPoolEntry(state.items, merged.item) });
+  },
 
-      const existing = state.rooms[target.level] ?? {};
-      const levelRooms =
-        merged.transport !== 0 && merged.transport !== target.current.transport
-          ? pairTransport(existing, action.room, merged, merged.transport)
-          : { ...existing, [action.room]: merged };
-      const rooms = writeRooms(state.rooms, target.level, levelRooms);
-      if (!settled.picked) return bump({ rooms });
-      return bump({ rooms, items: grantPoolEntry(state.items, merged.item) });
-    }
+  clearRooms(state, action, bump) {
+    const key = String(action.level);
+    if (!(key in state.rooms) && !(key in state.levelStarts)) return state;
+    /*
+     * One level, not all nine. The room map is the thing you redraw when you
+     * realise you mapped a level wrong, and losing the other eight to that
+     * mistake would be worse than the mistake.
+     */
+    const rooms = { ...state.rooms };
+    delete rooms[key];
+    // The entrance is drawn on the sheet, so clearing the sheet clears it.
+    const levelStarts = { ...state.levelStarts };
+    delete levelStarts[key];
+    return bump({ rooms, levelStarts });
+  },
+};
 
-    case 'clearRooms': {
-      const key = String(action.level);
-      if (!(key in state.rooms) && !(key in state.levelStarts)) return state;
-      /*
-       * One level, not all nine. The room map is the thing you redraw when you
-       * realise you mapped a level wrong, and losing the other eight to that
-       * mistake would be worse than the mistake.
-       */
-      const rooms = { ...state.rooms };
-      delete rooms[key];
-      // The entrance is drawn on the sheet, so clearing the sheet clears it.
-      const levelStarts = { ...state.levelStarts };
-      delete levelStarts[key];
-      return bump({ rooms, levelStarts });
-    }
+function otherQuest(quest: SeedSettings['questLow']): SeedSettings['questLow'] {
+  return quest === '1st' ? '2nd' : '1st';
+}
 
-    case 'setSeed': {
-      const seed = { ...state.seed, ...action.patch };
-      // Mixed Quest guarantees 1-6 and 7-9 come from different quests, so
-      // setting one half implies the other rather than allowing an impossible
-      // "both 1st Quest" that would show the wrong item slots.
-      if (questsMustDiffer(seed.dungeonQuest)) {
-        if (action.patch.questLow && !action.patch.questHigh) {
-          seed.questHigh = seed.questLow === '1st' ? '2nd' : '1st';
-        } else if (action.patch.questHigh && !action.patch.questLow) {
-          seed.questLow = seed.questHigh === '1st' ? '2nd' : '1st';
-        } else if (seed.questLow === seed.questHigh) {
-          seed.questHigh = seed.questLow === '1st' ? '2nd' : '1st';
-        }
-      }
-      // Mirroring moves the coast between F16 and F1, so the Coast spot moves
-      // with it: off the old screen's item and onto the new one's.
-      if (seed.mirroredOverworld !== state.seed.mirroredOverworld) {
-        const screenNotes: Record<string, ScreenNote> = {};
-        for (const [screen, note] of Object.entries(state.screenNotes)) {
-          screenNotes[screen] = {
-            ...note,
-            spot: conformSpot(screen, note.spot, note.item, seed.mirroredOverworld),
-          };
-        }
-        return bump({ seed, screenNotes });
-      }
-      return bump({ seed });
-    }
-
-    case 'collectLocation': {
-      const current = state.locations[action.id] ?? { item: '', collected: false };
-      if (typeof action.collected !== 'boolean' || current.collected === action.collected) return state;
-      // Same refusal as `collectRoom` and `collectScreen`: an entry with no
-      // known item has nothing to have collected. Clearing one an older save
-      // holds is still allowed.
-      if (action.collected && current.item === '') return state;
-      const locations = {
-        ...state.locations,
-        [action.id]: { ...current, collected: action.collected },
-      };
-
-      if (!action.collected) return bump({ locations });
-      // A Heart Container records where it was without touching inventory —
-      // see `grantPoolEntry`, which every collect gesture shares.
-      return bump({ locations, items: grantPoolEntry(state.items, current.item) });
-    }
-
-    case 'addHint': {
-      const seq = state.hintSeq + 1;
-      const hint: HintEntry = { id: `h${seq}`, subject: '', region: '', screen: '', note: '' };
-      return bump({ hints: [...state.hints, hint], hintSeq: seq });
-    }
-
-    case 'updateHint': {
-      const index = state.hints.findIndex((hint) => hint.id === action.id);
-      if (index < 0) return state;
-      const current = state.hints[index]!;
-      const next = { ...current, ...action.patch, id: current.id };
-      const fields = Object.keys(next) as (keyof HintEntry)[];
-      if (fields.every((field) => next[field] === current[field])) return state;
-      const hints = state.hints.map((hint, i) => (i === index ? next : hint));
-      return bump({ hints });
-    }
-
-    case 'removeHint': {
-      const hints = state.hints.filter((hint) => hint.id !== action.id);
-      if (hints.length === state.hints.length) return state;
-      // Don't leave the map highlighting a region no hint mentions any more.
-      const stillReferenced = hints.some((hint) => hint.region === state.focusRegion);
-      return bump({ hints, focusRegion: stillReferenced ? state.focusRegion : '' });
-    }
-
-    case 'focusRegion': {
-      const next = state.focusRegion === action.region ? '' : action.region;
-      if (next === state.focusRegion) return state;
-      return bump({ focusRegion: next });
-    }
-
-    case 'replace':
-      // A peer's state is adopted whole, `rev` included, so both windows land
-      // on the same counter and neither treats the other as stale afterwards.
-      return { ...action.state, updatedAt: now };
-
-    case 'import':
-      // A file the user just opened here wins over whatever peers hold, so its
-      // `rev` is lifted above both sides rather than adopted as-is.
-      return {
-        ...action.state,
-        rev: Math.max(state.rev, action.state.rev ?? 0) + 1,
-        updatedAt: now,
-      };
-
-    case 'reset':
-      return { ...createInitialState(now), rev: state.rev + 1 };
+/**
+ * Mixed Quest guarantees 1-6 and 7-9 come from different quests, so setting
+ * one half implies the other rather than allowing an impossible "both 1st
+ * Quest" that would show the wrong item slots.
+ *
+ * Writes into `seed`, which the caller has already copied.
+ */
+function pairQuests(seed: SeedSettings, patch: Partial<SeedSettings>): void {
+  if (!questsMustDiffer(seed.dungeonQuest)) return;
+  if (patch.questLow && !patch.questHigh) {
+    seed.questHigh = otherQuest(seed.questLow);
+  } else if (patch.questHigh && !patch.questLow) {
+    seed.questLow = otherQuest(seed.questHigh);
+  } else if (seed.questLow === seed.questHigh) {
+    seed.questHigh = otherQuest(seed.questLow);
   }
+}
+
+/** Every note with its Coast spot re-fitted to the screen that is the coast now. */
+function respotNotes(notes: Record<string, ScreenNote>, mirrored: boolean): Record<string, ScreenNote> {
+  const screenNotes: Record<string, ScreenNote> = {};
+  for (const [screen, note] of Object.entries(notes)) {
+    screenNotes[screen] = {
+      ...note,
+      spot: conformSpot(screen, note.spot, note.item, mirrored),
+    };
+  }
+  return screenNotes;
+}
+
+const SEED_HANDLERS: Pick<Handlers, 'setSeed' | 'collectLocation'> = {
+  setSeed(state, action, bump) {
+    const seed = { ...state.seed, ...action.patch };
+    pairQuests(seed, action.patch);
+    // Mirroring moves the coast between F16 and F1, so the Coast spot moves
+    // with it: off the old screen's item and onto the new one's.
+    if (seed.mirroredOverworld === state.seed.mirroredOverworld) return bump({ seed });
+    return bump({ seed, screenNotes: respotNotes(state.screenNotes, seed.mirroredOverworld) });
+  },
+
+  collectLocation(state, action, bump) {
+    const current = state.locations[action.id] ?? { item: '', collected: false };
+    if (typeof action.collected !== 'boolean' || current.collected === action.collected) return state;
+    // Same refusal as `collectRoom` and `collectScreen`: an entry with no
+    // known item has nothing to have collected. Clearing one an older save
+    // holds is still allowed.
+    if (action.collected && current.item === '') return state;
+    const locations = {
+      ...state.locations,
+      [action.id]: { ...current, collected: action.collected },
+    };
+
+    if (!action.collected) return bump({ locations });
+    // A Heart Container records where it was without touching inventory —
+    // see `grantPoolEntry`, which every collect gesture shares.
+    return bump({ locations, items: grantPoolEntry(state.items, current.item) });
+  },
+};
+
+const HINT_HANDLERS: Pick<Handlers, 'addHint' | 'updateHint' | 'removeHint' | 'focusRegion'> = {
+  addHint(state, _action, bump) {
+    const seq = state.hintSeq + 1;
+    const hint: HintEntry = { id: `h${seq}`, subject: '', region: '', screen: '', note: '' };
+    return bump({ hints: [...state.hints, hint], hintSeq: seq });
+  },
+
+  updateHint(state, action, bump) {
+    const index = state.hints.findIndex((hint) => hint.id === action.id);
+    if (index < 0) return state;
+    const current = state.hints[index]!;
+    const next = { ...current, ...action.patch, id: current.id };
+    const fields = Object.keys(next) as (keyof HintEntry)[];
+    if (fields.every((field) => next[field] === current[field])) return state;
+    const hints = state.hints.map((hint, i) => (i === index ? next : hint));
+    return bump({ hints });
+  },
+
+  removeHint(state, action, bump) {
+    const hints = state.hints.filter((hint) => hint.id !== action.id);
+    if (hints.length === state.hints.length) return state;
+    // Don't leave the map highlighting a region no hint mentions any more.
+    const stillReferenced = hints.some((hint) => hint.region === state.focusRegion);
+    return bump({ hints, focusRegion: stillReferenced ? state.focusRegion : '' });
+  },
+
+  focusRegion(state, action, bump) {
+    const next = state.focusRegion === action.region ? '' : action.region;
+    if (next === state.focusRegion) return state;
+    return bump({ focusRegion: next });
+  },
+};
+
+const LIFECYCLE_HANDLERS: Pick<Handlers, 'replace' | 'import' | 'reset'> = {
+  replace(_state, action, _bump, now) {
+    // A peer's state is adopted whole, `rev` included, so both windows land
+    // on the same counter and neither treats the other as stale afterwards.
+    return { ...action.state, updatedAt: now };
+  },
+
+  import(state, action, _bump, now) {
+    // A file the user just opened here wins over whatever peers hold, so its
+    // `rev` is lifted above both sides rather than adopted as-is.
+    return {
+      ...action.state,
+      rev: Math.max(state.rev, action.state.rev ?? 0) + 1,
+      updatedAt: now,
+    };
+  },
+
+  reset(state, _action, _bump, now) {
+    return { ...createInitialState(now), rev: state.rev + 1 };
+  },
+};
+
+const HANDLERS: Handlers = {
+  ...ITEM_HANDLERS,
+  ...MARK_HANDLERS,
+  ...SCREEN_NOTE_HANDLERS,
+  ...ROOM_HANDLERS,
+  ...SEED_HANDLERS,
+  ...HINT_HANDLERS,
+  ...LIFECYCLE_HANDLERS,
+};
+
+export function reduce(state: TrackerState, action: Action, now = Date.now()): TrackerState {
+  const bump: Bump = (patch) => ({
+    ...state,
+    ...patch,
+    rev: state.rev + 1,
+    updatedAt: now,
+  });
+
+  // Own keys only. An action that arrives over a BroadcastChannel has not been
+  // through the compiler, and a type such as `toString` must not reach
+  // Object.prototype. An unknown type changes nothing.
+  const handler = Object.prototype.hasOwnProperty.call(HANDLERS, action.type)
+    ? (HANDLERS[action.type] as Handler<Action['type']>)
+    : undefined;
+  return handler ? handler(state, action, bump, now) : state;
 }
 
 export type Listener = (state: TrackerState, action: Action | null) => void;

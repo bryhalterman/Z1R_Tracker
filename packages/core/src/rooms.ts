@@ -400,21 +400,37 @@ export function emptyRoom(): RoomNote {
   };
 }
 
+/**
+ * The flags a bare room has none of. Read for truthiness rather than compared
+ * with `false`, so a flag a patch left `undefined` still reads as unset.
+ */
+const ROOM_FLAGS = ['visited', 'known', 'collected', 'ladder', 'cleared'] as const;
+
+/**
+ * The value every other field holds on a bare room. `transportSeq` is left out
+ * on purpose: it is eviction bookkeeping, meaningless without a `transport`
+ * number, so it never holds a room up on its own.
+ */
+const BARE_ROOM_VALUES: Pick<
+  RoomNote,
+  'item' | 'boss' | 'stairs' | 'transport' | 'from' | 'layout' | 'pushBlock'
+> = {
+  item: '',
+  boss: '',
+  stairs: 'none',
+  transport: 0,
+  from: 'auto',
+  layout: '',
+  pushBlock: '',
+};
+
+const BARE_ROOM_FIELDS = Object.keys(BARE_ROOM_VALUES) as (keyof typeof BARE_ROOM_VALUES)[];
+
 /** True once a room carries nothing worth keeping. */
 export function roomIsBare(room: RoomNote): boolean {
   return (
-    !room.visited &&
-    !room.known &&
-    room.item === '' &&
-    room.boss === '' &&
-    room.stairs === 'none' &&
-    room.transport === 0 &&
-    !room.collected &&
-    room.from === 'auto' &&
-    !room.ladder &&
-    room.layout === '' &&
-    room.pushBlock === '' &&
-    !room.cleared &&
+    ROOM_FLAGS.every((flag) => !room[flag]) &&
+    BARE_ROOM_FIELDS.every((field) => room[field] === BARE_ROOM_VALUES[field]) &&
     ROOM_SIDES.every((side) => room.doors[side] === 'unknown')
   );
 }
