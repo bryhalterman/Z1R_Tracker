@@ -28,15 +28,15 @@
 @source "./components";
 
 /* The tracker is dark-only, so shadcn's `dark:` styles always apply. */
-@custom-variant dark (&:where(.spectrum, .spectrum *));
+@custom-variant dark (&:where(:root, :root *));
 
 /*
- * shadcn's theme variables, bound to the tracker's own Spectrum aliases rather
- * than shadcn's palette, so the card matches the panels around it and
- * `theme:check` still measures the colours it uses. On `.spectrum` — the page
- * body — because popovers and select lists are portalled out of their panel.
+ * shadcn's theme variables, bound to the tracker's own aliases rather than
+ * shadcn's palette, so the card matches the panels around it and
+ * `theme:check` still measures the colors it uses. On `:root`, like the
+ * aliases, because popovers and select lists are portalled out of their panel.
  */
-.spectrum {
+:root {
   --background: var(--z1r-field);
   --foreground: var(--z1r-text);
   --card: var(--z1r-field);
@@ -61,8 +61,8 @@
    * The steps again, as runtime variables. The `@theme` block below inlines
    * them into `rounded-*`, but the components also write
    * `rounded-[min(var(--radius-md),12px)]`, which reads the variable itself —
-   * and Tailwind declares that on `:root`, above `.spectrum`, where the
-   * tracker's tokens are not defined yet. Declared here, it resolves.
+   * and Tailwind declares its own default for it on `:root` in the theme
+   * layer. Declared here, unlayered, the tracker's step wins.
    */
   --radius-sm: var(--z1r-radius-cell);
   --radius-md: var(--z1r-radius);

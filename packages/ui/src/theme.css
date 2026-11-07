@@ -1,63 +1,49 @@
 /*
- * Theme layer — Adobe Spectrum tokens bound to the tracker's semantic names.
+ * Theme layer — the tracker's semantic names, bound to literal values.
  *
- * Everything the tracker's chrome paints resolves to a Spectrum token. The
- * exceptions are deliberate and live outside this file: `overworld.ts` and
- * `regions.ts` hold categorical map colours, and `styles.css` keeps one `#000`
- * for overlay text outlines. Spectrum's scales carry
- * documented contrast behaviour, so "is this readable" becomes a property of
- * the step you chose rather than something to remember to check.
+ * This file is where the tracker's colors are chosen; everything the chrome
+ * paints reads one of these names, and so does the OBS setup page, which
+ * imports this file on its own. The exceptions are deliberate, live outside
+ * this file, and are listed in the Theming section of `docs/ARCHITECTURE.md`:
+ * categorical map colors, black outlines over busy art, the finished
+ * Triforce's highlight, and the shadcn backdrop scrim.
  *
- * The step numbers below aren't arbitrary. Against the `gray-100` panel,
- * Spectrum's 1000 step is where a hue first clears WCAG AA (4.5:1) — measured,
- * not assumed. `npm run theme:check` re-measures every pair we render and
- * fails if one drops below AA.
+ * The values are the ones Adobe Spectrum's dark theme and medium scale resolved
+ * to while the tracker imported that package. They were copied in when it was
+ * dropped, so nothing on screen changed — but they are now plain values, and
+ * nothing re-checks them against a design system. `npm run theme:check`
+ * measures every foreground/background pair the tracker renders and fails
+ * below WCAG AA (4.5:1); run it after changing any color here.
  *
- * Only the dark theme and the `medium` (desktop) scale are imported. Pulling
- * the light and large sets too would roughly double the CSS for variables
- * nothing references.
+ * On `:root` so the page shell, every mount root and every popup portalled to
+ * the body all see the same values without opting in.
  */
 
-@import '@spectrum-css/tokens/dist/css/global-vars.css';
-@import '@spectrum-css/tokens/dist/css/medium-vars.css';
-@import '@spectrum-css/tokens/dist/css/dark-vars.css';
-
-/*
- * Bound to `.spectrum` itself rather than to the tracker's own roots, so the
- * page shell gets the palette too. Each app's `<body>` carries the Spectrum
- * classes; the mount roots add them as well, which is harmless when nested.
- *
- * The shells previously hand-picked #101218 / #e8e8ef / #8b90a0 / #d9a441 —
- * the last being the very hex this migration replaced. `theme:check` was
- * measuring text against a page background that was never rendered.
- */
-.spectrum {
+:root {
   /* Surfaces. */
-  --z1r-bg: var(--spectrum-gray-50);
-  --z1r-panel: var(--spectrum-gray-100);
+  --z1r-bg: #1b1b1b;
+  --z1r-panel: #2c2c2c;
   /* Wells: inputs and grouped rows, one step below the panel they sit on. */
-  --z1r-field: var(--spectrum-gray-75);
-  --z1r-inset: var(--spectrum-gray-200);
-  --z1r-border: var(--spectrum-gray-400);
+  --z1r-field: #222222;
+  --z1r-inset: #323232;
+  --z1r-border: #444444;
 
-  /* Text. gray-700 rather than gray-600 — 600 measures 4.05:1 and misses AA. */
-  --z1r-text: var(--spectrum-gray-900);
-  --z1r-muted: var(--spectrum-gray-700);
+  /* Text. The muted step was chosen at 6.37:1 on the panel; the step below it
+     measured 4.05:1 and missed AA. */
+  --z1r-text: #f2f2f2;
+  --z1r-muted: #afafaf;
 
-  /* Spectrum's guidance is to bind alias tokens, not the raw scale, so the
-     product tracks the design system as it moves. `yellow-visual-color`
-     resolves to yellow-1100 in dark — the same Triforce gold as the hand-picked
-     #d9a441 it replaced — and clears AA at 5.95:1. */
-  --z1r-accent: var(--spectrum-yellow-visual-color);
-  --z1r-good: var(--spectrum-green-1000);
-  --z1r-bad: var(--spectrum-red-1000);
+  /* Triforce gold, 5.95:1 on the panel. */
+  --z1r-accent: #da9f00;
+  --z1r-good: #0eaf62;
+  --z1r-bad: #ff6756;
 
   /* The room drawing's stairway: its dotted edges and the transport tile. */
-  --z1r-stair: var(--spectrum-purple-1000);
+  --z1r-stair: #ba7fed;
   /* Room layout squares. Drawn shapes, never text, and each square kind has a
      shape of its own as well — so these are fills, not readability pairs. */
-  --z1r-water: var(--spectrum-blue-900);
-  --z1r-sand: var(--spectrum-orange-900);
+  --z1r-water: #5681ff;
+  --z1r-sand: #e06400;
 
   /* Geometry. */
   /*
@@ -69,40 +55,35 @@
    * Edges drawn as ruled lines (the room sheet's paper, a divider) stay square.
    * The React components read the same three through `shadcn.css`.
    */
-  --z1r-radius-panel: var(--spectrum-corner-radius-100);
-  --z1r-radius: var(--spectrum-corner-radius-75);
+  --z1r-radius-panel: 8px;
+  --z1r-radius: 4px;
   --z1r-radius-cell: calc(var(--z1r-radius) / 2);
-  --z1r-border-width: var(--spectrum-border-width-100);
-  --z1r-border-width-thick: var(--spectrum-border-width-200);
+  --z1r-border-width: 1px;
+  --z1r-border-width-thick: 2px;
 
   /*
    * Keyboard focus: one gold outline on every control, plain DOM and React
-   * alike — see the focus rule in `styles.css`. Spectrum's thickness and gap,
-   * in the tracker's accent rather than Spectrum's blue, so focus matches the
-   * selected states it sits beside. An outline, so it is a shape as well as a
-   * color.
+   * alike — see the focus rule in `styles.css`. In the tracker's accent, so
+   * focus matches the selected states it sits beside. An outline, so it is a
+   * shape as well as a color.
    */
   --z1r-focus: var(--z1r-accent);
-  --z1r-focus-width: var(--spectrum-focus-indicator-thickness);
-  --z1r-focus-gap: var(--spectrum-focus-indicator-gap);
+  --z1r-focus-width: 2px;
+  --z1r-focus-gap: 2px;
 
   /* Spacing steps, used instead of ad-hoc pixel values. */
-  --z1r-space-sm: var(--spectrum-spacing-75); /* 4px */
-  --z1r-space-md: var(--spectrum-spacing-100); /* 8px */
-  --z1r-space-lg: var(--spectrum-spacing-200); /* 12px */
+  --z1r-space-sm: 4px;
+  --z1r-space-md: 8px;
+  --z1r-space-lg: 12px;
 
   /* Type. */
-  /* Not Spectrum's stack: it leads with Adobe Clean, a licensed font this repo
-     has no @font-face for, so it silently fell through to different typefaces
-     in different parts of the same window. */
   --z1r-font: system-ui, "Segoe UI", Roboto, -apple-system, sans-serif;
-  --z1r-font-mono: var(--spectrum-code-font-family-stack);
-  /* Spectrum's type scale stops at 11px. The overworld region codes and the
-     slot chips have to fit inside a ~60x40px grid cell, so they step below it
-     — derived from the token rather than hard-coded, so they track the scale. */
-  --z1r-text-2xs: calc(var(--spectrum-font-size-50) - 2px); /* 9px, smallest */
-  --z1r-text-xs: calc(var(--spectrum-font-size-50) - 1px); /* 10px */
-  --z1r-text-sm: var(--spectrum-font-size-50); /* 11px */
-  --z1r-text-md: var(--spectrum-font-size-75); /* 12px */
-  --z1r-text-lg: var(--spectrum-font-size-100); /* 14px */
+  --z1r-font-mono: "Source Code Pro", Monaco, monospace;
+  /* The overworld region codes and the slot chips have to fit inside a
+     ~60x40px grid cell, so the two smallest steps sit below body text. */
+  --z1r-text-2xs: 9px;
+  --z1r-text-xs: 10px;
+  --z1r-text-sm: 11px;
+  --z1r-text-md: 12px;
+  --z1r-text-lg: 14px;
 }

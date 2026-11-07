@@ -264,10 +264,7 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     mapsLayout: followMapsLayout = false,
   } = options;
 
-  // Spectrum scopes its tokens to these classes, so the mount root carries them
-  // rather than requiring each app's HTML to opt in. `medium` is the desktop
-  // scale; `large` is for touch and would inflate every control.
-  root.classList.add('z1r-tracker', 'spectrum', 'spectrum--dark', 'spectrum--medium');
+  root.classList.add('z1r-tracker');
   root.dataset.mode = mode;
   root.dataset.compact = String(compact);
   root.dataset.interactive = String(interactive);

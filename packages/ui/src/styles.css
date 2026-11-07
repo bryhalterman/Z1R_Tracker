@@ -202,7 +202,6 @@
 
 .z1r-triforce {
   inline-size: 100%;
-  max-inline-size: 260px;
   block-size: auto;
   display: block;
   margin-inline: auto;
@@ -226,7 +225,6 @@
 
 .z1r-tri-piece[data-on="true"] polygon {
   fill: var(--z1r-accent);
-  stroke: var(--z1r-panel);
   stroke-width: 1.25;
 }
 
@@ -343,7 +341,8 @@
  * top of it rather than being the only thing drawn.
  */
 .z1r-triforce-halo {
-  stroke: var(--z1r-triforce);
+  /* The gold of the held wedges, so the lit edge reads as their own border. */
+  stroke: var(--z1r-accent);
   stroke-width: 1.2;
   opacity: 0.5;
   animation: z1r-triforce-breathe 3.6s ease-in-out infinite;
@@ -1403,9 +1402,7 @@
 }
 
 /* Controls that live in a heading keep their own cursor. */
-.z1r-panel-title button:not([data-panel-toggle]),
-.z1r-panel-title select,
-.z1r-panel-title input {
+.z1r-panel-title button:not([data-panel-toggle]) {
   cursor: auto;
 }
 
@@ -1844,17 +1841,6 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-/* The armed cell is the one the next room click spends: full strength, a solid
-   border, and a dashed ring outside it that no other item state uses. */
-.z1r-item[data-armed="true"] {
-  filter: none;
-  opacity: 1;
-  border-style: solid;
-  border-color: var(--z1r-accent);
-  outline: var(--z1r-border-width-thick) dashed var(--z1r-accent);
-  outline-offset: 1px;
 }
 
 /*

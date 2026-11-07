@@ -25,6 +25,11 @@ jobs:
       - name: Test
         run: npm test
 
+      # The palette is literal values in theme.css; nothing else checks that
+      # every rendered pair still clears WCAG AA.
+      - name: Theme contrast
+        run: npm run theme:check
+
       - name: Build all targets
         run: npm run build
 

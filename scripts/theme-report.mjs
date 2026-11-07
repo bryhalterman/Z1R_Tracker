@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /*
- * Contrast report for the tracker's semantic colour aliases.
+ * Contrast report for the tracker's semantic color aliases.
  *
- * The tracker's palette is Spectrum's — `packages/ui/src/theme.css` binds each
- * `--z1r-*` alias to a Spectrum token rather than to a hand-picked hex. This
- * script resolves those bindings through Spectrum's own token CSS and checks
- * every foreground/background pair we actually render against WCAG AA.
+ * `packages/ui/src/theme.css` binds each `--z1r-*` alias to a literal value.
+ * This script reads those bindings straight from that file and checks every
+ * foreground/background pair the tracker renders against WCAG AA.
  *
  * It exists because the one accessibility bug that shipped came from choosing
- * colours by eye. Run it after touching the theme:
+ * colors by eye. Run it after touching the theme:
  *
  *   npm run theme:check
  */
@@ -16,27 +15,11 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const TOKENS_DIR = fileURLToPath(
-  new URL('../node_modules/@spectrum-css/tokens/dist/css/', import.meta.url),
-);
 const THEME = fileURLToPath(new URL('../packages/ui/src/theme.css', import.meta.url));
 
-/** Parse `--name: value;` declarations out of a CSS file. */
-async function readVars(file) {
-  const text = await readFile(new URL(file, `file://${TOKENS_DIR}`), 'utf8');
-  const vars = new Map();
-  for (const [, name, value] of text.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
-    vars.set(name, value.trim());
-  }
-  return vars;
-}
-
 /**
- * Expand every `var()` in a value until a literal falls out.
- *
- * Substitution has to be textual rather than whole-value: Spectrum stores
- * colours as `rgba(var(--spectrum-gray-50-rgb))`, so the reference sits inside
- * a function call and a "does this value start with var(" check misses it.
+ * Expand every `var()` in a value until a literal falls out. An alias may
+ * point at another alias — `--z1r-focus` is the accent.
  */
 function resolve(name, vars, depth = 0) {
   let value = vars.get(name);
@@ -60,7 +43,7 @@ function toRgb(value) {
     const h = hex[1].length === 3 ? hex[1].replace(/./g, (c) => c + c) : hex[1];
     return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
   }
-  const rgb = value.match(/rgba?\(([^)]+)\)/i);
+  const rgb = value.match(/^rgba?\(([^)]+)\)$/i);
   if (rgb) {
     const parts = rgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
     if (parts.length >= 3 && parts.every((n) => Number.isFinite(n))) return parts.slice(0, 3);
@@ -81,23 +64,11 @@ const contrast = (a, b) => {
   return (l1 + 0.05) / (l2 + 0.05);
 };
 
-const globalVars = await readVars('global-vars.css');
-const darkVars = await readVars('dark-vars.css');
-const mediumVars = await readVars('medium-vars.css');
-const spectrum = new Map([...globalVars, ...mediumVars, ...darkVars]);
-
-// The alias -> Spectrum token bindings, read from theme.css so the report can
-// never drift from what actually ships.
-const themeCss = await readFile(THEME, 'utf8');
-// An alias may point at another alias (`--z1r-focus` is the accent), so each
-// is resolved against the Spectrum tokens and the theme's own bindings at once.
-const bindings = new Map(spectrum);
+// Comments stripped first, so a value quoted in a comment is never read.
+const themeCss = (await readFile(THEME, 'utf8')).replace(/\/\*[\s\S]*?\*\//g, '');
+const bindings = new Map();
 for (const [, name, value] of themeCss.matchAll(/(--z1r-[\w-]+)\s*:\s*([^;]+);/g)) {
   bindings.set(name, value.trim());
-}
-const aliases = new Map();
-for (const name of bindings.keys()) {
-  if (name.startsWith('--z1r-')) aliases.set(name, resolve(name, bindings));
 }
 
 /** Foreground / background pairs the tracker actually renders. */
@@ -114,13 +85,17 @@ const PAIRS = [
   ['--z1r-stair', '--z1r-panel', 'room drawing stairway'],
   // Every keyboard focus outline, against the panel it is drawn over.
   ['--z1r-focus', '--z1r-panel', 'focus outline'],
+  // Reversed: page-colored text on a filled tag.
+  ['--z1r-bg', '--z1r-accent', 'pressed Level and Maps strips, checked boxes, focused region tag'],
+  ['--z1r-bg', '--z1r-text', 'warp guide tags'],
+  ['--z1r-bg', '--z1r-stair', 'transport pair numbers'],
 ];
 
 let failures = 0;
-console.log('Spectrum-derived palette — WCAG AA needs 4.5:1 for body text\n');
+console.log('Tracker palette — WCAG AA needs 4.5:1 for body text\n');
 for (const [fg, bg, label] of PAIRS) {
-  const fgRgb = toRgb(aliases.get(fg));
-  const bgRgb = toRgb(aliases.get(bg));
+  const fgRgb = toRgb(resolve(fg, bindings));
+  const bgRgb = toRgb(resolve(bg, bindings));
   if (!fgRgb || !bgRgb) {
     console.log(`  ?      ${label} — could not resolve ${!fgRgb ? fg : bg}`);
     failures++;
@@ -137,6 +112,6 @@ for (const [fg, bg, label] of PAIRS) {
 
 console.log(
   `\n${PAIRS.length - failures}/${PAIRS.length} pairs meet AA.` +
-    (failures ? ' Adjust the token bindings in packages/ui/src/theme.css.' : ''),
+    (failures ? ' Adjust the values in packages/ui/src/theme.css.' : ''),
 );
 process.exit(failures ? 1 : 0);

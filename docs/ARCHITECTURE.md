@@ -115,46 +115,38 @@ not judged by eye — which is what `npm run theme:check` is for.
 
 ## Theming
 
-`packages/ui/src/theme.css` imports Adobe Spectrum's token package and binds each `--z1r-*` semantic
-alias to a Spectrum token. No hex value is chosen by hand anywhere in the tracker. The single
-literal colour left in `styles.css` is `#000`, for the text outlines on the OBS overlay — that text
-sits on arbitrary gameplay, so there is no backdrop to reason about and a hard outline is the only
-answer.
+`packages/ui/src/theme.css` is where the tracker's colors are chosen. Each `--z1r-*` semantic alias
+is a literal value, declared on `:root` so the page shell, every mount root and every portalled
+popup see the same values without opting in. `shadcn.css` binds shadcn's own variables
+(`--background`, `--primary` and the rest) to those aliases, so the React panels and the plain-DOM
+panels share one palette.
 
-The reason for Spectrum specifically is that its scales carry documented contrast behaviour, so "is
-this readable" becomes a property of the step you picked rather than something you have to remember
-to check. Measured against the `gray-100` panel, the **1000 step is where a hue first clears WCAG
-AA**. Two consequences worth knowing:
+Outside `theme.css`, literal colors are deliberate exceptions: the categorical map colors in
+`overworld.ts` and `regions.ts`, black outlines behind text and sprites drawn over busy art (the
+overlay's gameplay, map cells, room marks) in `styles.css` and `obs.css`, the warm highlight on
+the finished Triforce, and the translucent black scrim (`bg-black/10`) the shadcn sheet and dialogs
+draw behind themselves. The OBS setup page imports `theme.css` for its colors rather than copying
+them. A new color belongs in `theme.css` as an alias, not inline.
 
-- `--z1r-muted` is `gray-700`, not `gray-600`. `gray-600` measures 4.05:1 and misses AA.
-- The accent stayed Triforce gold. `yellow-1100` lands within a few points of the hand-picked
-  `#d9a441` it replaces and clears AA at 5.95:1, so nothing was traded away for the guarantee.
+The values came from Adobe Spectrum. The tracker used to import `@spectrum-css/tokens` and bind each
+alias to a Spectrum token, because Spectrum's scales carry documented contrast behavior: against its
+`gray-100` panel, the 1000 step is where a hue first clears WCAG AA. Once the React panels moved to
+shadcn, the package was dropped and the dark-theme values it resolved to were copied in, so nothing
+on screen changed. Two of those choices are worth keeping in mind when editing:
 
-Spectrum scopes its tokens to the `.spectrum`, `.spectrum--dark` and `.spectrum--medium` classes.
-`mountTracker` and `mountControls` add all three to their own mount roots, so no app HTML has to opt
-in and there's no global class for an embedding page to collide with.
+- `--z1r-muted` is the step that measures 6.37:1 on the panel. The step below it measured 4.05:1
+  and missed AA.
+- The accent is Triforce gold, `#da9f00`, at 5.95:1 on the panel.
 
-One thing the scale doesn't cover: its type sizes stop at 11px. The overworld region codes and the
-slot chips have to fit inside a ~60x40px grid cell, so `--z1r-text-xs` and `--z1r-text-2xs` derive
-9px and 10px with `calc()` from the smallest token rather than hard-coding them — they still track
-the scale if it moves.
+Nothing re-derives the values from a design system any more, so the check below is the guarantee.
+`npm run theme:check` (`scripts/theme-report.mjs`) reads the aliases from `theme.css` and fails if
+any foreground/background pair the tracker renders drops below 4.5:1, including the reversed ones
+where page-colored text sits on a filled tag. CI runs it on pushes to `main` and on pull requests. It exists because the one
+accessibility bug that shipped came from picking a color by eye.
 
-`npm run theme:check` (`scripts/theme-report.mjs`) resolves the alias bindings through Spectrum's
-own token CSS and fails if any foreground/background pair the tracker renders drops below 4.5:1.
-Currently 9 of 9 pass. It exists because the one accessibility bug that shipped came from picking a
-colour by eye.
-
-### The cost
-
-Only the dark theme and the medium (desktop) scale are imported; pulling the light and large sets in
-as well would roughly double the figures below. Even so, the stylesheet went from about 12KB raw /
-2.8KB gzipped to about 134KB raw / 18.5KB gzipped, because all of Spectrum's dark and medium tokens
-ship even though the tracker references roughly 25 of them.
-
-That is a real trade and it hasn't been paid down. Subsetting the imports to the tokens actually
-referenced would recover nearly all of it; nothing in the build does that yet. For a page that is
-served once and then run offline for hours, the size was judged worth the contrast guarantee — but
-if the tracker ever grows a light theme, subset first.
+The import used to cost most of the stylesheet: every Spectrum dark and medium token shipped though
+about 25 were read. Dropping it took the web build's stylesheet from about 219KB raw / 32KB gzipped
+to about 99KB raw / 16KB gzipped.
 
 ## Seeds and derived locations
 

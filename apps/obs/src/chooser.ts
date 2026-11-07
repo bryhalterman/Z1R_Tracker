@@ -4,6 +4,10 @@
  * They have to be copied into OBS by hand, so showing the real address beats
  * showing a relative path the reader then has to assemble themselves.
  */
+
+// The page's colors read the tracker's aliases.
+import '@z1r/ui/theme.css';
+
 const targets: [id: string, page: string][] = [
   ['overlay-url', 'overlay.html'],
   ['dock-url', 'dock.html'],

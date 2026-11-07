@@ -90,16 +90,16 @@ Contrast is measured rather than eyeballed:
 npm run theme:check
 ```
 
-That resolves every `--z1r-*` alias through Spectrum's token files and fails if any
-foreground/background pair the tracker renders drops below WCAG AA (4.5:1). All nine pairs pass.
+That reads every `--z1r-*` alias from `packages/ui/src/theme.css` and fails if any
+foreground/background pair the tracker renders drops below WCAG AA (4.5:1). CI runs it on pushes to
+`main` and on pull requests.
 
 ## Theming
 
-Colours are not chosen here. `packages/ui/src/theme.css` imports Adobe Spectrum's token package
-(`@spectrum-css/tokens`, dark theme and the medium/desktop scale only) and binds each `--z1r-*`
-semantic alias to a Spectrum token. The only literal colour left in `styles.css` is `#000`, used for
-text outlines on the OBS overlay, where the backdrop is arbitrary gameplay and nothing else would
-hold up. The reasoning, including where the accent came from, is in
+Colors are chosen in one place: `packages/ui/src/theme.css` binds each `--z1r-*` semantic alias to
+a literal value, and the React components read the same aliases through `shadcn.css`. The values
+came from Adobe Spectrum's dark theme, which the tracker imported until the React panels moved to
+shadcn. The exceptions, and where the accent came from, are in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#theming).
 
 ## Sprites
@@ -194,9 +194,9 @@ scripts          sprite manifest and theme contrast tooling
 docs             architecture, sprite and OBS notes
 ```
 
-There are no runtime dependencies — the tracker is plain TypeScript and DOM, and ships no
-framework. The dev dependencies are Vite, TypeScript, esbuild (for the test bundle) and
-`@spectrum-css/tokens`, whose CSS variables are inlined into the built stylesheet.
+The panels are React components built on shadcn/ui and Base UI, with Tailwind scoped to them; the
+runtime dependencies are listed in `packages/ui/package.json`. The dev dependencies are Vite,
+TypeScript, Tailwind and esbuild (for the test bundle).
 
 ## Status
 
@@ -207,8 +207,8 @@ Sprites are largely filled in: 36 of the 45 keys render as art, with the nine le
 glyphs on purpose. `npm run sprites:check` lists the state of the manifest, and
 `-- --fetch` checks the URLs are still alive.
 
-The theme is bound to Spectrum tokens and every rendered colour pair clears WCAG AA. The known cost
-is stylesheet size — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#theming).
+Every rendered color pair clears WCAG AA, measured by `npm run theme:check` — see
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#theming).
 
 ## License
 

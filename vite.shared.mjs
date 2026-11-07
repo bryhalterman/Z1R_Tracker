@@ -94,11 +94,13 @@ export function localMaps() {
  * hot-reloading across package boundaries and removes a build ordering step.
  *
  * Order matters: Vite treats a string `find` as a prefix match, so the deep
- * `styles.css` entry has to come before the bare package name or it resolves
+ * stylesheet entries have to come before the bare package name or they resolve
  * to `.../index.ts/styles.css`.
  */
 export const workspaceAliases = [
   { find: '@z1r/ui/styles.css', replacement: source('./packages/ui/src/styles.css') },
+  // The OBS setup page takes the palette alone, not the tracker's styles.
+  { find: '@z1r/ui/theme.css', replacement: source('./packages/ui/src/theme.css') },
   { find: '@z1r/ui', replacement: source('./packages/ui/src/index.ts') },
   { find: '@z1r/core', replacement: source('./packages/core/src/index.ts') },
 ];

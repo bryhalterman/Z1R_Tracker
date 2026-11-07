@@ -18,9 +18,7 @@ export interface ControlsOptions {
 }
 
 export function mountControls(root: HTMLElement, options: ControlsOptions): () => void {
-  // Mounted separately from the tracker, so it needs the Spectrum theme
-  // classes of its own — see the note in `mountTracker`.
-  root.classList.add('z1r-controls', 'spectrum', 'spectrum--dark', 'spectrum--medium');
+  root.classList.add('z1r-controls');
   root.replaceChildren();
   const unmount = mountToolbar(root, {
     store: options.store,
