@@ -1,6 +1,6 @@
 /** Where the plain-DOM hint panel hands its rows to React. The toolbar's sheet mounts with the toolbar. */
 
-import { createRoot } from 'react-dom/client';
+import { createPanelRoot } from '../shared/panel-root.js';
 import { HintList, type HintListProps } from './HintList.js';
 import '../shadcn.css';
 
@@ -9,7 +9,7 @@ export interface HintListHost {
 }
 
 export function mountHintList(container: HTMLElement): HintListHost {
-  const root = createRoot(container);
+  const root = createPanelRoot(container);
   return {
     render(props) {
       root.render(<HintList {...props} />);

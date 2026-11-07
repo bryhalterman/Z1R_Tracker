@@ -54,6 +54,7 @@ import {
 import { cn } from '#lib/utils';
 import { LayoutArt } from './LayoutArt.js';
 import { Sprite } from '../shared/Sprite.js';
+import { dropTarget } from '../shared/drop-target.js';
 
 /** Most-met first, so the keys under the left hand are the common ones. */
 export const DOOR_ORDER: readonly DoorState[] = ['open', 'locked', 'shutter', 'wall', 'bombed', 'unknown'];
@@ -63,7 +64,6 @@ export interface RoomCardProps {
   level: number;
   /** Room id, or '' with nothing selected. */
   selected: string;
-  interactive: boolean;
   resolver: SpriteResolver;
   /** Dispatches against the selected room and keeps it selected. */
   commit: (action: Action) => void;
@@ -199,39 +199,25 @@ function Segmented<T extends string>({
 }
 
 export function RoomCard(props: RoomCardProps) {
-  const { state, level, selected, interactive, resolver, commit, canDrop, onDropItem } = props;
+  const { state, level, selected, resolver, commit, canDrop, onDropItem } = props;
   /** A palette drag that can land is over the card. */
   const [dropping, setDropping] = useState(false);
 
   /*
    * The whole card takes a palette drag for the selected room — the same
    * placement a drop on the room's cell makes — so the drop does not have to
-   * find the small Item box. The box shows where it will land. Entering is
-   * accepted as well as hovering, which is what the drag-and-drop model asks
-   * of a drop target.
+   * find the small Item box. The box shows where it will land.
    */
-  const accept = (event: React.DragEvent) => {
-    if (off || !canDrop()) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-    setDropping(true);
-  };
-  const dropTarget = {
-    onDragEnter: accept,
-    onDragOver: accept,
-    onDragLeave: (event: React.DragEvent) => {
-      // Moving between the card's own children fires a leave as well.
-      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
-    },
-    onDrop: (event: React.DragEvent) => {
-      event.preventDefault();
-      setDropping(false);
+  const dropHandlers = dropTarget(
+    () => !off && canDrop(),
+    () => {
       if (!off) onDropItem();
     },
-  };
+    { onAccept: () => setDropping(true), onLeave: () => setDropping(false) },
+  );
   const rooms = state.rooms[String(level)] ?? {};
   const note = selected ? rooms[selected] : undefined;
-  const off = !interactive || !selected;
+  const off = !selected;
   const isEntrance = !!selected && state.levelStarts[String(level)] === selected;
 
   const patch = (patch: RoomNotePatch) => {
@@ -285,7 +271,7 @@ export function RoomCard(props: RoomCardProps) {
   return (
     <div
       className="z1r-ui z1r-card grid gap-3 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground"
-      {...dropTarget}
+      {...dropHandlers}
     >
       {/* The room, and the things you do to a room as a whole. */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -326,7 +312,7 @@ export function RoomCard(props: RoomCardProps) {
           variant="ghost"
           size="sm"
           className="ml-auto text-destructive"
-          disabled={!interactive || !note}
+          disabled={!note}
           title="Forget everything recorded about this room"
           onClick={() =>
             // One patch of empty values: a room that carries nothing is pruned

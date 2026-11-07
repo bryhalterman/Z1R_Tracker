@@ -3,7 +3,7 @@
  * again whenever the panel redraws.
  */
 
-import { createRoot } from 'react-dom/client';
+import { createPanelRoot } from '../shared/panel-root.js';
 import { RoomCard, type RoomCardProps } from './RoomCard.js';
 import '../shadcn.css';
 
@@ -12,7 +12,7 @@ export interface RoomCardHost {
 }
 
 export function mountRoomCard(container: HTMLElement): RoomCardHost {
-  const root = createRoot(container);
+  const root = createPanelRoot(container);
   return {
     render(props) {
       root.render(<RoomCard {...props} />);

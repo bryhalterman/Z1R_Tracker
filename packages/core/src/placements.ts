@@ -114,8 +114,22 @@ function storedPlacement(state: TrackerState, id: string): ItemPlacement | null 
  * left. Only when every floor spot in the level is full does it overflow.
  *
  * Screens are walked in overworld grid order for the same reason as rooms.
+ *
+ * Cached per state object. The store replaces the state on every edit and
+ * never mutates one in place, and one edit asks for this from several panels
+ * and once per numbered dungeon cell, so each state is derived once.
  */
 export function deriveItemLocations(state: TrackerState): ItemLocations {
+  const cached = DERIVED.get(state);
+  if (cached) return cached;
+  const derived = derive(state);
+  DERIVED.set(state, derived);
+  return derived;
+}
+
+const DERIVED = new WeakMap<TrackerState, ItemLocations>();
+
+function derive(state: TrackerState): ItemLocations {
   const locations = deriveLocations(state.seed);
 
   // Free slots per level and kind, in listed order, consumed from the front.

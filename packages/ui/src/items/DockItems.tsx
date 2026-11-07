@@ -25,8 +25,6 @@ export interface DockItemsProps {
   placedAt: Map<string, string[]>;
   resolver: SpriteResolver;
   itemSize: number;
-  /** Keep the inventory screen's always-active / B-slot split. */
-  grouped: boolean;
   step: (id: string, direction: 1 | -1) => void;
 }
 
@@ -38,22 +36,11 @@ const GROUPS = [
 /** Every room item a cell can stand for — a chain covers more than one. Fixed, so worked out once. */
 const COVERS = new Map(ITEMS.map((def) => [def.id, roomItemsForInventory(def)]));
 
-export function DockItems({ state, placedAt, resolver, itemSize, grouped, step }: DockItemsProps) {
+export function DockItems({ state, placedAt, resolver, itemSize, step }: DockItemsProps) {
   const cells = (group: ItemDef['group']) =>
     ITEMS.filter((def) => def.group === group).map((def) => (
       <ItemCell key={def.id} def={def} value={state.items[def.id] ?? 0} placedAt={placedAt} resolver={resolver} itemSize={itemSize} step={step} />
     ));
-
-  if (!grouped) {
-    return (
-      <div className="z1r-item-group" data-group="all">
-        <div className="z1r-item-grid">
-          {cells('passive')}
-          {cells('bslot')}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

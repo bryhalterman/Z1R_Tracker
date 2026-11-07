@@ -1,6 +1,6 @@
 /** Where the plain-DOM Items panel hands its palette to React. */
 
-import { createRoot } from 'react-dom/client';
+import { createPanelRoot } from '../shared/panel-root.js';
 import { ItemPalette, type ItemPaletteProps } from './ItemPalette.js';
 import '../shadcn.css';
 
@@ -11,7 +11,7 @@ export interface ItemPaletteHost {
 }
 
 export function mountItemPalette(container: HTMLElement): ItemPaletteHost {
-  const root = createRoot(container);
+  const root = createPanelRoot(container);
   return {
     render(props) {
       root.render(<ItemPalette {...props} />);

@@ -1,6 +1,6 @@
 /** Where the plain-DOM Items panel hands the OBS dock's grid to React. */
 
-import { createRoot } from 'react-dom/client';
+import { createPanelRoot } from '../shared/panel-root.js';
 import { DockItems, type DockItemsProps } from './DockItems.js';
 
 export interface DockItemsHost {
@@ -8,7 +8,7 @@ export interface DockItemsHost {
 }
 
 export function mountDockItems(container: HTMLElement): DockItemsHost {
-  const root = createRoot(container);
+  const root = createPanelRoot(container);
   return {
     render(props) {
       root.render(<DockItems {...props} />);

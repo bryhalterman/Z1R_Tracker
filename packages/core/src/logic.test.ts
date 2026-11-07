@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
-import { canBeatGanon, canEnterLevel9, dungeonItems } from './logic.js';
-import { createInitialState, type TrackerState } from './state.js';
+import { canBeatGanon, canEnterLevel9, dungeonItems, levelProgress } from './logic.js';
+import { createInitialState, reduce, type TrackerState } from './state.js';
 
 /**
  * `triforce` on levels 1-8, plus whatever items are named.
@@ -79,4 +79,44 @@ test('dungeonItems ignores Heart Containers', () => {
   const state = createInitialState();
   state.locations['d5.heart'] = { item: 'heart', collected: false };
   assert.deepEqual(dungeonItems(state, 5), []);
+});
+
+/* ------------------------------------------------------------ level progress */
+
+const room = (state: TrackerState, level: number, id: string, patch: { item?: string; boss?: string }) =>
+  reduce(state, { type: 'setRoomNote', level, room: id, patch });
+
+test('a level is not found until the overworld map marks it', () => {
+  let state = createInitialState();
+  assert.equal(levelProgress(state, 3), 'notFound');
+  // Rooms on its sheet are not the entrance on the map.
+  state = room(state, 3, 'A1', { item: 'bow' });
+  assert.equal(levelProgress(state, 3), 'notFound');
+  state = reduce(state, { type: 'placeDungeon', screen: 'H8', level: 3 });
+  assert.equal(levelProgress(state, 3), 'found');
+  // Re-marked as something else, it is no longer that level.
+  state = reduce(state, { type: 'setMark', screen: 'H8', mark: 'shop' });
+  assert.equal(levelProgress(state, 3), 'notFound');
+});
+
+test('Levels 1-8 are complete with the piece held and every slot located', () => {
+  // Level 2 under the 1st Quest has a floor spot and the heart spot.
+  let state = reduce(createInitialState(), { type: 'placeDungeon', screen: 'H8', level: 2 });
+  state = room(state, 2, 'A1', { item: 'bow' });
+  state = reduce(state, { type: 'setDungeon', level: 2, patch: { triforce: true } });
+  assert.equal(levelProgress(state, 2), 'found', 'the heart spot is still empty');
+  state = room(state, 2, 'A2', { item: 'heart' });
+  assert.equal(levelProgress(state, 2), 'complete');
+  // Located is enough; nothing has to be ticked collected.
+  assert.equal(state.rooms['2']?.A2?.collected, false);
+  // And the piece is required.
+  state = reduce(state, { type: 'setDungeon', level: 2, patch: { triforce: false } });
+  assert.equal(levelProgress(state, 2), 'found');
+});
+
+test('Level 9 is complete once its sheet records both Ganon and Zelda', () => {
+  let state = room(createInitialState(), 9, 'A1', { boss: 'ganon' });
+  assert.equal(levelProgress(state, 9), 'notFound');
+  state = room(state, 9, 'A2', { boss: 'zelda' });
+  assert.equal(levelProgress(state, 9), 'complete');
 });

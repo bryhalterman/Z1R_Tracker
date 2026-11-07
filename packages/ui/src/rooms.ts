@@ -23,6 +23,7 @@ import {
   DUNGEONS,
   ROOM_COLUMNS,
   ROOM_ITEMS_BY_ID,
+  levelProgress,
   SHUFFLE_POOL,
   type Action,
   type ItemDef,
@@ -120,11 +121,9 @@ export function buildRooms(
   store: Store,
   resolver: SpriteResolver,
   patches: Patch[],
-  interactive: boolean,
   placement: PlacementChannel,
 ): HTMLElement {
   const root = el('section', 'z1r-panel z1r-rooms-panel');
-  root.dataset.interactive = String(interactive);
 
   /*
    * "Levels", not "Rooms" — the heading sits directly above the nine level
@@ -192,31 +191,29 @@ export function buildRooms(
   count.title = 'Rooms recorded on this level';
   title.append(count);
 
-  if (interactive) {
-    const clearHost = el('span', 'z1r-heading-clearhost');
-    const onClear = async () => {
-      const total = Object.keys(roomsOf(store.getState())).length;
-      if (total === 0) return;
-      // Held from the click: the level showing can change while the dialog is
-      // up, and the answer is about the level it asked about.
-      const asked = level;
-      // A whole level of mapping is a lot to lose to a misclick, and the
-      // question is scoped to this level for the same reason the action is.
-      const ok = await askToConfirm({
-        title: `Clear Level ${asked}?`,
-        description: `All ${total} recorded rooms on Level ${asked} are wiped. The other levels are not affected.`,
-        confirm: 'Clear level',
-      });
-      if (!ok) return;
-      if (level === asked) selected = '';
-      commit(level === asked ? '' : selected, { type: 'clearRooms', level: asked });
-    };
-    mountClearButton(clearHost).render({
-      title: 'Wipe this level’s room map. The other levels are untouched.',
-      onClear: () => void onClear(),
+  const clearHost = el('span', 'z1r-heading-clearhost');
+  const onClear = async () => {
+    const total = Object.keys(roomsOf(store.getState())).length;
+    if (total === 0) return;
+    // Held from the click: the level showing can change while the dialog is
+    // up, and the answer is about the level it asked about.
+    const asked = level;
+    // A whole level of mapping is a lot to lose to a misclick, and the
+    // question is scoped to this level for the same reason the action is.
+    const ok = await askToConfirm({
+      title: `Clear Level ${asked}?`,
+      description: `All ${total} recorded rooms on Level ${asked} are wiped. The other levels are not affected.`,
+      confirm: 'Clear level',
     });
-    title.append(clearHost);
-  }
+    if (!ok) return;
+    if (level === asked) selected = '';
+    commit(level === asked ? '' : selected, { type: 'clearRooms', level: asked });
+  };
+  mountClearButton(clearHost).render({
+    title: 'Wipe this level’s room map. The other levels are untouched.',
+    onClear: () => void onClear(),
+  });
+  title.append(clearHost);
 
   /* ------------------------------------------------------------- the sheet */
 
@@ -332,9 +329,8 @@ export function buildRooms(
   own.push((state) => {
     drawCaption();
     levelStrip.render({
-      levels: LEVELS.map((value) => ({ value, touched: Object.keys(roomsOf(state, value)).length > 0 })),
+      levels: LEVELS.map((value) => ({ value, progress: levelProgress(state, value) })),
       level,
-      disabled: !interactive,
       onPick: pickLevel,
     });
 
@@ -343,7 +339,7 @@ export function buildRooms(
   });
 
   own.push((state) =>
-    cells.render({ state, level, selected, interactive, resolver, onTouch: touchRoom, canDrop: roomCanTake }),
+    cells.render({ state, level, selected, resolver, onTouch: touchRoom, canDrop: roomCanTake }),
   );
 
   own.push((state) => {
@@ -356,7 +352,6 @@ export function buildRooms(
       state,
       level,
       selected,
-      interactive,
       resolver,
       commit: (action) => {
         if (selected) commit(selected, action);
@@ -371,7 +366,7 @@ export function buildRooms(
 
   patches.push((state) => runPatches(own, state));
   // Arming changes nothing in the store, so the channel drives its own redraw.
-  if (interactive) placement.watch(redraw);
+  placement.watch(redraw);
 
   return root;
 }

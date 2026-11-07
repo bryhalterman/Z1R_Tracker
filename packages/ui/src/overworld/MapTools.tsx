@@ -190,7 +190,6 @@ export interface ScreenCardProps {
   state: TrackerState;
   view: MapView;
   resolver: SpriteResolver;
-  interactive: boolean;
   actions: MapActions;
 }
 
@@ -265,7 +264,7 @@ const SPOTS = [
   })),
 ];
 
-export function ScreenCard({ state, view, resolver, interactive, actions }: ScreenCardProps) {
+export function ScreenCard({ state, view, resolver, actions }: ScreenCardProps) {
   const { selected, armed } = view;
   const mark = selected ? (state.marks[selected] ?? 'none') : 'none';
   const note = selected ? state.screenNotes[selected] : undefined;
@@ -386,7 +385,7 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
                     step={1}
                     placeholder="–"
                     aria-label={`Price of ${stock.name}`}
-                    disabled={!stocked || !interactive}
+                    disabled={!stocked}
                     value={price ? String(price) : ''}
                     onChange={(event) => actions.setPrice(stock.id, Number(event.target.value))}
                     className="h-6 w-10 [appearance:textfield] px-1 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -440,7 +439,7 @@ export function ScreenCard({ state, view, resolver, interactive, actions }: Scre
                 variant="outline"
                 size="sm"
                 pressed={got}
-                disabled={!interactive || !placed}
+                disabled={!placed}
                 title={
                   placed
                     ? got

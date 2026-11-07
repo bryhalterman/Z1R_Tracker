@@ -25,7 +25,6 @@ import {
   type SpriteResolver,
   type Store,
 } from '@z1r/core';
-import { collectAction } from './collect.js';
 import { createSprite } from './sprite.js';
 import { memoise, runPatches, type Patch } from './patch.js';
 import { mountCompactLocations } from './locations/mount.js';
@@ -242,21 +241,8 @@ function buildCompactLocations(
     slot.className = 'z1r-compact-slot';
     slot.dataset.kind = kind;
     if (!location) slot.dataset.overflow = 'true';
-    slot.disabled = !interactive;
-    if (interactive) {
-      const toggle = () => {
-        const action = collectAction(read().placement);
-        if (action) store.dispatch(action);
-      };
-      // Either button toggles collected. The left click used to open an item
-      // picker, which is gone with item assignment here; the right click is
-      // kept because it is the gesture this chip has always had for it.
-      slot.addEventListener('click', toggle);
-      slot.addEventListener('contextmenu', (event) => {
-        event.preventDefault();
-        toggle();
-      });
-    }
+    // Only the read-only overlay draws these; the clickable chips are React.
+    slot.disabled = true;
 
     const face = document.createElement('span');
     face.className = 'z1r-compact-face';
@@ -309,19 +295,8 @@ function buildCompactLocations(
         const piece = document.createElement('button');
         piece.type = 'button';
         piece.className = 'z1r-compact-head';
-        piece.disabled = !interactive;
+        piece.disabled = true;
         appendNumberedTriangle(piece, level);
-        if (interactive) {
-          piece.addEventListener('click', () =>
-            store.dispatch({
-              type: 'setDungeon',
-              level: Number(level),
-              patch: {
-                triforce: !(store.getState().dungeons[level]?.triforce ?? false),
-              },
-            }),
-          );
-        }
         slotPatches.push((s2) => {
           const held = s2.dungeons[level]?.triforce ?? false;
           // Held reads as solid border and a full-strength triangle, unheld as

@@ -604,12 +604,15 @@ test('an entry an older save made in an extra floor slot is listed as overflow',
 
 test('a stored entry for a slot only the other quest has stays hidden, not overflow', () => {
   // Switching quests and back must find the entry where it was left.
-  const state = createInitialState();
-  const second = { ...state, seed: { ...state.seed, dungeonQuest: '2nd' as const } };
+  // Derived from separate objects: results are cached per state, so the state
+  // under test is only derived after its entry is in place.
+  const first = createInitialState();
+  const second = { ...first, seed: { ...first.seed, dungeonQuest: '2nd' as const } };
   const secondOnly = deriveItemLocations(second).slots
     .map((slot) => slot.location.id)
-    .find((id) => !deriveItemLocations(state).slots.some((slot) => slot.location.id === id));
+    .find((id) => !deriveItemLocations(first).slots.some((slot) => slot.location.id === id));
   assert.ok(secondOnly, 'the 2nd quest has a dungeon slot the 1st does not');
+  const state = createInitialState();
   state.locations[secondOnly] = { item: 'raft', collected: false };
   const derived = deriveItemLocations(state);
   assert.equal([...derived.overflow.values()].flat().length, 0);

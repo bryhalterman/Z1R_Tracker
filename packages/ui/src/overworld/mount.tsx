@@ -1,6 +1,6 @@
 /** Where the plain-DOM overworld panel hands its controls to React. */
 
-import { createRoot } from 'react-dom/client';
+import { createPanelRoot } from '../shared/panel-root.js';
 import {
   MapBrushes,
   MapHeading,
@@ -16,7 +16,7 @@ export type { Armed, MapActions, MapView } from './MapTools.js';
 
 function host<P extends object>(Component: (props: P) => React.ReactNode) {
   return (container: HTMLElement) => {
-    const root = createRoot(container);
+    const root = createPanelRoot(container);
     return { render: (props: P) => root.render(<Component {...props} />) };
   };
 }

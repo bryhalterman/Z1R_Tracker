@@ -28,10 +28,8 @@ import {
   TRIFORCE_REQUIRED_FOR_L9,
   type ConcreteQuest,
   type SpriteResolver,
-  type Store,
-  type TrackerState,
 } from '@z1r/core';
-import { memoise, runPatches, type Patch } from './patch.js';
+import { memoise, type Patch } from './patch.js';
 import { createSprite } from './sprite.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -152,12 +150,12 @@ function softenFilter(): SVGDefsElement {
   return defs;
 }
 
-export function buildTriforce(
-  store: Store,
-  resolver: SpriteResolver,
-  patches: Patch[],
-  interactive: boolean,
-): HTMLElement {
+/**
+ * The Triforce panel, drawn only on the OBS overlay — the page and the desktop
+ * build carry the pieces in Item locations — so it is display only. Pieces are
+ * marked held from those columns or the dock.
+ */
+export function buildTriforce(resolver: SpriteResolver, patches: Patch[]): HTMLElement {
   const root = document.createElement('section');
   root.className = 'z1r-panel z1r-triforce-panel';
 
@@ -204,31 +202,12 @@ export function buildTriforce(
   );
   root.append(stage);
 
-  const toggle = (level: number) =>
-    store.dispatch({
-      type: 'setDungeon',
-      level,
-      patch: { triforce: !(store.getState().dungeons[String(level)]?.triforce ?? false) },
-    });
-
   for (const level of LEVELS) {
     const group = svg('g', {
       class: 'z1r-tri-piece',
       'data-level': String(level),
-      role: interactive ? 'button' : 'img',
+      role: 'img',
     });
-    if (interactive) {
-      group.setAttribute('tabindex', '0');
-      group.addEventListener('click', () => toggle(level));
-      group.addEventListener('keydown', (event) => {
-        // SVG elements are not natively activatable, so Enter/Space are wired
-        // by hand or the piece is keyboard-dead.
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          toggle(level);
-        }
-      });
-    }
 
     const polygon = svg('polygon');
     const numeral = svg('text', {
@@ -253,7 +232,6 @@ export function buildTriforce(
 
       const held = state.dungeons[String(level)]?.triforce ?? false;
       group.dataset.on = String(held);
-      if (interactive) group.setAttribute('aria-pressed', String(held));
       group.setAttribute(
         'aria-label',
         `Level ${level} Triforce piece — ${held ? 'collected' : 'not collected'}`,

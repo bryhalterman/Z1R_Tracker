@@ -42,6 +42,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#compo
 import { SpriteArt } from '../shared/Sprite.js';
 import { CellTip } from '../room-grid/CellTip.js';
 import { previewHandlers } from '../map-preview.js';
+import { dropTarget } from '../shared/drop-target.js';
 
 /**
  * Where one map image sits inside every cell.
@@ -97,7 +98,6 @@ export interface ScreenGridProps {
   readonly warpFrom: string;
   /** The map image for the seed's quest and orientation, or '' when it did not resolve. */
   readonly mapUrl: string;
-  readonly interactive: boolean;
   readonly resolver: SpriteResolver;
   readonly onTouch: (screen: string) => void;
   /** Right-click: clear the mark outright. */
@@ -109,7 +109,7 @@ export interface ScreenGridProps {
 }
 
 export function ScreenGrid(props: ScreenGridProps) {
-  const { state, selected, previewed, warpFrom, mapUrl, interactive, resolver, onTouch, onClear, onCycle, canDrop } =
+  const { state, selected, previewed, warpFrom, mapUrl, resolver, onTouch, onClear, onCycle, canDrop } =
     props;
   const routes = warpRoutes(state);
   const mirrored = state.seed.mirroredOverworld;
@@ -158,7 +158,6 @@ export function ScreenGrid(props: ScreenGridProps) {
             isSelected={id === selected}
             isPreviewed={previewed.has(id)}
             mapUrl={mapUrl}
-            interactive={interactive}
             resolver={resolver}
             onTouch={onTouch}
             onClear={onClear}
@@ -402,7 +401,6 @@ interface ScreenCellProps {
   readonly isSelected: boolean;
   readonly isPreviewed: boolean;
   readonly mapUrl: string;
-  readonly interactive: boolean;
   readonly resolver: SpriteResolver;
   readonly onTouch: (screen: string) => void;
   readonly onClear: (screen: string) => void;
@@ -431,7 +429,6 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
     isSelected,
     isPreviewed,
     mapUrl,
-    interactive,
     resolver,
     onTouch,
     onClear,
@@ -558,51 +555,23 @@ const ScreenCell = memo(function ScreenCell(props: ScreenCellProps) {
           } as React.CSSProperties
         }
         aria-label={label}
-        disabled={!interactive}
         // Hovering or focusing a numbered warp draws its routes — see `WarpGuides`.
         {...(props.exits ? previewHandlers({ kind: 'warp', screen: id }) : {})}
-        onClick={interactive ? () => onTouch(id) : undefined}
+        onClick={() => onTouch(id)}
         // Right-click clears outright — the common correction, and faster than
         // picking "Unmarked".
-        onContextMenu={
-          interactive
-            ? (event) => {
-                event.preventDefault();
-                onClear(id);
-              }
-            : undefined
-        }
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onClear(id);
+        }}
         // Arrow keys step through the marks without opening anything, which is
         // quicker than the brushes when tagging a run of screens.
-        onKeyDown={
-          interactive
-            ? (event) => {
-                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-                event.preventDefault();
-                onCycle(id, event.key === 'ArrowRight' ? 1 : -1);
-              }
-            : undefined
-        }
-        // A palette drag lands like a click with the item armed: the drag
-        // armed it, so the click handler places it.
-        onDragEnter={interactive ? (event) => canDrop() && event.preventDefault() : undefined}
-        onDragOver={
-          interactive
-            ? (event) => {
-                if (!canDrop()) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'copy';
-              }
-            : undefined
-        }
-        onDrop={
-          interactive
-            ? (event) => {
-                event.preventDefault();
-                onTouch(id);
-              }
-            : undefined
-        }
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+          event.preventDefault();
+          onCycle(id, event.key === 'ArrowRight' ? 1 : -1);
+        }}
+        {...dropTarget(canDrop, () => onTouch(id))}
       >
         <span className="z1r-screen-terrain">
           {/*

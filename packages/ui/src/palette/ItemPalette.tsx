@@ -38,6 +38,7 @@ import {
   type SpriteResolver,
   type TrackerState,
 } from '@z1r/core';
+import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#components/ui/tooltip';
 import { cn } from '#lib/utils';
 import { Sprite } from '../shared/Sprite.js';
@@ -93,6 +94,9 @@ const UNPLACED: readonly ItemDef[] = ITEMS.filter(
       family.tiles.some((tile) => typeof tile !== 'string' && tile.inventory === item.id),
     ),
 );
+
+/** An inventory item nothing places: held stage only, never armable. Built once, so memoized tiles see the same spec. */
+const UNPLACED_SPECS: readonly TileSpec[] = UNPLACED.map((def) => ({ inventory: def.id, stage: 1 }));
 
 export interface ItemPaletteProps {
   state: TrackerState;
@@ -174,107 +178,158 @@ function PlacedTick() {
   );
 }
 
+interface PaletteTileProps {
+  spec: TileSpec;
+  inFamily: boolean;
+  /** The inventory, by reference: unchanged items keep the same object. */
+  items: TrackerState['items'];
+  isArmed: boolean;
+  /** Where the item has been placed, phrased for the label, or ''. */
+  where: string;
+  resolver: SpriteResolver;
+  itemSize: number;
+  placeInto: ItemPaletteProps['placeInto'];
+  arm: ItemPaletteProps['arm'];
+  setHeld: ItemPaletteProps['setHeld'];
+  step: ItemPaletteProps['step'];
+  dragStart: ItemPaletteProps['dragStart'];
+  dragEnd: ItemPaletteProps['dragEnd'];
+}
+
+/**
+ * One tile, whatever it stands for.
+ *
+ * Memoized: every store edit and every arm redraws the palette, and a tile's
+ * props only change when its own item, armed state or placements do. The
+ * callbacks are made once per mount, so they never break the comparison.
+ */
+const PaletteTile = memo(function PaletteTile(props: PaletteTileProps) {
+  const { spec, inFamily, items, isArmed, where, resolver, itemSize, placeInto, arm, setHeld, step, dragStart, dragEnd } = props;
+  const bought = typeof spec !== 'string';
+  const pool = bought ? undefined : SCREEN_ITEMS_BY_ID.get(spec);
+  const def = bought ? undefined : (ROOM_ITEMS_BY_ID.get(spec) ?? pool);
+  if (!bought && !def) return null;
+
+  // The inventory item this tile reports, and the stage it stands for. The
+  // Heart Container's inventory id is empty, and the Map, the Compass and a
+  // Triforce piece have no pool entry: those four have no held state.
+  const inventory = bought ? ITEMS_BY_ID.get(spec.inventory) : pool?.itemId ? ITEMS_BY_ID.get(pool.itemId) : undefined;
+  const stage = bought ? spec.stage : (pool?.value ?? 0);
+  const value = inventory ? (items[inventory.id] ?? 0) : 0;
+  const name = bought ? (inventory ? labelFor(inventory, stage) : '') : def!.name;
+  const sprite = bought ? (inventory ? spriteFor(inventory, stage) : '') : def!.sprite;
+  const id = bought ? `${spec.inventory}.${spec.stage}` : spec;
+
+  const target = bought ? '' : targetFor(spec, placeInto);
+  const held: Held = inventory && stage > 0 ? (value >= stage ? 'held' : 'unheld') : 'none';
+
+  /*
+   * A left click says whether you hold this tier. Not held: the item goes up
+   * to it. Held: the item drops to the tier below, so a click on the tier you
+   * have is how you take it back. A one-stage item is the same rule — on, off.
+   */
+  const toggleHeld = () => {
+    if (inventory && stage > 0) setHeld(inventory.id, value >= stage ? stage - 1 : stage);
+  };
+  const toggleArmed = () => {
+    if (target) arm(isArmed ? '' : spec as string);
+  };
+
+  // What the tile is, a fact per line. How to use the palette is behind the
+  // ? in the heading; the accessible name keeps it, since a screen reader
+  // reaches the tile without passing the ?.
+  const facts: string[] = [];
+  if (held !== 'none') facts.push(held === 'held' ? 'held' : 'not held');
+  if (where) facts.push(`placed at ${where}`);
+  if (isArmed) facts.push('armed');
+  if (bought) facts.push('bought in a shop, never placed');
+  else if (!target) facts.push('nowhere in this window to place it');
+  const hints: string[] = [];
+  if (target) hints.push(isArmed ? 'right-click to put it down' : `right-click to arm, or drag onto ${target}`);
+  if (held !== 'none') hints.push(held === 'held' ? 'click to mark it not held' : 'click to mark it held');
+  const text = [name, ...facts, ...hints].join(' — ');
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        type="button"
+        aria-label={text}
+        // Pressed reports what Enter or Space does: arming a tile that can be
+        // placed, otherwise holding it. The mouse's held click is told by the
+        // label instead.
+        aria-pressed={target ? isArmed : held === 'none' ? undefined : held === 'held'}
+        data-item={id}
+        data-armed={isArmed}
+        data-held={held === 'held'}
+        data-placed={!!where}
+        className={tileClass({ held, armed: isArmed, placeable: !!target, bought, inFamily })}
+        // A click from the keyboard (Enter, Space) arms a tile that can be
+        // placed; one from the mouse says whether it is held. A tile with
+        // nothing to arm toggles held from the keyboard too, rather than
+        // doing nothing. `detail` is the mouse's click count, and 0 for a
+        // click the keyboard made.
+        onClick={(event) => (event.detail === 0 && target ? toggleArmed() : toggleHeld())}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          toggleArmed();
+        }}
+        onKeyDown={(event) => {
+          if (!inventory) return;
+          if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            step(inventory.id, 1);
+          } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            step(inventory.id, -1);
+          }
+        }}
+        draggable={!!target}
+        onDragStart={
+          target
+            ? (event) => {
+                event.dataTransfer.effectAllowed = 'copy';
+                // Required for the drag to start in Firefox; the drop reads the
+                // armed item, not this.
+                event.dataTransfer.setData('text/plain', name);
+                dragStart(spec as string);
+              }
+            : undefined
+        }
+        onDragEnd={target ? (event) => dragEnd(event.dataTransfer.dropEffect !== 'none') : undefined}
+      >
+        {sprite ? <Sprite resolver={resolver} spriteKey={sprite} size={itemSize} /> : null}
+        {where ? <PlacedTick /> : null}
+      </TooltipTrigger>
+      <TooltipContent className="z1r-ui max-w-64">
+        <CellTip heading={name} lines={facts} />
+      </TooltipContent>
+    </Tooltip>
+  );
+});
+
 export function ItemPalette(props: ItemPaletteProps) {
   const { state, armed, placedAt, resolver, itemSize, placeInto, arm, setHeld, step, dragStart, dragEnd } = props;
 
-  /** One tile, whatever it stands for. */
+  /** One tile, keyed by what it stands for. */
   const tile = (spec: TileSpec, inFamily: boolean) => {
     const bought = typeof spec !== 'string';
-    const pool = bought ? undefined : SCREEN_ITEMS_BY_ID.get(spec);
-    const def = bought ? undefined : (ROOM_ITEMS_BY_ID.get(spec) ?? pool);
-    if (!bought && !def) return null;
-
-    // The inventory item this tile reports, and the stage it stands for. The
-    // Heart Container's inventory id is empty, and the Map, the Compass and a
-    // Triforce piece have no pool entry: those four have no held state.
-    const inventory = bought ? ITEMS_BY_ID.get(spec.inventory) : pool?.itemId ? ITEMS_BY_ID.get(pool.itemId) : undefined;
-    const stage = bought ? spec.stage : (pool?.value ?? 0);
-    const value = inventory ? (state.items[inventory.id] ?? 0) : 0;
-    const name = bought ? (inventory ? labelFor(inventory, stage) : '') : def!.name;
-    const sprite = bought ? (inventory ? spriteFor(inventory, stage) : '') : def!.sprite;
-    const id = bought ? `${spec.inventory}.${spec.stage}` : spec;
-
-    const target = bought ? '' : targetFor(spec, placeInto);
-    const isArmed = !bought && armed === spec;
-    const where = bought ? '' : (placedAt.get(spec) ?? []).join(', ');
-    const held: Held = inventory && stage > 0 ? (value >= stage ? 'held' : 'unheld') : 'none';
-
-    /*
-     * A left click says whether you hold this tier. Not held: the item goes up
-     * to it. Held: the item drops to the tier below, so a click on the tier you
-     * have is how you take it back. A one-stage item is the same rule — on, off.
-     */
-    const toggleHeld = () => {
-      if (inventory && stage > 0) setHeld(inventory.id, value >= stage ? stage - 1 : stage);
-    };
-    const toggleArmed = () => {
-      if (target) arm(isArmed ? '' : spec as string);
-    };
-
-    // What the tile is, a fact per line. How to use the palette is behind the
-    // ? in the heading; the accessible name keeps it, since a screen reader
-    // reaches the tile without passing the ?.
-    const facts: string[] = [];
-    if (held !== 'none') facts.push(held === 'held' ? 'held' : 'not held');
-    if (where) facts.push(`placed at ${where}`);
-    if (isArmed) facts.push('armed');
-    if (bought) facts.push('bought in a shop, never placed');
-    else if (!target) facts.push('nowhere in this window to place it');
-    const hints: string[] = [];
-    if (target) hints.push(isArmed ? 'right-click to put it down' : `right-click to arm, or drag onto ${target}`);
-    if (held !== 'none') hints.push(held === 'held' ? 'click to mark it not held' : 'click to mark it held');
-    const text = [name, ...facts, ...hints].join(' — ');
-
     return (
-      <Tooltip key={id}>
-        <TooltipTrigger
-          type="button"
-          aria-label={text}
-          aria-pressed={held === 'none' ? isArmed : held === 'held'}
-          data-item={id}
-          data-armed={isArmed}
-          data-held={held === 'held'}
-          data-placed={!!where}
-          className={tileClass({ held, armed: isArmed, placeable: !!target, bought, inFamily })}
-          // A click from the keyboard (Enter, Space) arms; one from the mouse
-          // says whether it is held. `detail` is the mouse's click count, and 0
-          // for a click the keyboard made.
-          onClick={(event) => (event.detail === 0 ? toggleArmed() : toggleHeld())}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            toggleArmed();
-          }}
-          onKeyDown={(event) => {
-            if (!inventory) return;
-            if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-              event.preventDefault();
-              step(inventory.id, 1);
-            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-              event.preventDefault();
-              step(inventory.id, -1);
-            }
-          }}
-          draggable={!!target}
-          onDragStart={
-            target
-              ? (event) => {
-                  event.dataTransfer.effectAllowed = 'copy';
-                  // Required for the drag to start in Firefox; the drop reads the
-                  // armed item, not this.
-                  event.dataTransfer.setData('text/plain', name);
-                  dragStart(spec as string);
-                }
-              : undefined
-          }
-          onDragEnd={target ? (event) => dragEnd(event.dataTransfer.dropEffect !== 'none') : undefined}
-        >
-          {sprite ? <Sprite resolver={resolver} spriteKey={sprite} size={itemSize} /> : null}
-          {where ? <PlacedTick /> : null}
-        </TooltipTrigger>
-        <TooltipContent className="z1r-ui max-w-64">
-          <CellTip heading={name} lines={facts} />
-        </TooltipContent>
-      </Tooltip>
+      <PaletteTile
+        key={bought ? `${spec.inventory}.${spec.stage}` : spec}
+        spec={spec}
+        inFamily={inFamily}
+        items={state.items}
+        isArmed={!bought && armed === spec}
+        where={bought ? '' : (placedAt.get(spec) ?? []).join(', ')}
+        resolver={resolver}
+        itemSize={itemSize}
+        placeInto={placeInto}
+        arm={arm}
+        setHeld={setHeld}
+        step={step}
+        dragStart={dragStart}
+        dragEnd={dragEnd}
+      />
     );
   };
 
@@ -289,12 +344,10 @@ export function ItemPalette(props: ItemPaletteProps) {
     );
   };
 
-  /** An inventory item nothing places: held stage only, never armable. */
-  const inventoryTile = (def: ItemDef) => tile({ inventory: def.id, stage: 1 }, false);
 
   const groups = [
     ...PALETTE_GROUPS.map(({ name, caption, entries }) => ({ name, caption, tiles: entries.map(entry) })),
-    ...(UNPLACED.length ? [{ name: 'inventory', caption: 'Mark held', tiles: UNPLACED.map(inventoryTile) }] : []),
+    ...(UNPLACED.length ? [{ name: 'inventory', caption: 'Mark held', tiles: UNPLACED_SPECS.map((spec) => tile(spec, false)) }] : []),
   ];
 
   return (

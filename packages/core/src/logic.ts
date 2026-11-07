@@ -15,6 +15,7 @@ import { OVERWORLD_STAIRWAY_COUNT } from './overworld.js';
 import { triforceCount } from './state.js';
 import { TRIFORCE_REQUIRED_FOR_L9 } from './dungeons.js';
 import { deriveItemLocations } from './placements.js';
+import { LEVEL_NINE } from './rooms.js';
 
 /** Level 9's entrance stays shut until every Triforce piece is in hand. */
 export function canEnterLevel9(state: TrackerState): boolean {
@@ -132,4 +133,35 @@ export function warpRoutes(state: TrackerState): WarpRoute[] {
     routes.push({ warp, screen: screens.get(warp) ?? null, exits });
   }
   return routes;
+}
+
+/**
+ * How far along a level is, for the Levels strip.
+ *
+ * - found: a screen on the overworld is marked as this level.
+ * - complete: for Levels 1-8, its Triforce piece is held and every item slot
+ *   the level has under the current seed holds a recorded item; for Level 9,
+ *   rooms on its sheet record both Ganon and Zelda.
+ *
+ * Complete does not require found: a run can hold the piece and every item
+ * without ever marking the entrance on the map, and that level is done.
+ */
+export type LevelProgress = 'notFound' | 'found' | 'complete';
+
+export function levelProgress(state: TrackerState, level: number): LevelProgress {
+  if (levelIsComplete(state, level)) return 'complete';
+  const found = Object.entries(state.screenNotes).some(
+    ([screen, note]) => note.dungeon === level && state.marks[screen] === 'dungeon',
+  );
+  return found ? 'found' : 'notFound';
+}
+
+function levelIsComplete(state: TrackerState, level: number): boolean {
+  if (level === LEVEL_NINE) {
+    const bosses = new Set(Object.values(state.rooms[String(level)] ?? {}).map((room) => room.boss));
+    return bosses.has('ganon') && bosses.has('zelda');
+  }
+  if (!state.dungeons[String(level)]?.triforce) return false;
+  const slots = deriveItemLocations(state).slots.filter((slot) => slot.location.level === level);
+  return slots.length > 0 && slots.every((slot) => slot.placement !== null);
 }

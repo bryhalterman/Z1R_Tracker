@@ -32,6 +32,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#compo
 import { SpriteArt } from '../shared/Sprite.js';
 import { LayoutArt } from '../room-card/LayoutArt.js';
 import { CellTip } from './CellTip.js';
+import { dropTarget } from '../shared/drop-target.js';
 
 /** Edge class suffixes, matching the `.n .e .s .w` hooks OBS CSS is written against. */
 const SIDE_CLASS: Record<RoomSide, string> = {
@@ -85,7 +86,6 @@ export interface RoomGridProps {
   readonly state: TrackerState;
   readonly level: number;
   readonly selected: string;
-  readonly interactive: boolean;
   readonly resolver: SpriteResolver;
   /** A click on a room: the panel decides whether that selects, cycles or drops. */
   readonly onTouch: (room: string) => void;
@@ -97,7 +97,7 @@ const ROOM_IDS: readonly string[] = Array.from({ length: ROOM_ROWS * ROOM_COLUMN
   roomId((index % ROOM_COLUMNS) + 1, Math.floor(index / ROOM_COLUMNS) + 1),
 );
 
-export function RoomGrid({ state, level, selected, interactive, resolver, onTouch, canDrop }: RoomGridProps) {
+export function RoomGrid({ state, level, selected, resolver, onTouch, canDrop }: RoomGridProps) {
   const rooms = state.rooms[String(level)] ?? {};
   const entrance = state.levelStarts[String(level)];
   const ladderHeld = (state.items['ladder'] ?? 0) >= 1;
@@ -112,7 +112,6 @@ export function RoomGrid({ state, level, selected, interactive, resolver, onTouc
           isEntrance={entrance === id}
           ladderHeld={ladderHeld}
           isSelected={id === selected}
-          interactive={interactive}
           resolver={resolver}
           onTouch={onTouch}
           canDrop={canDrop}
@@ -129,7 +128,6 @@ interface RoomCellProps {
   readonly isEntrance: boolean;
   readonly ladderHeld: boolean;
   readonly isSelected: boolean;
-  readonly interactive: boolean;
   readonly resolver: SpriteResolver;
   readonly onTouch: (room: string) => void;
   readonly canDrop: () => boolean;
@@ -147,7 +145,6 @@ const RoomCell = memo(function RoomCell({
   isEntrance,
   ladderHeld,
   isSelected,
-  interactive,
   resolver,
   onTouch,
   canDrop,
@@ -204,28 +201,8 @@ const RoomCell = memo(function RoomCell({
         data-collected={String(collected)}
         aria-current={isSelected ? 'true' : 'false'}
         aria-label={label}
-        disabled={!interactive}
-        onClick={interactive ? () => onTouch(id) : undefined}
-        // A palette drag lands like a click with the item armed: the drag
-        // armed it, so the click handler places it.
-        onDragEnter={interactive ? (event) => canDrop() && event.preventDefault() : undefined}
-        onDragOver={
-          interactive
-            ? (event) => {
-                if (!canDrop()) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'copy';
-              }
-            : undefined
-        }
-        onDrop={
-          interactive
-            ? (event) => {
-                event.preventDefault();
-                onTouch(id);
-              }
-            : undefined
-        }
+        onClick={() => onTouch(id)}
+        {...dropTarget(canDrop, () => onTouch(id))}
       >
         {/*
          * The doorways, drawn and nothing more. The compass on the room card is

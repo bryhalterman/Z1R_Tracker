@@ -9,29 +9,18 @@
 
 import {
   safeStorage,
-  DUNGEON_BLOCKS,
-  DUNGEONS,
-  deriveItemLocations,
-  MARKS,
   OVERWORLD_COLUMNS,
   overworldMap,
   OVERWORLD_STAIRWAY_COUNT,
   warpRoutes,
-  ROOM_ITEMS,
   ROOM_ITEMS_BY_ID,
   REGIONS_BY_ID,
-  SECRET_SIZES,
-  SHOP_STOCK,
-  SCREEN_ITEMS,
   SCREEN_ITEMS_BY_ID,
   ITEMS,
-  ITEMS_BY_ID,
   labelFor,
   maxValue,
   spriteFor,
   type ItemDef,
-  type MarkKind,
-  type RoomItemDef,
   type ScreenNote,
   type SecretSize,
   type SpriteResolver,
@@ -46,6 +35,7 @@ import { mountHelpTip, mountPanelToggle } from './panel/mount.js';
 import { mountDockItems } from './items/mount.js';
 import { MAP_PREVIEW_EVENT, type MapPreview } from './map-preview.js';
 import { mapsLayout } from './maps-layout.js';
+import { collectDisposers, onDispose } from './shared/disposers.js';
 import {
   mountMapBrushes,
   mountMapHeading,
@@ -81,7 +71,15 @@ export interface MountOptions {
   readonly resolver: SpriteResolver;
   /** `overlay` drops padding and chrome for use as an OBS browser source. */
   readonly mode?: 'full' | 'overlay';
-  /** false renders a read-only display — the browser source should not be clickable. */
+  /**
+   * false renders the seed, items, Item locations and hint log read-only, for
+   * the OBS browser source, which should not be clickable.
+   *
+   * Only the shipped mounts are supported: the overlay, the one read-only
+   * mount, never shows the map or rooms, so those two are always clickable and
+   * ignore this. The Triforce panel, which only the overlay builds, is always
+   * display only.
+   */
   readonly interactive?: boolean;
   readonly sections?: readonly TrackerSection[];
   /** Item cell edge length in CSS pixels. */
@@ -313,19 +311,15 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     items: () =>
       palette
         ? buildPalette(store, resolver, patches, { itemSize, placement, placeInto })
-        : buildItems(store, resolver, patches, {
-            interactive,
-            itemSize,
-            // The browser sources keep the split; a page does not.
-            grouped: mode === 'overlay' || compact,
-          }),
-    dungeons: () => buildTriforce(store, resolver, patches, interactive),
+        : buildItems(store, resolver, patches, { interactive, itemSize }),
+    dungeons: () => buildTriforce(resolver, patches),
     // A column per level headed by its Triforce piece — which, in the page's
     // Items card, covers the Triforce panel as well.
     locations: () => buildLocations(store, resolver, patches, interactive, palette),
     hintlog: () => buildHintTracker(store, patches, interactive),
-    map: () => buildMap(store, resolver, patches, interactive, placement),
-    rooms: () => buildRooms(store, resolver, patches, interactive, placement),
+    // Only interactive mounts show these; the overlay's allow-list leaves them out.
+    map: () => buildMap(store, resolver, patches, placement),
+    rooms: () => buildRooms(store, resolver, patches, placement),
   };
 
   /*
@@ -347,13 +341,24 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     document.addEventListener('keydown', onEscape, true);
   }
 
+  /*
+   * Everything this mount must undo on teardown: each panel's React root
+   * registers its own unmount while the panels are built (see
+   * `collectDisposers`), and the document listeners and the Maps watcher
+   * are added below.
+   */
+  const disposers: (() => void)[] = [];
+  const collect = (build: () => void) => disposers.push(...collectDisposers(build).disposers);
+
   const built = new Map<TrackerSection, HTMLElement>();
-  for (const name of sections) {
-    if (name === 'dungeons' && piecesInLocations) continue;
-    // An unknown `?sections=` value must not take the whole overlay down.
-    const build = builders[name];
-    if (build) built.set(name, build());
-  }
+  collect(() => {
+    for (const name of sections) {
+      if (name === 'dungeons' && piecesInLocations) continue;
+      // An unknown `?sections=` value must not take the whole overlay down.
+      const build = builders[name];
+      if (build) built.set(name, build());
+    }
+  });
   const items = built.get('items');
   const triforce = built.get('dungeons');
 
@@ -422,7 +427,9 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     const choice = mapsLayout.get();
     main.dataset.maps = choice === 'auto' ? (root.dataset.width === 'md' ? 'side' : 'stacked') : choice;
   };
-  if (followMapsLayout) mapsLayout.watch(applyMapsLayout);
+  // The choice is module state shared by every mount, so the watch is undone
+  // on teardown rather than left holding this mount's tree.
+  if (followMapsLayout) disposers.push(mapsLayout.watch(applyMapsLayout));
 
   /*
    * Balance each item grid so the last row is never a stray remainder.
@@ -439,18 +446,14 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    * multiple and visibly disagree with its neighbour.
    */
   const balanceItemGrids = () => {
+    /*
+     * Overlay only. Other mounts have room to let cells stretch to fill, which
+     * is what `auto-fill` with a `1fr` track already does well; balancing
+     * there would shrink every cell to its minimum and centre the block. The
+     * mode is fixed per mount, so those mounts never write a column count.
+     */
+    if (mode !== 'overlay') return;
     for (const grid of root.querySelectorAll<HTMLElement>('.z1r-item-grid')) {
-      /*
-       * Overlay only. The web and desktop panels have room to let cells stretch
-       * to fill, which is what `auto-fill` with a `1fr` track already does well;
-       * balancing there would shrink every cell to its minimum and centre the
-       * block, which is a change to those apps that nobody asked for.
-       */
-      if (mode !== 'overlay') {
-        if (grid.style.gridTemplateColumns) grid.style.removeProperty('grid-template-columns');
-        continue;
-      }
-
       const count = grid.childElementCount;
       if (count === 0) continue;
 
@@ -520,11 +523,18 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
    * Folding is for the dock and the page, never the overlay: a browser source
    * takes no clicks, so a caret there would be furniture that cannot be used.
    */
-  if (interactive) wireCollapsing(root, defaultCollapsed);
+  if (interactive) collect(() => wireCollapsing(root, defaultCollapsed));
 
   applyLayout();
   const widthObserver = new ResizeObserver(applyLayout);
   widthObserver.observe(root);
+  /*
+   * The map too. Side by side and stacked change the map panel's width
+   * without changing the root's, so watching the root alone left the cells at
+   * their old pixel size until the window itself was resized.
+   */
+  const map = root.querySelector<HTMLElement>('.z1r-map');
+  if (map) widthObserver.observe(map);
 
   apply(store.getState());
   const unsubscribe = store.subscribe(apply);
@@ -533,8 +543,11 @@ export function mountTracker(root: HTMLElement, options: MountOptions): () => vo
     unsubscribe();
     document.removeEventListener('keydown', onEscape, true);
     widthObserver.disconnect();
+    for (const dispose of disposers) dispose();
     root.replaceChildren();
     root.classList.remove('z1r-tracker');
+    // What this mount wrote on the root, so a later mount starts clean.
+    for (const key of ['mode', 'compact', 'interactive', 'width', 'rail']) delete root.dataset[key];
   };
 }
 
@@ -554,8 +567,6 @@ function buildItems(
   opts: {
     interactive: boolean;
     itemSize: number;
-    /** Keep the inventory screen's always-active / B-slot split. */
-    grouped: boolean;
   },
 ): HTMLElement {
   const { root, body } = section('Items', 'z1r-item-groups');
@@ -582,7 +593,6 @@ function buildItems(
         placedAt: placedIndex(state),
         resolver,
         itemSize: opts.itemSize,
-        grouped: opts.grouped,
         step,
       }),
     );
@@ -593,41 +603,21 @@ function buildItems(
   const cellOpts = { ...opts, placedAt };
 
   /*
-   * One grid on a page, two labelled groups on a stream.
-   *
-   * The inventory screen's own split — always-active on top, the boxed B-slot
-   * below — cost two captions, two gaps and a border drawn around whatever
-   * empty space the B-slot row did not fill. On a page that is furniture: the
-   * items are in the game's order either way, and which half an item lives in
-   * is not a question anyone asks the tracker. The browser sources keep the
-   * split, because they are composed by hand against a stream layout and the
-   * overlay balances each grid's columns separately.
+   * The inventory screen's own split: always-active on top, the boxed B-slot
+   * below, each labelled. The browser sources are composed by hand against a
+   * stream layout, and the overlay balances each grid's columns separately.
    */
-  const buildGroup = (group: 'passive' | 'bslot', grid: HTMLElement) => {
+  for (const [group, caption] of [
+    ['passive', 'Always active'],
+    ['bslot', 'B slot'],
+  ] as const) {
+    const wrap = el('div', 'z1r-item-group');
+    wrap.dataset.group = group;
+    wrap.append(el('span', 'z1r-item-group-label', caption));
+    const grid = el('div', 'z1r-item-grid');
     for (const def of ITEMS.filter((item) => item.group === group)) {
       grid.append(buildItemCell(resolver, def, cellPatches, cellOpts));
     }
-  };
-
-  if (opts.grouped) {
-    for (const [group, caption] of [
-      ['passive', 'Always active'],
-      ['bslot', 'B slot'],
-    ] as const) {
-      const wrap = el('div', 'z1r-item-group');
-      wrap.dataset.group = group;
-      wrap.append(el('span', 'z1r-item-group-label', caption));
-      const grid = el('div', 'z1r-item-grid');
-      buildGroup(group, grid);
-      wrap.append(grid);
-      body.append(wrap);
-    }
-  } else {
-    const wrap = el('div', 'z1r-item-group');
-    wrap.dataset.group = 'all';
-    const grid = el('div', 'z1r-item-grid');
-    buildGroup('passive', grid);
-    buildGroup('bslot', grid);
     wrap.append(grid);
     body.append(wrap);
   }
@@ -817,7 +807,6 @@ function buildMap(
   store: Store,
   resolver: SpriteResolver,
   patches: Patch[],
-  interactive: boolean,
   placement: PlacementChannel,
 ): HTMLElement {
   const { root, body } = section('Overworld', 'z1r-map');
@@ -863,7 +852,7 @@ function buildMap(
       warpsFound: Object.values(state.marks).filter((mark) => mark === 'stairway').length,
       warpsTotal: OVERWORLD_STAIRWAY_COUNT,
       focus: def ? `showing ${def.code} · ${def.name}` : '',
-      onClear: interactive ? () => void clearMap() : undefined,
+      onClear: () => void clearMap(),
     });
   };
   patches.push(drawHeading);
@@ -960,7 +949,6 @@ function buildMap(
       // A missing or unreachable map leaves the cells blank; the codes and
       // marks carry the tracker's own information regardless.
       mapUrl: resolved.kind === 'image' ? resolved.url : '',
-      interactive,
       resolver,
       onTouch: touchScreen,
       onClear: clearScreen,
@@ -1141,7 +1129,7 @@ function buildMap(
   const syncToolbar = (state: TrackerState) => {
     const view: MapView = { selected, armed, armedLevel, armedStairway, armedSecret };
     brushes.render({ state, view, resolver, actions });
-    screenCard.render({ state, view, resolver, interactive, actions });
+    screenCard.render({ state, view, resolver, actions });
   };
 
   // Escape lets go of the screen without having to find somewhere safe to click.
@@ -1193,11 +1181,14 @@ function buildMap(
     body.dataset.preview = String(matches.size > 0);
     drawGrid(state);
   };
-  document.addEventListener(MAP_PREVIEW_EVENT, (event) => {
+  const onPreview = (event: Event) => {
     const tracker = body.closest('.z1r-tracker');
     if (!tracker || !(event.target instanceof Node) || !tracker.contains(event.target)) return;
     applyPreview((event as CustomEvent<MapPreview>).detail);
-  });
+  };
+  document.addEventListener(MAP_PREVIEW_EVENT, onPreview);
+  // On the document, so it outlives this panel unless the mount takes it off.
+  onDispose(() => document.removeEventListener(MAP_PREVIEW_EVENT, onPreview));
 
   return root;
 }
