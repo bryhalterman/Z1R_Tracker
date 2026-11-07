@@ -222,9 +222,9 @@ function RoomHeader({ room, isEntrance }: { room: RoomContext; isEntrance: boole
         onPressedChange={() => selected && commit({ type: 'setLevelStart', level, room: selected })}
       />
       <Button
-        variant="ghost"
+        variant="destructive"
         size="sm"
-        className="ml-auto text-destructive"
+        className="ml-auto"
         disabled={!note}
         title="Forget everything recorded about this room"
         onClick={() => patch(wipePatch())}

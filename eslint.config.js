@@ -35,6 +35,12 @@ export default tseslint.config(
     languageOptions: { globals: globals.serviceworker },
   },
   {
+    // Ambient globals are declared with `var`: only that puts them on
+    // `globalThis`, which core reads storage and its listeners through.
+    files: ['**/*.d.ts'],
+    rules: { 'no-var': 'off' },
+  },
+  {
     rules: {
       // A leading underscore marks a parameter kept for its position.
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],

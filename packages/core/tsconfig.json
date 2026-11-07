@@ -1,12 +1,14 @@
 // Core alone, without the Node or Vite types the root config adds for the apps
-// and the tests: its source runs in the browser and must not reach for Node
-// globals. Part of `npm run typecheck`.
+// and the tests, and without the DOM lib: its source must not reach for Node
+// globals or the page. The few browser APIs it does call are declared in
+// platform.d.ts. Part of `npm run typecheck`.
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "lib": ["ES2022"],
     "types": []
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "platform.d.ts"],
   "exclude": ["src/**/*.test.ts"]
 }

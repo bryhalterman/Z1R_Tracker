@@ -17,7 +17,9 @@
 ```
 
 Dependencies point one way only. `core` renders nothing: its only browser APIs are storage and
-`BroadcastChannel` for persistence, and `fetch` and `Image` for loading sprites. `ui` knows nothing
+`BroadcastChannel` for persistence, and `fetch` and `Image` for loading sprites. Core's own
+typecheck runs without the DOM lib and declares just those in `packages/core/platform.d.ts`, so
+any other browser global is a compile error. `ui` knows nothing
 about which app it's inside; apps hold only their own wiring and build config.
 
 Apps import workspace packages as **TypeScript source**, aliased in `vite.shared.mjs`. There is no

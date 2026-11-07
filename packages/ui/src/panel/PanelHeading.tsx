@@ -47,18 +47,15 @@ export interface ClearButtonProps {
 }
 
 /**
- * A heading's destructive Clear. Red text and border, but not by hue alone: it
+ * A heading's destructive Clear. Red text on a red tint, but not by hue alone: it
  * sits apart at the end of the heading, and every caller asks before it fires.
  */
 export function ClearButton({ title, onClear, className }: ClearButtonProps) {
   return (
     <Button
-      variant="outline"
+      variant="destructive"
       size="sm"
-      className={cn(
-        'z1r-ui tracking-normal normal-case text-destructive hover:border-destructive',
-        className,
-      )}
+      className={cn('z1r-ui tracking-normal normal-case', className)}
       title={title}
       onClick={onClear}
     >
