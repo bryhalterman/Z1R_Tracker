@@ -626,3 +626,29 @@ test('a stored entry for a slot only the other quest has stays hidden, not overf
   const derived = deriveItemLocations(state);
   assert.equal([...derived.overflow.values()].flat().length, 0);
 });
+
+test('collecting a Triforce Piece in a room marks that level’s piece held', () => {
+  let state = placeRoom(createInitialState(), 3, 'B4', 'triforce');
+  assert.equal(state.dungeons['3']?.triforce, false, 'placing it does not mark it');
+  state = reduce(state, { type: 'collectRoom', level: 3, room: 'B4', collected: true });
+  assert.equal(state.dungeons['3']?.triforce, true);
+  // Un-collecting never takes it back, the same as the inventory.
+  state = reduce(state, { type: 'collectRoom', level: 3, room: 'B4', collected: false });
+  assert.equal(state.dungeons['3']?.triforce, true);
+});
+
+test('a room patch that places and collects a Triforce Piece marks the piece', () => {
+  const state = reduce(createInitialState(), {
+    type: 'setRoomNote',
+    level: 5,
+    room: 'C2',
+    patch: { item: 'triforce', collected: true },
+  });
+  assert.equal(state.dungeons['5']?.triforce, true);
+});
+
+test('a Triforce Piece collected on Level 9 marks no piece', () => {
+  let state = placeRoom(createInitialState(), 9, 'B4', 'triforce');
+  state = reduce(state, { type: 'collectRoom', level: 9, room: 'B4', collected: true });
+  assert.equal(state.dungeons['9']?.triforce, false);
+});

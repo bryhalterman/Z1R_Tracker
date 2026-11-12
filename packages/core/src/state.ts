@@ -570,6 +570,22 @@ function grantPoolEntry(items: Record<string, number>, poolId: string): Record<s
 }
 
 /**
+ * What picking up a room's item raises: the inventory, or — for a Triforce
+ * Piece, which is no inventory item — that level's piece, the same flag the
+ * Item locations piece and the Triforce panel read. Only ever raises, like
+ * `grantPoolEntry`, and returns an empty patch when nothing rises.
+ */
+function grantRoomPickup(state: TrackerState, level: string, item: string): Partial<TrackerState> {
+  if (item !== 'triforce') {
+    const items = grantPoolEntry(state.items, item);
+    return items === state.items ? {} : { items };
+  }
+  const current = state.dungeons[level];
+  if (!current || current.triforce || !holdsTriforcePiece(Number(level))) return {};
+  return { dungeons: { ...state.dungeons, [level]: { ...current, triforce: true } } };
+}
+
+/**
  * The collected flag after an edit that may also have changed the item.
  *
  * A flag is about one item, so a changed or cleared item drops it unless the
@@ -989,7 +1005,7 @@ const ROOM_HANDLERS: Pick<
     // Un-collecting never revokes, the same promise `collectLocation` makes:
     // the inventory may have been raised by other means since.
     if (!action.collected) return bump({ rooms });
-    return bump({ rooms, items: grantPoolEntry(state.items, target.current.item) });
+    return bump({ rooms, ...grantRoomPickup(state, target.level, target.current.item) });
   },
 
   setRoomFrom(state, action, bump) {
@@ -1064,7 +1080,7 @@ const ROOM_HANDLERS: Pick<
         : { ...existing, [action.room]: merged };
     const rooms = writeRooms(state.rooms, target.level, levelRooms);
     if (!settled.picked) return bump({ rooms });
-    return bump({ rooms, items: grantPoolEntry(state.items, merged.item) });
+    return bump({ rooms, ...grantRoomPickup(state, target.level, merged.item) });
   },
 
   clearRooms(state, action, bump) {
