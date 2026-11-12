@@ -197,9 +197,12 @@ so leave screens unmarked until you have been there.
 
 ### Fill in a dungeon entrance
 
-Select a Dungeon screen, or arm the Dungeon mark, and pick the level number.
-When the Dungeon mark is armed, pick a level before stamping;
-the toolbar label reads "Pick a level" until you do.
+Mark the screen as a Dungeon, then pick its level number on the screen card.
+An armed Dungeon mark stamps the screen straight away and selects it,
+so the Level row is ready for the number.
+The same goes for a Warp and its number, and a Rupee secret and its size.
+Setting a level or warp number that another screen already has
+clears that screen, because each number belongs to one place.
 
 Under **Blocked by**, toggle what kept you out:
 Locked door, Bomb wall, Ladder gap, Needs the Bow, or Needs the Recorder.

@@ -760,9 +760,9 @@ const SCREEN_NOTE_HANDLERS: Pick<
   },
 
   toggleDungeonBlock(state, action, bump) {
-    // Blockers belong to a dungeon. With the dungeon brush armed the card
-    // offers them for whatever screen is selected, so this is reachable on a
-    // shop; refusing keeps an invisible blocker off it.
+    // Blockers belong to a dungeon. The card only offers them on one, but
+    // this also arrives from other windows and saves; refusing keeps an
+    // invisible blocker off any other screen.
     if (state.marks[action.screen] !== 'dungeon') return state;
     const current = state.screenNotes[action.screen] ?? emptyNote();
     const held = current.blocks.includes(action.block);

@@ -3,46 +3,25 @@
  * and what the screen card is describing.
  */
 
-import { MARKS_BY_KIND, SECRET_SIZES, type MarkKind, type ScreenNote, type TrackerState } from '@z1r/core';
+import { MARKS_BY_KIND, type MarkKind, type ScreenNote, type TrackerState } from '@z1r/core';
 import type { Armed, MapView } from './MapTools.js';
 
 export interface Status {
   readonly text: string;
-  /** The armed brush needs a choice before a click can place anything. */
-  readonly waiting: boolean;
 }
 
-const placing = (text: string): Status => ({ text: `Placing ${text}`, waiting: false });
-
-/**
- * The brushes that carry a choice of their own. One that returns nothing
- * reads like any other brush, by its mark's name.
- */
-const ARMED_STATUS: Partial<Record<MarkKind, (view: MapView) => Status | undefined>> = {
-  dungeon: (view) =>
-    view.armedLevel ? placing(`Level ${view.armedLevel}`) : { text: 'Pick a level', waiting: true },
-  stairway: (view) =>
-    view.armedStairway ? placing(`Warp ${view.armedStairway}`) : { text: 'Pick a warp', waiting: true },
-  rupeeSecret: (view) => {
-    if (!view.armedSecret) return undefined;
-    const size = SECRET_SIZES.find((entry) => entry.id === view.armedSecret)?.name ?? '';
-    return placing(`${size} rupee secret`);
-  },
-};
+const placing = (text: string): Status => ({ text: `Placing ${text}` });
 
 /** What the next click on the map does, in the order the controls read. */
 export function statusLine({ state, view }: { state: TrackerState; view: MapView }): Status {
   const { selected, armed } = view;
   if (armed === 'start') return placing('the start');
-  if (armed) return ARMED_STATUS[armed]?.(view) ?? placing(MARKS_BY_KIND.get(armed)?.name ?? armed);
+  if (armed) return placing(MARKS_BY_KIND.get(armed)?.name ?? armed);
   if (selected) {
     const mark = state.marks[selected];
-    return {
-      text: `${selected} selected${mark ? ` · ${MARKS_BY_KIND.get(mark)?.name ?? mark}` : ''}`,
-      waiting: false,
-    };
+    return { text: `${selected} selected${mark ? ` · ${MARKS_BY_KIND.get(mark)?.name ?? mark}` : ''}` };
   }
-  return { text: 'Pick a screen, or a marker to place', waiting: false };
+  return { text: 'Pick a screen, or a marker to place' };
 }
 
 /** Which mark the screen card's rows are for; '' for none. */
@@ -53,17 +32,18 @@ export interface CardSubject {
   readonly mark: MarkKind;
   readonly note: ScreenNote | undefined;
   /**
-   * The rows shown are for whichever the card is describing: the marker being
-   * armed, or the screen being edited.
+   * The selected screen's mark, whose rows the card shows. Every row edits the
+   * selected screen, so with nothing selected there are none: an armed marker
+   * stamps its mark, and its rows follow on the screen it stamped.
    */
   readonly showing: Showing;
 }
 
 export function cardSubject(state: TrackerState, view: MapView): CardSubject {
-  const { selected, armed } = view;
+  const { selected } = view;
   const mark = selected ? (state.marks[selected] ?? 'none') : 'none';
   const note = selected ? state.screenNotes[selected] : undefined;
-  return { mark, note, showing: armed || (selected ? mark : '') };
+  return { mark, note, showing: selected ? mark : '' };
 }
 
 /**

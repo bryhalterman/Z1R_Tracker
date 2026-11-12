@@ -8,7 +8,6 @@ import {
   type Action,
   type MarkKind,
   type ScreenNote,
-  type SecretSize,
   type SpriteResolver,
   type Store,
   type TrackerState,
@@ -148,12 +147,6 @@ export function buildMap(
    */
   /** A mark, or the start pennant, which is one per map rather than a mark. */
   let armed: Armed = '';
-  /** Which level the armed Dungeon marker will place. 0 means none chosen. */
-  let armedLevel = 0;
-  /** Which of the four the armed Stairway marker will place. 0 means none. */
-  let armedStairway = 0;
-  /** The size the armed Rupee secret marker stamps. Optional, unlike the two above. */
-  let armedSecret: SecretSize = '';
 
   /** Screens another panel is pointing at — see `applyPreview` below. */
   let previewed: ReadonlySet<string> = new Set();
@@ -229,29 +222,16 @@ export function buildMap(
   };
 
   /**
-   * What a click with each of the markers that are not plain marks writes, or
-   * `null` while the marker cannot stamp yet.
+   * What a click with the armed marker writes. Every mark stamps as it is —
+   * a dungeon with no level yet, a warp with no number, a secret with no
+   * size — and the stamped screen is selected, so the card's rows to fill
+   * those in are right there. The start pennant is one per map: it moves,
+   * and leaves the screen's mark alone.
    */
-  const stamps: Record<'dungeon' | 'stairway' | 'start', (screen: string) => Action | null> = {
-    // A dungeon needs its number first. You learn which level it is by walking
-    // into it, so by the time you are marking one you know — and an unnumbered
-    // dungeon marker is a note to yourself that says nothing useful.
-    dungeon: (screen) => (armedLevel ? { type: 'placeDungeon', screen, level: armedLevel } : null),
-    // A stairway the same. The four are indistinguishable on the map, so an
-    // unnumbered one records nothing you did not already know from the mark.
-    stairway: (screen) => (armedStairway ? { type: 'placeStairway', screen, number: armedStairway } : null),
-    // One per map: this moves the pennant, and leaves the screen's mark alone.
-    start: (screen) => ({ type: 'setStartScreen', screen }),
-  };
-  const stampMark = (screen: string, mark: MarkKind): Action => {
-    // The size goes on in the same edit as the mark.
-    const patch = mark === 'rupeeSecret' && armedSecret ? { secret: armedSecret } : {};
-    return { type: 'markScreen', screen, mark, patch };
-  };
-  const stampFor = (screen: string, kind: Exclude<Armed, ''>): Action | null =>
-    kind === 'dungeon' || kind === 'stairway' || kind === 'start'
-      ? stamps[kind](screen)
-      : stampMark(screen, kind);
+  const stampFor = (screen: string, kind: Exclude<Armed, ''>): Action =>
+    kind === 'start'
+      ? { type: 'setStartScreen', screen }
+      : { type: 'markScreen', screen, mark: kind as MarkKind, patch: {} };
 
   /** A tile click: drop the armed item or stamp the armed marker, and edit the tile. */
   const touchScreen = (screen: string) => {
@@ -264,9 +244,7 @@ export function buildMap(
       selectScreen(screen);
       return;
     }
-    const action = stampFor(screen, armed);
-    if (!action) return;
-    store.dispatch(action);
+    store.dispatch(stampFor(screen, armed));
     // Selected, not toggled — clicking an already-selected tile while armed
     // should re-stamp it, not drop the selection out from under the detail rows.
     selected = screen;
@@ -289,9 +267,6 @@ export function buildMap(
 
   const setArmed = (kind: Armed) => {
     armed = kind;
-    if (kind !== 'dungeon') armedLevel = 0;
-    if (kind !== 'stairway') armedStairway = 0;
-    if (kind !== 'rupeeSecret') armedSecret = '';
     /*
      * The marker brush and the palette are exclusive. Each arms what the next
      * click on this map does, so with both armed one click would mean two
@@ -314,34 +289,16 @@ export function buildMap(
 
   const actions: MapActions = {
     arm: (kind) => setArmed(kind),
+    // Through `placeDungeon` and `placeStairway`, so a number set here still
+    // moves off whichever screen held it before.
     pickLevel: (level) => {
-      if (armed === 'dungeon') {
-        // Arming half of the flow: marker, then number, then click the map.
-        armedLevel = level;
-        syncToolbar(store.getState());
-        return;
-      }
-      // Editing a screen already on the map. Through `placeDungeon`, so a
-      // renumbered one still moves the level off wherever it used to be.
       if (selected && level) store.dispatch({ type: 'placeDungeon', screen: selected, level });
     },
     pickStairway: (number) => {
-      if (armed === 'stairway') {
-        armedStairway = number;
-        syncToolbar(store.getState());
-        return;
-      }
       if (selected && number) store.dispatch({ type: 'placeStairway', screen: selected, number });
     },
-    pickSecret: (size) => {
-      if (armed === 'rupeeSecret') {
-        armedSecret = size;
-        syncToolbar(store.getState());
-        return;
-      }
-      // Optional, unlike a level: the same size again takes it back off.
-      patchSelected({ secret: size });
-    },
+    // The same size again takes it back off.
+    pickSecret: (size) => patchSelected({ secret: size }),
     toggleBlock: (block) => {
       if (selected) store.dispatch({ type: 'toggleDungeonBlock', screen: selected, block });
     },
@@ -363,7 +320,7 @@ export function buildMap(
 
   /** Draws the brushes and the screen card from the map's view state. */
   const syncToolbar = (state: TrackerState) => {
-    const view: MapView = { selected, armed, armedLevel, armedStairway, armedSecret };
+    const view: MapView = { selected, armed };
     brushes.render({ state, view, resolver, actions });
     screenCard.render({ state, view, resolver, actions });
   };

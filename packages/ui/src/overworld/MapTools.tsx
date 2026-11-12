@@ -50,14 +50,10 @@ export type Armed = MarkKind | 'start' | '';
 export interface MapView {
   selected: string;
   armed: Armed;
-  armedLevel: number;
-  armedStairway: number;
-  armedSecret: SecretSize;
 }
 
 export interface MapActions {
   arm: (kind: Armed) => void;
-  /** 0 takes an armed level back off. */
   pickLevel: (level: number) => void;
   pickStairway: (number: number) => void;
   pickSecret: (size: SecretSize) => void;
@@ -150,13 +146,7 @@ export function MapBrushes(props: MapBrushesProps) {
             <Sprite resolver={resolver} spriteKey="mark.start" size={18} />
           </TooltipTrigger>
         </Tip>
-        <span
-          className={cn(
-            'ml-2 truncate text-xs',
-            status.waiting ? 'font-medium text-primary' : 'text-muted-foreground',
-          )}
-          aria-live="polite"
-        >
+        <span className="ml-2 truncate text-xs text-muted-foreground" aria-live="polite">
           {status.text}
         </span>
       </div>
@@ -362,47 +352,43 @@ function IconToggle({
   );
 }
 
-function DungeonRows({ view, mark, note, resolver, actions }: MarkRowsProps) {
-  const { selected, armed } = view;
+function DungeonRows({ note, resolver, actions }: MarkRowsProps) {
   return (
     <>
       <Row label="Level">
         <Numbers
           label="Level"
-          value={numberValue(armed === 'dungeon' ? view.armedLevel : (note?.dungeon ?? 0))}
+          value={numberValue(note?.dungeon ?? 0)}
           options={LEVELS}
           onChange={(value) => actions.pickLevel(Number(value) || 0)}
           // Hovering a number points at where that level already is.
           preview={(value) => ({ kind: 'dungeon', level: Number(value) })}
         />
       </Row>
-      {/* Blockers belong to a dungeon, and the reducer refuses them on
-          anything else, so the row is only offered on a dungeon screen —
-          not on a shop selected while the dungeon brush is armed. */}
-      {selected && mark === 'dungeon' ? (
-        <Row label="Blocked by">
-          {DUNGEON_BLOCKS.map((block) => (
-            <IconToggle
-              key={block.id}
-              name={block.name}
-              sprite={block.sprite}
-              on={!!note?.blocks.includes(block.id)}
-              resolver={resolver}
-              onToggle={() => actions.toggleBlock(block.id)}
-            />
-          ))}
-        </Row>
-      ) : null}
+      {/* These rows only show for a screen marked Dungeon, the one mark the
+          reducer accepts blockers on. */}
+      <Row label="Blocked by">
+        {DUNGEON_BLOCKS.map((block) => (
+          <IconToggle
+            key={block.id}
+            name={block.name}
+            sprite={block.sprite}
+            on={!!note?.blocks.includes(block.id)}
+            resolver={resolver}
+            onToggle={() => actions.toggleBlock(block.id)}
+          />
+        ))}
+      </Row>
     </>
   );
 }
 
-function WarpRows({ view, note, actions }: MarkRowsProps) {
+function WarpRows({ note, actions }: MarkRowsProps) {
   return (
     <Row label="Warp">
       <Numbers
         label="Which warp"
-        value={numberValue(view.armed === 'stairway' ? view.armedStairway : (note?.stairway ?? 0))}
+        value={numberValue(note?.stairway ?? 0)}
         options={WARPS}
         onChange={(value) => actions.pickStairway(Number(value) || 0)}
       />
@@ -410,12 +396,12 @@ function WarpRows({ view, note, actions }: MarkRowsProps) {
   );
 }
 
-function SecretRows({ view, note, actions }: MarkRowsProps) {
+function SecretRows({ note, actions }: MarkRowsProps) {
   return (
     <Row label="Size">
       <Numbers
         label="Secret size"
-        value={view.armed === 'rupeeSecret' ? view.armedSecret : (note?.secret ?? '')}
+        value={note?.secret ?? ''}
         options={SIZES}
         onChange={(value) => actions.pickSecret(value as SecretSize)}
       />
