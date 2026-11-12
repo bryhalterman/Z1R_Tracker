@@ -230,13 +230,20 @@ test('an overworld screen with an item but no named spot fills nothing', () => {
   assert.deepEqual(derived.overworldOverflow, []);
 });
 
-test('a second screen naming the same spot is shown as overworld overflow', () => {
+test('a second screen naming the same spot, from an older save, is shown as overworld overflow', () => {
+  // The reducer moves a spot rather than letting two screens hold it, so this
+  // shape only arrives in a save written before it did.
   let state = createInitialState();
   for (const [screen, item] of [
     ['E9', 'bow'],
     ['B2', 'raft'],
   ] as const) {
-    state = reduce(state, { type: 'setScreenNote', screen, patch: { spot: 'ow.armos', item } });
+    const placed = reduce(createInitialState(), {
+      type: 'setScreenNote',
+      screen,
+      patch: { spot: 'ow.armos', item },
+    });
+    state = { ...state, screenNotes: { ...state.screenNotes, ...placed.screenNotes } };
   }
   const derived = deriveItemLocations(state);
   // B2 comes first in grid order, so it holds the spot.

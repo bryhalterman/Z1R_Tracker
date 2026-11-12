@@ -300,29 +300,6 @@ function emptyDungeon(): DungeonState {
  * Returns `notes` itself when the stored entry would not change, so a caller
  * can tell a no-op from a write.
  */
-/**
- * Takes a once-only marker off every screen but `keep`: there is one Level 3
- * and one stairway 2, so marking one anew means the old spot was wrong, and
- * the marker moves rather than duplicating. Edits `marks` and `notes` in
- * place and returns the notes it took the marker from.
- */
-function moveUniqueMarker(
-  notes: Record<string, ScreenNote>,
-  marks: Record<string, MarkKind>,
-  keep: string,
-  field: 'dungeon' | 'stairway',
-  value: number,
-): ScreenNote[] {
-  const moved: ScreenNote[] = [];
-  for (const [screen, note] of Object.entries(notes)) {
-    if (screen === keep || note[field] !== value) continue;
-    moved.push(note);
-    delete notes[screen];
-    delete marks[screen];
-  }
-  return moved;
-}
-
 function pruneNote(
   notes: Record<string, ScreenNote>,
   marks: Record<string, MarkKind>,
@@ -440,6 +417,46 @@ function writeMark(state: TrackerState, screen: string, mark: MarkKind): Partial
 }
 
 /**
+ * Takes a once-only marker off every screen but `keep`: there is one Level 3,
+ * one stairway 2 and one White Sword Cave, so marking one anew means the old
+ * screen was wrong, and the marker moves rather than duplicating. The old
+ * screen is cleared entirely, mark and note. Edits `marks` and `notes` in
+ * place and returns the notes it took the marker from.
+ */
+function moveUniqueMarker(
+  notes: Record<string, ScreenNote>,
+  marks: Record<string, MarkKind>,
+  keep: string,
+  field: 'dungeon' | 'stairway' | 'spot',
+  value: number | string,
+): ScreenNote[] {
+  const moved: ScreenNote[] = [];
+  for (const [screen, note] of Object.entries(notes)) {
+    if (screen === keep || note[field] !== value) continue;
+    moved.push(note);
+    delete notes[screen];
+    delete marks[screen];
+  }
+  return moved;
+}
+
+/** A patched note's numbers and size, read into the values that exist. Edits `next` in place. */
+function coerceNoteFields(next: ScreenNote): ScreenNote {
+  if (typeof next.dungeon === 'number') {
+    // 0 means "found but not yet identified", which is a real state.
+    next.dungeon = clampWhole(next.dungeon, 9);
+  }
+  if (typeof next.stairway === 'number') {
+    // 0 is "no number yet"; the UI places stairways through placeStairway,
+    // which is what keeps the numbers unique.
+    next.stairway = clampWhole(next.stairway, OVERWORLD_STAIRWAY_COUNT);
+  }
+  // An unknown size reads as unknown rather than refusing the whole patch.
+  if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
+  return next;
+}
+
+/**
  * Apply a patch to one screen's note, for `setScreenNote` and `markScreen`.
  *
  * Null when the stored note and the inventory come out unchanged, so neither
@@ -452,18 +469,7 @@ function editScreenNote(
   patch: Partial<ScreenNote>,
 ): Partial<TrackerState> | null {
   const current = { ...emptyNote(), ...state.screenNotes[screen] };
-  const next = { ...current, ...patch };
-  if (typeof next.dungeon === 'number') {
-    // 0 means "found but not yet identified", which is a real state.
-    next.dungeon = clampWhole(next.dungeon, 9);
-  }
-  if (typeof next.stairway === 'number') {
-    // 0 is "no number yet"; the UI places stairways through placeStairway,
-    // which is what keeps the numbers unique.
-    next.stairway = clampWhole(next.stairway, OVERWORLD_STAIRWAY_COUNT);
-  }
-  // An unknown size reads as unknown rather than refusing the whole patch.
-  if (!SECRET_SIZES_BY_ID.has(next.secret)) next.secret = '';
+  const next = coerceNoteFields({ ...current, ...patch });
   // The coast spot belongs to its screen: set there by the item, refused
   // anywhere else.
   next.spot = conformSpot(screen, next.spot, next.item, state.seed.mirroredOverworld);
@@ -472,10 +478,36 @@ function editScreenNote(
   const requested = patch.collected === undefined ? undefined : patch.collected === true;
   const settled = settleCollected(current, next.item, requested);
   next.collected = settled.collected;
-  const screenNotes = pruneNote(state.screenNotes, state.marks, screen, next);
+  const moved = claimSpot(state, screen, patch, next.spot);
+  const screenNotes = pruneNote(moved?.screenNotes ?? state.screenNotes, state.marks, screen, next);
   const items = settled.picked ? grantPoolEntry(state.items, next.item) : state.items;
-  if (sameNote(screenNotes[screen], state.screenNotes[screen]) && items === state.items) return null;
-  return items === state.items ? { screenNotes } : { screenNotes, items };
+  if (!moved && sameNote(screenNotes[screen], state.screenNotes[screen]) && items === state.items)
+    return null;
+  return {
+    screenNotes,
+    ...(moved ? { marks: moved.marks } : {}),
+    ...(items === state.items ? {} : { items }),
+  };
+}
+
+/**
+ * A named spot is one place on the map. Setting it on `screen` clears any
+ * other screen holding it, the way a level number moves — including when the
+ * patch names the spot this screen already has, so picking it again settles
+ * two screens an older save left claiming it. Null when no other screen held
+ * it, or the patch did not set a spot.
+ */
+function claimSpot(
+  state: TrackerState,
+  screen: string,
+  patch: Partial<ScreenNote>,
+  spot: string,
+): { screenNotes: Record<string, ScreenNote>; marks: Record<string, MarkKind> } | null {
+  if (patch.spot === undefined || !spot) return null;
+  const screenNotes = { ...state.screenNotes };
+  const marks = { ...state.marks };
+  const moved = moveUniqueMarker(screenNotes, marks, screen, 'spot', spot);
+  return moved.length ? { screenNotes, marks } : null;
 }
 
 export function createInitialState(now = Date.now()): TrackerState {

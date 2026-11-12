@@ -234,6 +234,7 @@ or select an Item screen and use the toolbar:
 - **Item spot** names which of the three shuffled spots the screen is:
   White Sword Cave, Armos, or Coast.
   An unnamed spot keeps the item on the map but fills no location slot.
+  Each spot is one place, so naming it on a screen clears any other screen that had it.
 - **Item** sets which item is there.
 - **Collected** marks the item picked up and marks it held in the palette.
   Turning it back off leaves the item held.

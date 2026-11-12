@@ -742,3 +742,51 @@ test('a price is refused for stock the shop does not carry', () => {
   // The same price again is not an edit.
   assert.equal(reduce(state, { type: 'setShopPrice', screen: 'C5', stock: 'bomb', price: 20 }), state);
 });
+
+test('setting a named spot clears any other screen that held it', () => {
+  let state = reduce(createInitialState(), {
+    type: 'markScreen',
+    screen: 'A2',
+    mark: 'item',
+    patch: { spot: 'ow.whiteSword', item: 'book' },
+  });
+  state = reduce(state, {
+    type: 'markScreen',
+    screen: 'C13',
+    mark: 'item',
+    patch: { spot: 'ow.whiteSword', item: 'redCandle' },
+  });
+  assert.equal(state.screenNotes['A2'], undefined);
+  assert.equal(state.marks['A2'], undefined);
+  assert.equal(state.screenNotes['C13']?.spot, 'ow.whiteSword');
+  assert.equal(state.marks['C13'], 'item');
+});
+
+test('picking a screen’s own spot again settles two screens an older save left holding it', () => {
+  const base = createInitialState();
+  const note = { ...base.screenNotes['A2'], dungeon: 0, stairway: 0, shop: [], shopPrices: {}, blocks: [] };
+  const state: TrackerState = {
+    ...base,
+    marks: { A2: 'item', C13: 'item' },
+    screenNotes: {
+      A2: { ...note, spot: 'ow.whiteSword', item: 'book', collected: false, secret: '' },
+      C13: { ...note, spot: 'ow.whiteSword', item: 'redCandle', collected: false, secret: '' },
+    },
+  };
+  const next = reduce(state, { type: 'setScreenNote', screen: 'C13', patch: { spot: 'ow.whiteSword' } });
+  assert.equal(next.screenNotes['A2'], undefined);
+  assert.equal(next.marks['A2'], undefined);
+  assert.equal(next.screenNotes['C13']?.item, 'redCandle');
+});
+
+test('an edit that does not set the spot leaves other screens alone', () => {
+  let state = reduce(createInitialState(), {
+    type: 'markScreen',
+    screen: 'A2',
+    mark: 'item',
+    patch: { spot: 'ow.armos', item: 'book' },
+  });
+  const before = state.screenNotes['A2'];
+  state = reduce(state, { type: 'markScreen', screen: 'C13', mark: 'item', patch: { item: 'redCandle' } });
+  assert.equal(state.screenNotes['A2'], before);
+});
